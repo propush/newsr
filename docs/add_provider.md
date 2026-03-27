@@ -9,6 +9,7 @@ The current registry already ships with multiple built-in providers:
 - `BBCNewsProvider`
 - `TechCrunchProvider`
 - `TheHackerNewsProvider`
+- `ArsTechnicaProvider`
 
 That means the surrounding architecture is already multi-provider, and new provider work should fit into the existing generic paths rather than adding special cases.
 
@@ -27,6 +28,7 @@ Current built-ins show the intended range of provider behavior:
 - `BBC News` uses live category discovery and merges discovered categories with its built-in base catalog.
 - `TechCrunch` currently returns a static built-in topic catalog.
 - `The Hacker News` currently returns a static built-in section catalog.
+- `Ars Technica` currently returns a static built-in mixed catalog with a catch-all `latest` feed plus section targets.
 
 Provider state lives in these SQLite tables:
 
