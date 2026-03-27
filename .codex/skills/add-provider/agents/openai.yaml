@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Provider"
+  short_description: "Add a NewsR source provider safely"
+  default_prompt: "Use $add-provider to add a new NewsR provider for https://example.com."

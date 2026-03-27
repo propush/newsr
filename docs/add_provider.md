@@ -2,6 +2,8 @@
 
 NewsR already has a generic provider-backed source model. This guide explains how to add another provider without introducing provider-specific behavior into the pipeline, storage layer, or source manager UI.
 
+Repo-local automation for this workflow lives in `.codex/skills/add-provider/SKILL.md`. That skill starts by requesting the provider URL and routes the clarification phase through `$brainstorming` before implementation.
+
 The current registry already ships with multiple built-in providers:
 
 - `BBCNewsProvider`
