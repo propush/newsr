@@ -1,0 +1,1 @@
+"""NewsR package."""

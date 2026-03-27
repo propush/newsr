@@ -1,0 +1,33 @@
+[project]
+name = "newsr"
+version = "0.1.0"
+description = "Local-first BBC news reader with translation and summaries"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "beautifulsoup4>=4.13.0",
+  "Pillow>=12.1.0",
+  "PyYAML>=6.0.2",
+  "textual>=3.1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.0",
+]
+
+[project.scripts]
+newsr = "newsr.app:main"
+
+[build-system]
+requires = ["setuptools>=80", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
