@@ -5,6 +5,7 @@ import webbrowser
 from datetime import UTC, datetime
 from threading import Event
 
+from rich.cells import cell_len
 from textual.color import Color
 from textual.widgets import DataTable
 from textual.widgets import Input
@@ -159,6 +160,13 @@ def provider_rows(app: NewsReaderApp) -> list[list[str]]:
         row = table.get_row_at(row_index)
         rows.append([str(cell) for cell in row])
     return rows
+
+
+def provider_row_index(app: NewsReaderApp, display_name: str) -> int:
+    for row_index, row in enumerate(provider_rows(app)):
+        if len(row) > 1 and row[1] == display_name:
+            return row_index
+    raise AssertionError(f"provider row not found for {display_name}")
 
 
 def target_list(app: NewsReaderApp) -> DataTable:
@@ -371,12 +379,13 @@ class FakeSourceProvider:
 
 
 class BusyStatusPipeline:
-    def __init__(self) -> None:
+    def __init__(self, status_message: str = "summarizing world-1, done 0 of 1") -> None:
         self.started = Event()
         self.release_refresh = Event()
+        self.status_message = status_message
 
     def refresh(self, on_status, on_article_ready, cancellation=None) -> None:  # type: ignore[no-untyped-def]
-        on_status("summarizing world-1, done 0 of 1")
+        on_status(self.status_message)
         self.started.set()
         self.release_refresh.wait(timeout=5)
         on_status("ready")
@@ -444,6 +453,44 @@ def test_ui_renders_cached_article(app_config, tmp_path, article_content) -> Non
             assert header_widget.border_subtitle is None
             assert "Translated text" in body
             assert url_source(app) == f"URL: {article_content.url}"
+
+    asyncio.run(runner())
+
+
+def test_ui_truncates_long_article_url_in_middle_to_fit_line(app_config, tmp_path, article_content) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    long_url = (
+        "https://example.com/very/long/path/"
+        "with-many-segments/and-even-more-detail/"
+        "that-keeps-going/until-it-would-overflow/final-segment"
+    )
+    app.storage.upsert_article_source(
+        article_content.__class__(
+            article_id=article_content.article_id,
+            provider_id=article_content.provider_id,
+            provider_article_id=article_content.provider_article_id,
+            url=long_url,
+            category=article_content.category,
+            title=article_content.title,
+            author=article_content.author,
+            published_at=article_content.published_at,
+            body=article_content.body,
+        )
+    )
+    app.storage.update_translation(
+        article_content.article_id, "Translated title", "Translated text", "done"
+    )
+
+    async def runner() -> None:
+        async with app.run_test(size=(50, 20)) as pilot:
+            await pilot.pause()
+            article_url = app.query_one("#article-url", Static)
+            rendered = str(article_url.content)
+            assert rendered.startswith("URL: https://")
+            assert rendered.endswith("/final-segment")
+            assert "…" in rendered
+            assert cell_len(rendered) <= article_url.size.width
 
     asyncio.run(runner())
 
@@ -2370,6 +2417,37 @@ def test_ui_shows_status_loading_indicator_during_refresh_work(app_config, tmp_p
     asyncio.run(runner())
 
 
+def test_ui_truncates_long_refresh_status_to_keep_progress_visible(app_config, tmp_path) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    pipeline = BusyStatusPipeline(
+        "summarizing provider:section:" + ("very-long-article-id-" * 5) + ", done 12 of 123"
+    )
+    app.pipeline = pipeline  # type: ignore[assignment]
+
+    async def runner() -> None:
+        async with app.run_test(size=(44, 20)) as pilot:
+            for _ in range(20):
+                await pilot.pause()
+                if pipeline.started.is_set():
+                    break
+
+            assert pipeline.started.is_set()
+            status_widget = app.query_one("#status", Static)
+            status_text = str(status_widget.content)
+            assert "done 12 of 123" in status_text
+            assert "…" in status_text
+            assert cell_len(status_text) <= status_widget.size.width
+
+            pipeline.release_refresh.set()
+            for _ in range(20):
+                await pilot.pause()
+                if str(app.query_one("#status", Static).content) == "ready":
+                    break
+
+    asyncio.run(runner())
+
+
 def test_ui_pressing_q_exits_without_waiting_for_refresh_shutdown(app_config, tmp_path) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
     app = NewsReaderApp(app_config, storage_path)
@@ -2804,15 +2882,26 @@ def test_ui_source_manager_loads_current_provider_and_targets(app_config, tmp_pa
                     break
             else:
                 raise AssertionError("source manager did not finish loading")
-            assert provider_rows(app)[0][:2] == ["[x]", "BBC News"]
-            assert provider_rows(app)[1][:2] == ["[ ]", "TechCrunch"]
-            assert provider_rows(app)[2][:2] == ["[ ]", "The Hacker News"]
-            assert target_rows(app)[:2] == [
+            provider_statuses = {
+                row[1]: row[0]
+                for row in provider_rows(app)
+            }
+            assert provider_statuses["BBC News"] == "[x]"
+            assert provider_statuses["TechCrunch"] == "[ ]"
+            assert provider_statuses["The Hacker News"] == "[ ]"
+            assert provider_statuses["Ars Technica"] == "[ ]"
+            assert len(provider_statuses) == len(app.storage.list_providers())
+
+            provider_list(app).move_cursor(row=provider_row_index(app, "BBC News"), column=0, animate=False)
+            await pilot.pause()
+            assert target_rows(app)[:4] == [
                 ["[x]", "World"],
                 ["[x]", "Technology"],
+                ["[x]", "Business"],
+                ["[x]", "Entertainment And Arts"],
             ]
             status_text = source_status_text(app)
-            assert "Loaded 3 providers." in status_text
+            assert f"Loaded {len(app.storage.list_providers())} providers." in status_text
             assert "Enabled 1." in status_text
 
     asyncio.run(runner())
@@ -2852,6 +2941,8 @@ def test_ui_source_manager_refreshes_provider_catalog(app_config, tmp_path) -> N
                     break
             else:
                 raise AssertionError("source manager did not finish loading")
+            provider_list(app).move_cursor(row=provider_row_index(app, "BBC News"), column=0, animate=False)
+            await pilot.pause()
             assert app.providers["bbc"].calls == 1
             assert [row[1] for row in target_rows(app)] == ["Science", "Culture"]
 
@@ -2881,6 +2972,8 @@ def test_ui_source_manager_save_persists_selection_and_starts_refresh(app_config
             else:
                 raise AssertionError("source manager did not finish loading")
             assert screen is not None
+            provider_list(app).move_cursor(row=provider_row_index(app, "BBC News"), column=0, animate=False)
+            await pilot.pause()
             app._start_refresh = original_start_refresh  # type: ignore[method-assign]
             screen.action_toggle_item()
             screen.action_save_selection()
@@ -2920,6 +3013,8 @@ def test_ui_source_manager_save_defers_when_refresh_running(app_config, tmp_path
                     break
             else:
                 raise AssertionError("source manager did not finish loading")
+            provider_list(app).move_cursor(row=provider_row_index(app, "BBC News"), column=0, animate=False)
+            await pilot.pause()
             await pilot.press("tab", "space")
             await pilot.press("a")
             await pilot.pause()

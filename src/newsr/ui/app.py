@@ -273,9 +273,9 @@ class NewsReaderApp(App[None]):
             header.border_subtitle = None
             header.update(self._article_header(article))
             body.update(self._article_text(article))
-            article_url.update(self._article_url_text(article))
-        status.update(self.status_text)
+            article_url.update(self._article_url_text(article, article_url.size.width))
         status_indicator.display = self._status_busy
+        status.update(self._visible_status_text(self.size.width))
 
     @property
     def current_article(self) -> ArticleRecord | None:
@@ -666,6 +666,32 @@ class NewsReaderApp(App[None]):
         gap = max(minimum_gap, available - cell_len(left) - cell_len(right))
         return f"{left}{'━' * gap}{right}"
 
+    def _visible_status_text(self, viewport_width: int) -> str:
+        if viewport_width <= 0:
+            return self.status_text
+        status_bar_padding = 2
+        busy_indicator_width = 4 if self._status_busy else 0
+        available = max(1, viewport_width - status_bar_padding - busy_indicator_width)
+        return self._format_status_text(self.status_text, available)
+
+    @classmethod
+    def _format_status_text(cls, value: str, max_cells: int) -> str:
+        if max_cells <= 0 or cell_len(value) <= max_cells:
+            return value
+        progress_marker = ", done "
+        progress_index = value.rfind(progress_marker)
+        if progress_index == -1:
+            return cls._truncate_middle_cells(value, max_cells)
+
+        progress = value[progress_index + 2 :]
+        separator = "… "
+        if cell_len(progress) + cell_len(separator) >= max_cells:
+            return cls._truncate_cells(progress, max_cells)
+
+        prefix_width = max_cells - cell_len(progress) - cell_len(separator)
+        prefix = cls._fit_cells(value[:progress_index], prefix_width)
+        return f"{prefix}{separator}{progress}"
+
     @staticmethod
     def _truncate_cells(text: str, max_cells: int) -> str:
         if max_cells <= 0:
@@ -674,12 +700,35 @@ class NewsReaderApp(App[None]):
             return text
         if max_cells == 1:
             return "…"
-        truncated = ""
-        for character in text:
-            if cell_len(truncated + character + "…") > max_cells:
+        return f"{NewsReaderApp._fit_cells(text, max_cells - 1)}…"
+
+    @classmethod
+    def _truncate_middle_cells(cls, text: str, max_cells: int) -> str:
+        if max_cells <= 0:
+            return ""
+        if cell_len(text) <= max_cells:
+            return text
+        if max_cells == 1:
+            return "…"
+        prefix_width = max(1, (max_cells - 1) // 2)
+        suffix_width = max(1, max_cells - prefix_width - 1)
+        prefix = cls._fit_cells(text, prefix_width)
+        suffix = cls._fit_cells(text, suffix_width, from_end=True)
+        return f"{prefix}…{suffix}"
+
+    @staticmethod
+    def _fit_cells(text: str, max_cells: int, *, from_end: bool = False) -> str:
+        if max_cells <= 0:
+            return ""
+        if cell_len(text) <= max_cells:
+            return text
+        fitted = ""
+        characters = reversed(text) if from_end else text
+        for character in characters:
+            if cell_len(character + fitted if from_end else fitted + character) > max_cells:
                 break
-            truncated += character
-        return f"{truncated}…"
+            fitted = character + fitted if from_end else fitted + character
+        return fitted
 
     def _article_source_label(self, article: ArticleRecord) -> str | None:
         author = article.author.strip() if article.author and article.author.strip() else None
@@ -700,9 +749,12 @@ class NewsReaderApp(App[None]):
             for provider in self.storage.list_providers()
         }
 
-    @staticmethod
-    def _article_url_text(article: ArticleRecord) -> str:
-        return f"URL: {article.url}"
+    @classmethod
+    def _article_url_text(cls, article: ArticleRecord, width: int | None = None) -> str:
+        value = f"URL: {article.url}"
+        if width is None or width <= 0:
+            return value
+        return cls._truncate_middle_cells(value, width)
 
     @staticmethod
     def _format_article_date(article: ArticleRecord) -> str:
