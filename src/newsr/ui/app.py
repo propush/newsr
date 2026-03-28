@@ -184,6 +184,10 @@ class NewsReaderApp(App[None]):
         self._open_link_confirm_screen: OpenLinkConfirmScreen | None = None
         self._pending_open_link: tuple[str, str] | None = None
         self.reader_state = self.storage.load_reader_state()
+        self._rendered_header_text: str | None = None
+        self._rendered_body_text: str | None = None
+        self._rendered_article_url: str | None = None
+        self._rendered_status_text: str | None = None
         if self.reader_state.theme_name and self.get_theme(self.reader_state.theme_name) is not None:
             self._restoring_theme = True
             try:
@@ -205,11 +209,21 @@ class NewsReaderApp(App[None]):
         yield Footer()
 
     async def on_mount(self) -> None:
+        # Force synchronized output so frame updates are atomic on the terminal
+        # side.  Without this, terminals that fail DEC-2026 detection (common
+        # over SSH) display partial frames, causing border artifacts.
+        self._sync_available = True
         self.load_articles()
+        self.call_after_refresh(self.refresh_view)
         self._start_refresh()
 
     def on_resize(self) -> None:
-        self.refresh_view()
+        self._invalidate_render_cache()
+
+    def _invalidate_render_cache(self) -> None:
+        """Clear width-dependent cached text so the next refresh_view picks up new sizes."""
+        self._rendered_article_url = None
+        self._rendered_status_text = None
 
     def _bootstrap_provider_state(self) -> None:
         provider_records = [
@@ -263,19 +277,32 @@ class NewsReaderApp(App[None]):
             return
         article = self.current_article
         if article is None:
-            header.border_title = None
-            header.border_subtitle = None
-            header.update("No cached articles")
-            body.update("Press D to fetch articles.")
-            article_url.update("")
+            border_title = None
+            header_text = "No cached articles"
+            body_text = "Press D to fetch articles."
+            article_url_text = ""
         else:
-            header.border_title = self._article_frame_title(article, header.size.width)
-            header.border_subtitle = None
-            header.update(self._article_header(article))
-            body.update(self._article_text(article))
-            article_url.update(self._article_url_text(article, article_url.size.width))
-        status_indicator.display = self._status_busy
-        status.update(self._visible_status_text(self.size.width))
+            border_title = self._article_frame_title(article, header.size.width)
+            header_text = self._article_header(article)
+            body_text = self._article_text(article)
+            article_url_text = self._article_url_text(article, article_url.size.width)
+        if header.border_title != border_title:
+            header.border_title = border_title
+        if self._rendered_header_text != header_text:
+            header.update(header_text)
+            self._rendered_header_text = header_text
+        if self._rendered_body_text != body_text:
+            body.update(body_text)
+            self._rendered_body_text = body_text
+        if self._rendered_article_url != article_url_text:
+            article_url.update(article_url_text)
+            self._rendered_article_url = article_url_text
+        if status_indicator.display != self._status_busy:
+            status_indicator.display = self._status_busy
+        status_text = self._visible_status_text(self.size.width)
+        if self._rendered_status_text != status_text:
+            status.update(status_text)
+            self._rendered_status_text = status_text
 
     @property
     def current_article(self) -> ArticleRecord | None:

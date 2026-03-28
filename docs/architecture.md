@@ -37,7 +37,7 @@ Provider catalogs are not uniform:
 3. Bootstrap syncs provider rows for all built-in providers, enables `bbc` by default, and seeds each provider's initial selected targets from `default_targets()`.
 4. Startup prunes expired articles, restores saved reader state, loads cached articles, and shows them immediately when available.
 5. The app starts a background refresh on launch. The refresh pipeline walks enabled providers and their selected targets from SQLite, fetches candidates, skips cached articles, extracts article bodies, stores source content, translates them through the configured LLM endpoint, and then generates summaries.
-6. The UI refreshes incrementally as translated articles and summaries become available.
+6. The UI refreshes incrementally as translated articles and summaries become available. Status updates and terminal resizes only recompute width-sensitive chrome such as frame titles, URLs, and the status line; the main article markdown is only replaced when the article content actually changes.
 7. The source manager can refresh a provider catalog through `discover_targets()`, persist the replacement target list, and preserve still-valid selections.
 8. Reader state such as the current article, view mode, scroll offset, and selected theme is persisted back to SQLite.
 9. "More info", article Q&A, and export actions run outside the refresh pipeline but reuse the same stored article content and configured LLM endpoint.

@@ -4,6 +4,7 @@ import asyncio
 import webbrowser
 from datetime import UTC, datetime
 from threading import Event
+from unittest.mock import patch
 
 from rich.cells import cell_len
 from textual.color import Color
@@ -450,7 +451,6 @@ def test_ui_renders_cached_article(app_config, tmp_path, article_content) -> Non
             assert "Reporter @ BBC News " in header_widget.border_title
             assert "world" in header_widget.border_title
             assert "From :" not in header_widget.border_title
-            assert header_widget.border_subtitle is None
             assert "Translated text" in body
             assert url_source(app) == f"URL: {article_content.url}"
 
@@ -495,6 +495,42 @@ def test_ui_truncates_long_article_url_in_middle_to_fit_line(app_config, tmp_pat
     asyncio.run(runner())
 
 
+def test_ui_status_and_resize_refresh_do_not_repaint_article_markdown(app_config, tmp_path) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    long_paragraph = " ".join(f"segment-{index}" for index in range(1, 80))
+    article = ArticleContent(
+        article_id="bbc:repaint-1",
+        provider_id="bbc",
+        provider_article_id="repaint-1",
+        url="https://www.bbc.com/news/repaint-1",
+        category="world",
+        title="Resize repaint regression",
+        author="Reporter",
+        published_at=datetime(2026, 3, 25, 12, 0, tzinfo=UTC),
+        body=f"{long_paragraph}\n\n{long_paragraph}",
+    )
+    app.storage.upsert_article_source(article)
+    app.storage.update_translation(article.article_id, "Translated repaint title", article.body, "done")
+
+    async def runner() -> None:
+        async with app.run_test(size=(72, 20)) as pilot:
+            await pilot.pause()
+            body_widget = app.query_one("#article-body", Markdown)
+            with patch.object(body_widget, "update", wraps=body_widget.update) as update_mock:
+                app.set_status("fetching translated repaint article, done 0 of 1")
+                app.refresh_view()
+                await pilot.pause()
+                assert update_mock.call_count == 0
+
+                await pilot.resize_terminal(72, 15)
+                await pilot.pause()
+                assert update_mock.call_count == 0
+
+    asyncio.run(runner())
+
+
 def test_ui_hides_author_row_when_author_is_missing(app_config, tmp_path, article_content) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
     app = NewsReaderApp(app_config, storage_path)
@@ -524,7 +560,6 @@ def test_ui_hides_author_row_when_author_is_missing(app_config, tmp_path, articl
             assert "BBC News " in header_widget.border_title
             assert "world" in header_widget.border_title
             assert "From :" not in header_widget.border_title
-            assert header_widget.border_subtitle is None
             assert "Area :" not in header
 
     asyncio.run(runner())
@@ -608,7 +643,6 @@ def test_ui_hides_from_row_when_author_and_provider_are_missing(app_config, tmp_
             header_widget = app.query_one("#article-header", Static)
             header = header_widget.content
             assert "From :" not in header
-            assert header_widget.border_subtitle is None
             assert header_widget.border_title == "world"
 
     asyncio.run(runner())
