@@ -7,3 +7,4 @@ cache/
 newsr.yml*
 .DS_Store
 exports/
+.claude
