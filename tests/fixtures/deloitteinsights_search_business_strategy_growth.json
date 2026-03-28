@@ -1,0 +1,59 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "_source": {
+          "title": "The importance of sharing success—and stress—metrics",
+          "page-type": "insights-article",
+          "content-type": "Article",
+          "url": "/us/en/insights/topics/business-strategy-growth/tracking-financial-stress-metrics.html",
+          "date-published": "2026-03-14T00:00:00Z"
+        }
+      },
+      {
+        "_source": {
+          "title": "The importance of sharing success—and stress—metrics",
+          "page-type": "insights-article",
+          "content-type": "Article",
+          "url": "/us/en/insights/topics/business-strategy-growth/tracking-financial-stress-metrics.html?icid=duplicate",
+          "date-published": "2026-03-14T00:00:00Z"
+        }
+      },
+      {
+        "_source": {
+          "title": "The future of engineering in technology",
+          "page-type": "insights-article",
+          "content-type": "Article",
+          "url": "/us/en/insights/topics/technology-management/tech-trends/2024/tech-trends-future-of-engineering-in-technology.html.html",
+          "date-published": "2025-12-15T00:00:00Z"
+        }
+      },
+      {
+        "_source": {
+          "title": "Deloitte Global Economics Research Center",
+          "page-type": "insights-research-hubs",
+          "content-type": "Collection",
+          "url": "/us/en/insights/research-centers/economics.html"
+        }
+      },
+      {
+        "_source": {
+          "title": "Value recovery in the automotive industry",
+          "page-type": "insights-article",
+          "content-type": "Collection",
+          "url": "/us/en/insights/industry/automotive/automotive-industry-value-chain.html",
+          "date-published": "2025-11-20T00:00:00Z"
+        }
+      },
+      {
+        "_source": {
+          "title": "Government transformation and citizen trust",
+          "page-type": "insights-multimedia",
+          "content-type": "Podcast",
+          "url": "/us/en/insights/multimedia/podcasts/government-transformation-tech-citizen-trust.html",
+          "date-published": "2025-10-10T00:00:00Z"
+        }
+      }
+    ]
+  }
+}

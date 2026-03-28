@@ -1,12 +1,12 @@
 # NewsR
 
-NewsR is a local-first terminal news reader with a provider-backed source model. It currently ships with BBC News, TechCrunch, and The Hacker News providers, translates full articles through an OpenAI-compatible LLM endpoint, stores local state in SQLite, and generates summaries for fast reading in a Textual UI.
+NewsR is a local-first terminal news reader with a provider-backed source model. It ships with multiple built-in news providers, translates full articles through an OpenAI-compatible LLM endpoint, stores local state in SQLite, and generates summaries for fast reading in a Textual UI. See [Current Providers](docs/current_providers.md) for the current built-in provider list and bootstrap defaults.
 
 NewsR currently requires Python 3.12 or newer.
 
 ## Features
 
-- built-in support for BBC News, TechCrunch, and The Hacker News
+- built-in support for multiple news providers; see [Current Providers](docs/current_providers.md)
 - background refresh with cached startup content
 - translated full articles plus summaries
 - "more info" and article Q&A overlays backed by DuckDuckGo search and the configured LLM
@@ -169,23 +169,7 @@ Press `C` to open **Manage Sources**.
 - `A` saves the current source configuration.
 - `Esc` closes the overlay without applying changes.
 
-The current build registers three providers:
-
-- `BBC News`
-- `TechCrunch`
-- `The Hacker News`
-
-Bootstrap defaults are:
-
-- `BBC News` is enabled by default with `World`, `Technology`, `Entertainment And Arts`, and `Business` selected.
-- `TechCrunch` is bootstrapped disabled with curated default targets preselected: `Latest`, `Startups`, `Venture`, `AI`, and `Security`.
-- `The Hacker News` is bootstrapped disabled with curated default targets preselected: `Threat Intelligence`, `Cyber Attacks`, `Vulnerabilities`, and `Expert Insights`.
-
-Catalog refresh behavior depends on the provider:
-
-- `BBC News` performs live category discovery and merges discovered categories with the built-in base catalog.
-- `TechCrunch` currently returns its built-in topic catalog.
-- `The Hacker News` currently returns its built-in section catalog.
+For the current built-in provider list, bootstrap defaults, and catalog behavior, see [Current Providers](docs/current_providers.md).
 
 Saving source changes starts a refresh immediately when no refresh is already running. If a refresh is in progress, the new source configuration is saved and picked up by the next refresh cycle.
 

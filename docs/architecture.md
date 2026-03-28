@@ -8,11 +8,8 @@ NewsR is a single-process local terminal application. It runs from the repositor
 - `newsr.config`: config dataclasses plus loading and validation for `newsr.yml`
 - `newsr.domain`: shared article, provider, and reader-state models used across UI, storage, and pipeline code
 - `newsr.providers.base`: `NewsProvider` protocol used by the refresh pipeline
-- `newsr.providers.registry`: built-in provider registration; the current registry ships with BBC News, TechCrunch, The Hacker News, and Ars Technica
-- `newsr.providers.bbc`: BBC target discovery, section parsing, article extraction, and URL helpers
-- `newsr.providers.techcrunch`: TechCrunch topic catalog, section parsing, article extraction, and URL helpers
-- `newsr.providers.thehackernews`: The Hacker News section catalog, section parsing, article extraction, and URL helpers
-- `newsr.providers.arstechnica`: Ars Technica mixed feed/section catalog, section parsing, article extraction, and URL helpers
+- `newsr.providers.registry`: built-in provider registration; see [Current Providers](current_providers.md) for the current built-in news provider set
+- `newsr.providers.<provider_id>`: built-in provider packages for target discovery, section parsing, article extraction, and provider-specific URL helpers; see [Current Providers](current_providers.md)
 - `newsr.providers.llm`: OpenAI-compatible client for headline translation, body translation, summaries, "more info" synthesis, search-query generation, and article Q&A answers
 - `newsr.providers.search`: DuckDuckGo search adapter used by the "more info" and article Q&A flows
 - `newsr.cancellation`: cooperative cancellation primitive (`RefreshCancellation`) and shared `cancellable_read` helper used by all HTTP-fetching providers
@@ -23,12 +20,7 @@ NewsR is a single-process local terminal application. It runs from the repositor
 
 All network-facing providers use `cancellable_read` from `newsr.cancellation` for chunked HTTP reads with cooperative cancellation support.
 
-Provider catalogs are not uniform:
-
-- `BBC News` supports live target discovery and merges discovered categories with its built-in defaults.
-- `TechCrunch` currently exposes a static built-in topic catalog.
-- `The Hacker News` currently exposes a static built-in section catalog.
-- `Ars Technica` currently exposes a static built-in mixed catalog with a catch-all `latest` feed plus section targets.
+Provider catalogs are not uniform. See [Current Providers](current_providers.md) for the current built-in provider list, bootstrap defaults, and catalog behavior.
 
 ## Runtime Flow
 

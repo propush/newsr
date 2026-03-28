@@ -4,12 +4,7 @@ NewsR already has a generic provider-backed source model. This guide explains ho
 
 Repo-local automation for this workflow lives in `.codex/skills/add-provider/SKILL.md`. That skill starts by requesting the provider URL and routes the clarification phase through `$brainstorming` before implementation.
 
-The current registry already ships with multiple built-in providers:
-
-- `BBCNewsProvider`
-- `TechCrunchProvider`
-- `TheHackerNewsProvider`
-- `ArsTechnicaProvider`
+The current registry already ships with multiple built-in providers. See [Current Providers](current_providers.md) for the canonical built-in provider list and documented bootstrap defaults.
 
 That means the surrounding architecture is already multi-provider, and new provider work should fit into the existing generic paths rather than adding special cases.
 
@@ -23,12 +18,7 @@ That means the surrounding architecture is already multi-provider, and new provi
 - `src/newsr/ui/app.py` bootstraps provider state and exposes source-management hooks to the UI.
 - `src/newsr/ui/screens/categories.py` implements the generic source manager.
 
-Current built-ins show the intended range of provider behavior:
-
-- `BBC News` uses live category discovery and merges discovered categories with its built-in base catalog.
-- `TechCrunch` currently returns a static built-in topic catalog.
-- `The Hacker News` currently returns a static built-in section catalog.
-- `Ars Technica` currently returns a static built-in mixed catalog with a catch-all `latest` feed plus section targets.
+Current built-ins show the intended range of provider behavior. See [Current Providers](current_providers.md) for the current built-in provider set and catalog behavior.
 
 Provider state lives in these SQLite tables:
 
@@ -161,11 +151,7 @@ Reason:
 
 - enabling a new provider immediately increases refresh volume and LLM work
 
-Current baseline:
-
-- `bbc` is enabled by default
-- `techcrunch` is bootstrapped disabled
-- `thehackernews` is bootstrapped disabled
+Current baseline: see [Current Providers](current_providers.md).
 
 ### 8. Add tests
 

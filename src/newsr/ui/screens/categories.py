@@ -98,6 +98,7 @@ class SourceSelectionScreen(ModalScreen[None]):
         self._targets_by_provider: dict[str, list[ProviderTarget]] = {}
         self._enabled_by_provider: dict[str, bool] = {}
         self._selected_by_provider: dict[str, set[str]] = {}
+        self._target_provider_id: str | None = None
         self._load_thread: Thread | None = None
         self._refresh_thread: Thread | None = None
 
@@ -301,7 +302,7 @@ class SourceSelectionScreen(ModalScreen[None]):
 
     def _refresh_target_rows(self, provider_id: str) -> None:
         table = self.query_one("#target-list", DataTable)
-        previous_target_key = self._current_target_key(provider_id)
+        previous_target_key = self._current_target_key() if self._target_provider_id == provider_id else None
         table.clear(columns=True)
         marker_width = 3
         marker_render_width = marker_width + (2 * table.cell_padding)
@@ -323,6 +324,7 @@ class SourceSelectionScreen(ModalScreen[None]):
                     break
         if table.row_count:
             table.move_cursor(row=cursor_row, column=0, animate=False, scroll=True)
+        self._target_provider_id = provider_id
         self._update_status_counts()
 
     def _move_provider_cursor(self, provider_id: str | None) -> None:
@@ -359,9 +361,17 @@ class SourceSelectionScreen(ModalScreen[None]):
         provider = self._current_provider()
         return provider.provider_id if provider is not None else None
 
-    def _current_target_key(self, provider_id: str) -> str | None:
-        table = self.query_one("#target-list", DataTable)
-        targets = self._targets_by_provider.get(provider_id, [])
-        if not targets or not table.is_valid_row_index(table.cursor_row):
+    def _current_target_key(self) -> str | None:
+        if self._target_provider_id is None:
             return None
-        return targets[table.cursor_row].target_key
+        table = self.query_one("#target-list", DataTable)
+        targets = self._targets_by_provider.get(self._target_provider_id, [])
+        cursor_row = table.cursor_row
+        if (
+            not targets
+            or cursor_row < 0
+            or cursor_row >= len(targets)
+            or not table.is_valid_row_index(cursor_row)
+        ):
+            return None
+        return targets[cursor_row].target_key

@@ -2941,6 +2941,39 @@ def test_ui_source_manager_loads_current_provider_and_targets(app_config, tmp_pa
     asyncio.run(runner())
 
 
+def test_ui_source_manager_switches_from_long_target_list_to_shorter_one(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+
+            provider_list(app).move_cursor(row=provider_row_index(app, "Ars Technica"), column=0, animate=False)
+            await pilot.pause()
+            target_list(app).move_cursor(row=6, column=0, animate=False)
+            await pilot.pause()
+
+            provider_list(app).move_cursor(row=provider_row_index(app, "BBC News"), column=0, animate=False)
+            await pilot.pause()
+
+            assert target_rows(app)[:4] == [
+                ["[x]", "World"],
+                ["[x]", "Technology"],
+                ["[x]", "Business"],
+                ["[x]", "Entertainment And Arts"],
+            ]
+
+    asyncio.run(runner())
+
+
 def test_ui_source_manager_refreshes_provider_catalog(app_config, tmp_path) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
