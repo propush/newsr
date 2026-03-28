@@ -80,6 +80,33 @@ export:
     assert config.ui.locale == "en"
 
 
+def test_load_config_accepts_russian_ui_locale(tmp_path: Path) -> None:
+    config_path = tmp_path / "newsr.yml"
+    config_path.write_text(
+        """
+articles:
+  fetch: 7
+  store: 14
+llm:
+  url: http://localhost:8081/v1
+  model_translation: translate
+  model_summary: summary
+translation:
+  target_language: Russian
+ui:
+  locale: ru
+export:
+  image:
+    quality: fhd
+""",
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.ui.locale == "ru"
+
+
 def test_load_config_rejects_invalid_article_fetch(tmp_path: Path) -> None:
     config_path = tmp_path / "newsr.yml"
     config_path.write_text(

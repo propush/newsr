@@ -19,6 +19,7 @@ class UILocaleDefinition:
 
 PREDEFINED_UI_LOCALES: Final[tuple[UILocaleDefinition, ...]] = (
     UILocaleDefinition("en", "English", aliases=("english",)),
+    UILocaleDefinition("ru", "Русский", aliases=("russian", "русский")),
 )
 
 
@@ -191,7 +192,165 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "status.synthesizing_results": "asking configured llm to synthesize results...",
         "status.asking_web_search_query": "asking configured llm for web search query...",
         "status.asking_llm_to_answer": "asking configured llm to answer...",
-    }
+    },
+    "ru": {
+        "app.binding.previous": "Назад",
+        "app.binding.next": "Вперёд",
+        "app.binding.up": "Вверх",
+        "app.binding.down": "Вниз",
+        "app.binding.pgup": "PgUp",
+        "app.binding.pgdn": "PgDn",
+        "app.binding.back": "Назад",
+        "app.binding.space": "Space",
+        "app.binding.summary": "Сводка",
+        "app.binding.more_info": "Подробнее",
+        "app.binding.ask": "Спросить",
+        "app.binding.list": "Список",
+        "app.binding.sources": "Источники",
+        "app.binding.export": "Экспорт",
+        "app.binding.open": "Открыть",
+        "app.binding.download": "Загрузить",
+        "app.binding.help": "Справка",
+        "app.binding.quit": "Выход",
+        "app.empty.header": "Нет статей в кеше",
+        "app.empty.body": "Нажмите D, чтобы загрузить статьи.",
+        "app.article.position": "Статья № {current} из {total}",
+        "app.article.date": "Дата : {date}",
+        "app.article.title": "Заголовок: {title}",
+        "app.article.mode": "Режим : {mode}",
+        "app.article.mode.full": "полный",
+        "app.article.mode.summary": "сводка",
+        "app.article.url": "URL: {url}",
+        "app.status.ready": "готово",
+        "app.status.refresh_already_running": "обновление уже запущено",
+        "app.status.fetching_target": "загрузка {provider}: {target}",
+        "app.status.failed_to_fetch_target": "не удалось загрузить {provider}: {target}: {error}",
+        "app.status.extracting_article": "извлечение {article_id}",
+        "app.status.translating_article": "перевод {article_id}, выполнено {done} из {total}",
+        "app.status.summarizing_article": "создание сводки {article_id}, выполнено {done} из {total}",
+        "app.status.browser_open_failed": "не удалось открыть браузер: {error}",
+        "app.status.browser_opened": "статья открыта в браузере",
+        "app.status.browser_not_confirmed": "браузер не подтвердил запрос на открытие",
+        "app.status.no_article_to_export": "нет статьи для экспорта",
+        "app.status.exiting": "Выход...",
+        "app.status.sources_unchanged": "источники не изменились",
+        "app.status.sources_saved_next_refresh": "источники сохранены; следующее обновление применит новые настройки провайдеров",
+        "app.status.sources_saved_refreshing": "источники сохранены; обновляются включённые провайдеры",
+        "help.body": (
+            "Left/Right: предыдущая/следующая статья\n"
+            "Up/Down/PgUp/PgDn/B: прокрутка\n"
+            "Space: страница вниз или следующая статья\n"
+            "S: переключить сводку\n"
+            "M: подробнее\n"
+            "?: спросить о статье\n"
+            "L: список статей\n"
+            "C: источники\n"
+            "E: экспорт текущего вида\n"
+            "O: открыть статью в браузере\n"
+            "D: загрузить новые статьи\n"
+            "Ctrl+P: палитра команд / выбор темы\n"
+            "H: справка\n"
+            "Q: выход"
+        ),
+        "source.binding.close": "Закрыть",
+        "source.binding.pane": "Панель",
+        "source.binding.toggle": "Переключить",
+        "source.binding.refresh": "Обновить",
+        "source.binding.apply": "Применить",
+        "source.header": "Управление источниками",
+        "source.loading.status": "Загрузка провайдеров и целей...",
+        "source.loading.body": "Загрузка источников...",
+        "source.hint": "Tab: сменить панель   Space: переключить   R: обновить каталог   A: применить   Esc: закрыть",
+        "source.status.still_loading": "Источники ещё загружаются.",
+        "source.status.refreshing_catalog": "Обновление каталога {provider}...",
+        "source.status.failed_load": "Не удалось загрузить источники: {error}",
+        "source.status.failed_refresh": "Не удалось обновить источники: {error}",
+        "source.status.refreshed_catalog": "Каталог {provider} обновлён.",
+        "source.status.unable_to_load": "Не удалось загрузить источники.",
+        "source.status.counts": "Загружено провайдеров: {providers}. Включено: {enabled}. Выбрано целей: {selected}.",
+        "source.table.provider": "Провайдер",
+        "source.table.targets": "Цели",
+        "source.table.target": "Цель",
+        "article_qa.binding.close": "Закрыть",
+        "article_qa.binding.next": "Следующий",
+        "article_qa.binding.previous": "Предыдущий",
+        "article_qa.binding.pgup": "PgUp",
+        "article_qa.binding.pgdn": "PgDn",
+        "article_qa.label.sources": "Источники",
+        "article_qa.placeholder": "Спросите что угодно об этой статье",
+        "article_qa.hint": "Enter: спросить/открыть источник   Tab: поле/источники   Esc: закрыть   PgUp/PgDn: прокрутка ответа",
+        "article_qa.header": "Вопросы по статье\nЗаголовок: {title}\nСостояние: {state}",
+        "article_qa.transcript.empty": (
+            "# Вопросы по статье\n\n"
+            "Спросите что угодно об этой статье на любом языке.\n\n"
+            "Ответы используют исходный текст статьи и живые результаты DuckDuckGo.\n\n"
+            "После закрытия окна ничего из этого чата не сохраняется."
+        ),
+        "article_qa.transcript.title": "# Вопросы по статье",
+        "article_qa.transcript.question": "## Вопрос {index}\n\n**Вы:** {question}",
+        "article_qa.transcript.pending": "_Идёт поиск в интернете и подготовка ответа..._",
+        "article_qa.transcript.answer_unavailable": (
+            "### Ответ недоступен\n\n"
+            "Сейчас на этот вопрос нельзя ответить.\n\n"
+            "Ошибка: `{error}`"
+        ),
+        "article_qa.transcript.answer": "### Ответ\n\n{answer}",
+        "article_qa.transcript.no_answer": "_Ответ не получен._",
+        "article_qa.transcript.sources_title": "### Источники",
+        "article_qa.transcript.sources_empty": "### Источники\n\n_Для этого вопроса не найдено публичных результатов поиска._",
+        "more_info.binding.close": "Закрыть",
+        "more_info.binding.refresh": "Обновить",
+        "more_info.binding.previous": "Назад",
+        "more_info.binding.next": "Вперёд",
+        "more_info.binding.back": "Назад",
+        "more_info.binding.space": "Space",
+        "more_info.hint": "Esc: закрыть   Space/B: страница   M: обновить   Left/Right: сменить статью",
+        "more_info.header": "Подробнее\nЗаголовок: {title}\nСостояние: {state}",
+        "more_info.body.unavailable": "# Дополнительная информация недоступна\n\nНе удалось выполнить дополнительный поиск.\n\nОшибка: `{error}`",
+        "more_info.body.no_results": "Для этой статьи пока не найдено дополнительного публичного контекста.",
+        "more_info.body.loading": "# Подробнее\n\nСбор дополнительного контекста для:\n\n**{title}**\n\nТекущий шаг: {stage}",
+        "quick_nav.binding.close": "Закрыть",
+        "quick_nav.header": "Быстрый переход",
+        "quick_nav.empty": "Нет переведённых статей.",
+        "quick_nav.hint": "Up/Down: выбор   Enter: открыть статью   Esc: закрыть",
+        "quick_nav.selection": "Выбрано {current} из {total}",
+        "quick_nav.table.date": "Дата",
+        "quick_nav.table.title": "Заголовок",
+        "quick_nav.table.provider": "Провайдер",
+        "quick_nav.table.category": "Категория",
+        "export.binding.save_png": "Сохранить PNG",
+        "export.binding.copy_png": "Копировать PNG",
+        "export.binding.save_markdown": "Сохранить MD",
+        "export.binding.copy_markdown": "Копировать MD",
+        "export.binding.cancel": "Отмена",
+        "export.header": "Экспорт текущего вида",
+        "export.body": (
+            "Заголовок: {title}\n"
+            "Режим: {mode}\n\n"
+            "1: Сохранить PNG   2: Копировать PNG\n"
+            "3: Сохранить Markdown   4: Копировать Markdown"
+        ),
+        "export.button.save_png": "Сохранить PNG",
+        "export.button.copy_png": "Копировать PNG",
+        "export.button.save_markdown": "Сохранить Markdown",
+        "export.button.copy_markdown": "Копировать Markdown",
+        "export.button.cancel": "Отмена",
+        "open_link.binding.open": "Открыть",
+        "open_link.binding.cancel": "Отмена",
+        "open_link.header": "Открыть ссылку на источник",
+        "open_link.source_link": "Ссылка на источник",
+        "open_link.body": "Открыть этот источник в браузере?\n\nЗаголовок: {title}\nURL: {url}",
+        "open_link.button.open": "Открыть",
+        "open_link.button.cancel": "Отмена",
+        "status.loading": "загрузка...",
+        "status.cached": "в кеше",
+        "status.failed": "ошибка",
+        "status.asking_search_query": "запрос поискового запроса у настроенной llm...",
+        "status.searching_duckduckgo": "поиск в DuckDuckGo...",
+        "status.synthesizing_results": "запрос к настроенной llm для синтеза результатов...",
+        "status.asking_web_search_query": "запрос веб-поискового запроса у настроенной llm...",
+        "status.asking_llm_to_answer": "запрос к настроенной llm для ответа...",
+    },
 }
 
 

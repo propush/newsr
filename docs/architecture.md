@@ -36,7 +36,7 @@ Provider catalogs are not uniform. See [Current Providers](current_providers.md)
 
 ## Local State
 
-- `newsr.yml`: user config for refresh limits, LLM endpoint/model settings, translation language, UI locale, and export quality
+- `newsr.yml`: user config for refresh limits, LLM endpoint/model settings, translation language, UI locale (`en` or `ru`), and export quality
 - `cache/newsr.sqlite3`: provider registry state, discovered targets, selected targets, article source text, translated text, summaries, job state, and saved reader state
 - `cache/newsr-llm.log`: request log for LLM calls
 - `exports/`: saved Markdown and PNG exports

@@ -58,6 +58,26 @@ def test_bootstrap_config_creates_local_config_with_locale_suggestion(tmp_path: 
     assert prompt.prompts[-1] == "Press Enter to continue..."
 
 
+def test_bootstrap_config_accepts_russian_ui_locale_display_name(tmp_path: Path) -> None:
+    config_path = tmp_path / "newsr.yml"
+    prompt = PromptStub(["Русский", "", "", "", "", ""])
+    secret_prompt = PromptStub([])
+    output = StringIO()
+
+    bootstrap_config(
+        config_path,
+        input_func=prompt,
+        secret_input_func=secret_prompt,
+        output=output,
+        locale_name="en_US.UTF-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.ui.locale == "ru"
+    assert "Available UI languages: English, Русский" in output.getvalue()
+
+
 def test_bootstrap_config_creates_cloud_config_and_retries_bad_headers(tmp_path: Path) -> None:
     config_path = tmp_path / "newsr.yml"
     prompt = PromptStub(
@@ -155,3 +175,46 @@ export:
     assert config.ui.locale == "en"
     assert prompt.prompts == ["UI language [English]: "]
     assert "Saved UI language: English" in output.getvalue()
+
+
+def test_ensure_ui_locale_suggests_and_saves_russian_display_name(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "newsr.yml"
+    config_path.write_text(
+        """
+articles:
+  fetch: 5
+  store: 10
+llm:
+  url: http://localhost:8081/v1
+  model_translation: local-translate
+  model_summary: local-translate
+translation:
+  target_language: Russian
+export:
+  image:
+    quality: fhd
+""",
+        encoding="utf-8",
+    )
+    prompt = PromptStub([""])
+    output = StringIO()
+    monkeypatch.setattr(bootstrap_module.sys, "stdin", FakeTerminal(interactive=True))
+    monkeypatch.setattr(bootstrap_module.sys, "stdout", FakeTerminal(interactive=True))
+
+    selected_locale = bootstrap_module.ensure_ui_locale(
+        config_path,
+        input_func=prompt,
+        output=output,
+        locale_name="ru_RU.UTF-8",
+    )
+
+    config = load_config(config_path)
+
+    assert selected_locale == "ru"
+    assert config.ui.locale == "ru"
+    assert prompt.prompts == ["UI language [Русский]: "]
+    assert "Suggested UI language from locale: Русский" in output.getvalue()
+    assert "Saved UI language: Русский" in output.getvalue()
