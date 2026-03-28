@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.binding import Binding
+from textual.binding import Binding, BindingsMap
 from textual.containers import Vertical, VerticalScroll
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import LoadingIndicator, Markdown, Static
+
+from ...ui_text import UILocalizer
 
 
 class MoreInfoScreen(ModalScreen[None]):
@@ -59,21 +61,26 @@ class MoreInfoScreen(ModalScreen[None]):
     }
     """
 
-    BINDINGS = [
-        ("escape", "close_overlay", "Close"),
-        ("m", "refresh_overlay", "Refresh"),
-        ("left", "previous_article", "Previous"),
-        ("right", "next_article", "Next"),
-        Binding("b", "page_up_overlay", "Back", show=False),
-        Binding("space", "page_down_overlay", "Space", show=False),
-    ]
+    BINDINGS = []
 
-    def __init__(self, article_title: str) -> None:
+    def __init__(self, ui: UILocalizer, article_title: str) -> None:
         super().__init__()
+        self._ui = ui
+        self._bindings = BindingsMap(self._build_bindings())
         self.article_title = article_title
         self.loading = True
         self.status_text = "loading..."
         self.body_text = ""
+
+    def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
+        return [
+            ("escape", "close_overlay", self._ui.text("more_info.binding.close")),
+            ("m", "refresh_overlay", self._ui.text("more_info.binding.refresh")),
+            ("left", "previous_article", self._ui.text("more_info.binding.previous")),
+            ("right", "next_article", self._ui.text("more_info.binding.next")),
+            Binding("b", "page_up_overlay", self._ui.text("more_info.binding.back"), show=False),
+            Binding("space", "page_down_overlay", self._ui.text("more_info.binding.space"), show=False),
+        ]
 
     def compose(self) -> ComposeResult:
         with Vertical(id="more-info-shell"):
@@ -81,10 +88,7 @@ class MoreInfoScreen(ModalScreen[None]):
             yield LoadingIndicator(id="more-info-loading")
             with VerticalScroll(id="more-info-pane"):
                 yield Markdown(id="more-info-body")
-            yield Static(
-                "Esc: close   Space/B: page   M: refresh   Left/Right: change article",
-                id="more-info-hint",
-            )
+            yield Static(self._ui.text("more_info.hint"), id="more-info-hint")
 
     def on_mount(self) -> None:
         self.update_header()
@@ -113,7 +117,7 @@ class MoreInfoScreen(ModalScreen[None]):
     def update_header(self) -> None:
         try:
             self.query_one("#more-info-header", Static).update(
-                f"More Info\nTitle: {self.article_title}\nState: {self.status_text}"
+                self._ui.text("more_info.header", title=self.article_title, state=self._ui.status(self.status_text))
             )
         except NoMatches:
             return

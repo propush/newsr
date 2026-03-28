@@ -764,7 +764,8 @@ def test_ui_space_advances_to_next_article_at_bottom(app_config, tmp_path, artic
 
 
 def test_ui_hides_space_hints_from_footer(app_config, tmp_path) -> None:
-    bindings = {binding.key: binding for binding in NewsReaderApp.BINDINGS if hasattr(binding, "key")}
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    bindings = {binding.key: binding for _key, binding in app._bindings}
 
     assert bindings["space"].show is False
     assert bindings["b"].show is False
@@ -2851,6 +2852,16 @@ def test_ui_registers_old_fido_theme(app_config, tmp_path) -> None:
     assert theme.primary == "#d8c24a"
     assert theme.accent == "#c8c8c8"
     assert theme.background == "#000000"
+
+
+def test_ui_keeps_summary_hotkey_fixed_when_localizing_labels(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+
+    summary_bindings = app._bindings.get_bindings_for_key("s")
+
+    assert len(summary_bindings) == 1
+    assert summary_bindings[0].action == "toggle_summary"
+    assert summary_bindings[0].description == "Summary"
 
 
 def test_ui_ignores_invalid_saved_theme(app_config, tmp_path, article_content) -> None:

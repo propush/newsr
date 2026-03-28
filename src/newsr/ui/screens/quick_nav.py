@@ -7,6 +7,7 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable, Static
 
 from ...domain.articles import ArticleRecord
+from ...ui_text import UILocalizer
 
 
 class QuickNavScreen(ModalScreen[None]):
@@ -59,17 +60,18 @@ class QuickNavScreen(ModalScreen[None]):
     }
     """
 
-    BINDINGS = [
-        ("escape", "close_overlay", "Close"),
-    ]
+    BINDINGS = []
 
     def __init__(
         self,
+        ui: UILocalizer,
         articles: list[ArticleRecord],
         current_article_id: str | None,
         provider_display_names: dict[str, str],
     ) -> None:
         super().__init__()
+        self._ui = ui
+        self._bindings.bind("escape", "close_overlay", self._ui.text("quick_nav.binding.close"))
         self._all_articles = articles
         self._current_article_id = current_article_id
         self._provider_display_names = provider_display_names
@@ -77,11 +79,11 @@ class QuickNavScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="quick-nav-shell"):
-            yield Static("Quick Navigation", id="quick-nav-header")
+            yield Static(self._ui.text("quick_nav.header"), id="quick-nav-header")
             yield DataTable(id="quick-nav-table", cursor_type="row")
-            yield Static("No translated articles available.", id="quick-nav-empty")
+            yield Static(self._ui.text("quick_nav.empty"), id="quick-nav-empty")
             yield Static(id="quick-nav-selection")
-            yield Static("Up/Down: select   Enter: open article   Esc: close", id="quick-nav-hint")
+            yield Static(self._ui.text("quick_nav.hint"), id="quick-nav-hint")
 
     def on_mount(self) -> None:
         self._configure_table()
@@ -122,14 +124,16 @@ class QuickNavScreen(ModalScreen[None]):
         category_width = self._category_column_width()
         table.clear(columns=True)
         table.add_column(" ", width=1, key="marker")
-        table.add_column("Date", width=10, key="date")
-        table.add_column("Title", width=title_width, key="title")
-        table.add_column("Provider", width=self._provider_column_width(), key="provider")
-        table.add_column("Category", width=category_width, key="category")
+        table.add_column(self._ui.text("quick_nav.table.date"), width=10, key="date")
+        table.add_column(self._ui.text("quick_nav.table.title"), width=title_width, key="title")
+        table.add_column(self._ui.text("quick_nav.table.provider"), width=self._provider_column_width(), key="provider")
+        table.add_column(self._ui.text("quick_nav.table.category"), width=category_width, key="category")
         if not self._visible_articles:
             table.display = False
             empty.display = True
-            self.query_one("#quick-nav-selection", Static).update("Selected 0 of 0")
+            self.query_one("#quick-nav-selection", Static).update(
+                self._ui.text("quick_nav.selection", current=0, total=0)
+            )
             return
 
         table.display = True
@@ -195,7 +199,9 @@ class QuickNavScreen(ModalScreen[None]):
     def _update_selection_status(self, selected_index: int) -> None:
         selection = self.query_one("#quick-nav-selection", Static)
         if not self._visible_articles:
-            selection.update("Selected 0 of 0")
+            selection.update(self._ui.text("quick_nav.selection", current=0, total=0))
             return
         bounded_index = min(max(selected_index, 0), len(self._visible_articles) - 1)
-        selection.update(f"Selected {bounded_index + 1} of {len(self._visible_articles)}")
+        selection.update(
+            self._ui.text("quick_nav.selection", current=bounded_index + 1, total=len(self._visible_articles))
+        )

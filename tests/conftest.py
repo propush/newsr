@@ -5,7 +5,15 @@ from pathlib import Path
 
 import pytest
 
-from newsr.config import AppConfig, ArticlesConfig, ExportConfig, ExportImageConfig, LLMConfig, TranslationConfig
+from newsr.config import (
+    AppConfig,
+    ArticlesConfig,
+    ExportConfig,
+    ExportImageConfig,
+    LLMConfig,
+    TranslationConfig,
+    UILocaleConfig,
+)
 from newsr.domain import ArticleContent, ProviderRecord, ProviderTarget
 from newsr.storage import NewsStorage
 
@@ -21,6 +29,7 @@ def app_config() -> AppConfig:
             headers={},
         ),
         translation=TranslationConfig(target_language="Russian"),
+        ui=UILocaleConfig(locale="en"),
         export=ExportConfig(image=ExportImageConfig(quality="hd")),
     )
 

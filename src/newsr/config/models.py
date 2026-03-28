@@ -25,6 +25,11 @@ class TranslationConfig:
 
 
 @dataclass(slots=True)
+class UILocaleConfig:
+    locale: str
+
+
+@dataclass(slots=True)
 class ExportImageConfig:
     quality: str
 
@@ -39,4 +44,5 @@ class AppConfig:
     articles: ArticlesConfig
     llm: LLMConfig
     translation: TranslationConfig
+    ui: UILocaleConfig
     export: ExportConfig

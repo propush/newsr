@@ -5,7 +5,16 @@ from typing import Any
 
 import yaml
 
-from .models import AppConfig, ArticlesConfig, ExportConfig, ExportImageConfig, LLMConfig, TranslationConfig
+from ..ui_text import parse_ui_locale
+from .models import (
+    AppConfig,
+    ArticlesConfig,
+    ExportConfig,
+    ExportImageConfig,
+    LLMConfig,
+    TranslationConfig,
+    UILocaleConfig,
+)
 
 
 def load_config(path: Path) -> AppConfig:
@@ -14,6 +23,7 @@ def load_config(path: Path) -> AppConfig:
         articles=_load_articles(raw.get("articles", {})),
         llm=_load_llm(raw.get("llm", {})),
         translation=_load_translation(raw.get("translation", {})),
+        ui=_load_ui(raw.get("ui", {})),
         export=_load_export(raw.get("export", {})),
     )
 
@@ -58,6 +68,13 @@ def _load_translation(raw: dict) -> TranslationConfig:
     if not target_language:
         raise ValueError("translation.target_language is required")
     return TranslationConfig(target_language=target_language)
+
+
+def _load_ui(raw: dict) -> UILocaleConfig:
+    locale = parse_ui_locale(raw.get("locale"))
+    if locale is None:
+        raise ValueError("ui.locale is required")
+    return UILocaleConfig(locale=locale)
 
 
 def _load_export(raw: dict) -> ExportConfig:

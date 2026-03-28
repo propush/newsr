@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.binding import Binding
+from textual.binding import Binding, BindingsMap
 from textual.containers import Vertical, VerticalScroll
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import Input, ListItem, ListView, LoadingIndicator, Markdown, Static
+
+from ...ui_text import UILocalizer
 
 
 class ArticleQuestionScreen(ModalScreen[None]):
@@ -79,20 +81,30 @@ class ArticleQuestionScreen(ModalScreen[None]):
     }
     """
 
-    BINDINGS = [
-        ("escape", "close_overlay", "Close"),
-        Binding("tab", "focus_next_control", "Next", show=False),
-        Binding("shift+tab", "focus_previous_control", "Previous", show=False),
-        ("pageup", "page_up_overlay", "PgUp"),
-        ("pagedown", "page_down_overlay", "PgDn"),
-    ]
+    BINDINGS = []
 
-    def __init__(self, article_title: str) -> None:
+    def __init__(self, ui: UILocalizer, article_title: str) -> None:
         super().__init__()
+        self._ui = ui
+        self._bindings = BindingsMap(self._build_bindings())
         self.article_title = article_title
         self.loading = False
         self.status_text = "ready"
         self.body_text = ""
+
+    def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
+        return [
+            ("escape", "close_overlay", self._ui.text("article_qa.binding.close")),
+            Binding("tab", "focus_next_control", self._ui.text("article_qa.binding.next"), show=False),
+            Binding(
+                "shift+tab",
+                "focus_previous_control",
+                self._ui.text("article_qa.binding.previous"),
+                show=False,
+            ),
+            ("pageup", "page_up_overlay", self._ui.text("article_qa.binding.pgup")),
+            ("pagedown", "page_down_overlay", self._ui.text("article_qa.binding.pgdn")),
+        ]
 
     def compose(self) -> ComposeResult:
         with Vertical(id="article-qa-shell"):
@@ -100,13 +112,10 @@ class ArticleQuestionScreen(ModalScreen[None]):
             yield LoadingIndicator(id="article-qa-loading")
             with VerticalScroll(id="article-qa-pane"):
                 yield Markdown(id="article-qa-body", open_links=False)
-            yield Static("Sources", id="article-qa-sources-label")
+            yield Static(self._ui.text("article_qa.label.sources"), id="article-qa-sources-label")
             yield ListView(id="article-qa-source-list")
-            yield Input(placeholder="Ask anything about this article", id="article-qa-input")
-            yield Static(
-                "Enter: ask/open source   Tab: input/sources   Esc: close   PgUp/PgDn: scroll answer",
-                id="article-qa-hint",
-            )
+            yield Input(placeholder=self._ui.text("article_qa.placeholder"), id="article-qa-input")
+            yield Static(self._ui.text("article_qa.hint"), id="article-qa-hint")
 
     def on_mount(self) -> None:
         self.update_header()
@@ -171,7 +180,7 @@ class ArticleQuestionScreen(ModalScreen[None]):
     def update_header(self) -> None:
         try:
             self.query_one("#article-qa-header", Static).update(
-                f"Ask About This Article\nTitle: {self.article_title}\nState: {self.status_text}"
+                self._ui.text("article_qa.header", title=self.article_title, state=self._ui.status(self.status_text))
             )
         except NoMatches:
             return
@@ -187,7 +196,7 @@ class ArticleQuestionScreen(ModalScreen[None]):
 
     def on_markdown_link_clicked(self, event: Markdown.LinkClicked) -> None:
         event.stop()
-        self.app.request_open_link("Source link", event.href)
+        self.app.request_open_link(self._ui.text("open_link.source_link"), event.href)
 
     def action_focus_next_control(self) -> None:
         try:

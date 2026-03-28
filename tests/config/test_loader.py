@@ -27,6 +27,8 @@ llm:
   model_summary: summary
 translation:
   target_language: Serbian
+ui:
+  locale: en
 export:
   image:
     quality: fhd
@@ -39,6 +41,7 @@ export:
     assert config.articles.fetch == 7
     assert config.articles.store == 14
     assert config.translation.target_language == "Serbian"
+    assert config.ui.locale == "en"
     assert config.export.image.quality == "fhd"
 
 
@@ -59,6 +62,8 @@ llm:
   request_retries: 3
 translation:
   target_language: Serbian
+ui:
+  locale: en
 export:
   image:
     quality: fhd
@@ -72,6 +77,7 @@ export:
     assert config.llm.api_key == "sk-test"
     assert config.llm.headers == {"OpenAI-Organization": "org-test"}
     assert config.llm.request_retries == 3
+    assert config.ui.locale == "en"
 
 
 def test_load_config_rejects_invalid_article_fetch(tmp_path: Path) -> None:
@@ -87,6 +93,8 @@ llm:
   model_summary: summary
 translation:
   target_language: Russian
+ui:
+  locale: en
 export:
   image:
     quality: fhd
@@ -113,6 +121,8 @@ llm:
     Invalid:
 translation:
   target_language: Russian
+ui:
+  locale: en
 export:
   image:
     quality: fhd
@@ -138,6 +148,8 @@ llm:
   request_retries: -1
 translation:
   target_language: Russian
+ui:
+  locale: en
 export:
   image:
     quality: fhd
@@ -162,6 +174,8 @@ llm:
   model_summary: summary
 translation:
   target_language: Russian
+ui:
+  locale: en
 export:
   image:
     quality: ultra
@@ -170,4 +184,28 @@ export:
     )
 
     with pytest.raises(ValueError, match="export.image.quality"):
+        load_config(config_path)
+
+
+def test_load_config_requires_ui_locale(tmp_path: Path) -> None:
+    config_path = tmp_path / "newsr.yml"
+    config_path.write_text(
+        """
+articles:
+  fetch: 5
+  store: 10
+llm:
+  url: http://localhost:8081/v1
+  model_translation: translate
+  model_summary: summary
+translation:
+  target_language: Russian
+export:
+  image:
+    quality: fhd
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="ui.locale"):
         load_config(config_path)

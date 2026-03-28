@@ -11,7 +11,7 @@ from time import monotonic
 from rich.cells import cell_len
 from textual.app import App, ComposeResult
 from textual.app import ScreenStackError
-from textual.binding import Binding
+from textual.binding import Binding, BindingsMap
 from textual.css.query import NoMatches
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Footer, Header, LoadingIndicator, Markdown, Static
@@ -26,6 +26,7 @@ from ..providers.llm.client import OpenAILLMClient
 from ..providers.registry import build_provider_registry
 from ..providers.search.duckduckgo import DuckDuckGoSearchClient, SearchResult, normalize_result_url
 from ..storage.facade import NewsStorage
+from ..ui_text import UILocalizer
 from .screens import (
     ArticleQuestionScreen,
     ExportScreen,
@@ -120,29 +121,19 @@ class NewsReaderApp(App[None]):
     }
     """
 
-    BINDINGS = [
-        ("left", "previous_article", "Previous"),
-        ("right", "next_article", "Next"),
-        ("up", "scroll_up", "Up"),
-        ("down", "scroll_down", "Down"),
-        ("pageup", "page_up", "PgUp"),
-        ("pagedown", "page_down", "PgDn"),
-        Binding("b", "page_up", "Back", show=False),
-        Binding("space", "space_down", "Space", show=False),
-        ("s", "toggle_summary", "Summary"),
-        ("m", "show_or_refresh_more_info", "More Info"),
-        Binding("?", "show_article_qa", "Ask"),
-        ("l", "show_quick_nav", "List"),
-        ("c", "show_source_manager", "Sources"),
-        ("e", "export_current", "Export"),
-        ("o", "open_article", "Open"),
-        ("d", "download_articles", "Download"),
-        ("h", "show_help", "Help"),
-        ("q", "quit_reader", "Quit"),
-    ]
+    BINDINGS = []
 
     def __init__(self, config: AppConfig, storage_path: Path, config_path: Path | None = None) -> None:
         super().__init__()
+        self.ui = UILocalizer(config.ui.locale)
+        palette_bindings = [
+            binding
+            for _key, binding in self._bindings
+            if binding.system
+        ]
+        self._bindings = BindingsMap(self._build_bindings())
+        for binding in palette_bindings:
+            self._bindings._add_binding(binding)
         self.register_theme(OLD_FIDO_THEME)
         self.config = config
         self.config_path = config_path or Path("newsr.yml")
@@ -157,7 +148,7 @@ class NewsReaderApp(App[None]):
         self.export_service = ExportService()
         self.articles: list[ArticleRecord] = []
         self.current_index = 0
-        self.status_text = "ready"
+        self.status_text = self.ui.text("app.status.ready")
         self._status_busy = False
         self._status_override_until = 0.0
         self.refresh_in_progress = False
@@ -194,6 +185,28 @@ class NewsReaderApp(App[None]):
                 self.theme = self.reader_state.theme_name
             finally:
                 self._restoring_theme = False
+
+    def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
+        return [
+            ("left", "previous_article", self.ui.text("app.binding.previous")),
+            ("right", "next_article", self.ui.text("app.binding.next")),
+            ("up", "scroll_up", self.ui.text("app.binding.up")),
+            ("down", "scroll_down", self.ui.text("app.binding.down")),
+            ("pageup", "page_up", self.ui.text("app.binding.pgup")),
+            ("pagedown", "page_down", self.ui.text("app.binding.pgdn")),
+            Binding("b", "page_up", self.ui.text("app.binding.back"), show=False),
+            Binding("space", "space_down", self.ui.text("app.binding.space"), show=False),
+            ("s", "toggle_summary", self.ui.text("app.binding.summary")),
+            ("m", "show_or_refresh_more_info", self.ui.text("app.binding.more_info")),
+            Binding("?", "show_article_qa", self.ui.text("app.binding.ask")),
+            ("l", "show_quick_nav", self.ui.text("app.binding.list")),
+            ("c", "show_source_manager", self.ui.text("app.binding.sources")),
+            ("e", "export_current", self.ui.text("app.binding.export")),
+            ("o", "open_article", self.ui.text("app.binding.open")),
+            ("d", "download_articles", self.ui.text("app.binding.download")),
+            ("h", "show_help", self.ui.text("app.binding.help")),
+            ("q", "quit_reader", self.ui.text("app.binding.quit")),
+        ]
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -278,8 +291,8 @@ class NewsReaderApp(App[None]):
         article = self.current_article
         if article is None:
             border_title = None
-            header_text = "No cached articles"
-            body_text = "Press D to fetch articles."
+            header_text = self.ui.text("app.empty.header")
+            body_text = self.ui.text("app.empty.body")
             article_url_text = ""
         else:
             border_title = self._article_frame_title(article, header.size.width)
@@ -377,10 +390,12 @@ class NewsReaderApp(App[None]):
         try:
             opened = webbrowser.open(normalized_url, new=2)
         except Exception as exc:
-            self._set_status_text(f"failed to open browser: {exc}", busy=False, hold_seconds=1.0)
+            self._set_status_text(self.ui.text("app.status.browser_open_failed", error=exc), busy=False, hold_seconds=1.0)
         else:
             self._set_status_text(
-                "opened article in browser" if opened else "browser did not confirm open request",
+                self.ui.text("app.status.browser_opened")
+                if opened
+                else self.ui.text("app.status.browser_not_confirmed"),
                 busy=False,
                 hold_seconds=1.0,
             )
@@ -390,7 +405,7 @@ class NewsReaderApp(App[None]):
         article = self.current_article
         if article is None:
             self.close_export_screen()
-            self._set_status_text("no article to export", busy=False, hold_seconds=1.0)
+            self._set_status_text(self.ui.text("app.status.no_article_to_export"), busy=False, hold_seconds=1.0)
             self.refresh_view()
             return
         result = self.export_service.export(
@@ -416,7 +431,7 @@ class NewsReaderApp(App[None]):
             pass
 
     def action_show_help(self) -> None:
-        self.push_screen(HelpScreen())
+        self.push_screen(HelpScreen(self.ui))
 
     def action_show_or_refresh_more_info(self) -> None:
         self.close_article_qa()
@@ -433,6 +448,7 @@ class NewsReaderApp(App[None]):
     def action_show_quick_nav(self) -> None:
         self.push_screen(
             QuickNavScreen(
+                self.ui,
                 self.articles,
                 self.current_article.article_id if self.current_article else None,
                 self._provider_display_names(),
@@ -440,7 +456,7 @@ class NewsReaderApp(App[None]):
         )
 
     def action_show_source_manager(self) -> None:
-        self.push_screen(SourceSelectionScreen())
+        self.push_screen(SourceSelectionScreen(self.ui))
 
     def action_show_category_picker(self) -> None:
         self.action_show_source_manager()
@@ -450,19 +466,20 @@ class NewsReaderApp(App[None]):
             return
         article = self.current_article
         if article is None:
-            self._set_status_text("no article to export", busy=False, hold_seconds=1.0)
+            self._set_status_text(self.ui.text("app.status.no_article_to_export"), busy=False, hold_seconds=1.0)
             self.refresh_view()
             return
         if self._export_screen is not None:
             return
         self._export_screen = ExportScreen(
+            self.ui,
             article.translated_title or article.title,
-            "summary" if self.reader_state.view_mode == ViewMode.SUMMARY and article.summary else "full",
+            self._view_mode_label(article),
         )
         self.push_screen(self._export_screen)
 
     async def action_quit_reader(self) -> None:
-        self._set_status_text("Exiting...", busy=False)
+        self._set_status_text(self.ui.text("app.status.exiting"), busy=False)
         self.refresh_view()
         self._shutdown_refresh()
         self._cancel_more_info_lookup()
@@ -507,7 +524,7 @@ class NewsReaderApp(App[None]):
             for provider in self.storage.list_providers()
         }
         if enabled_by_provider == current_enabled and selected_targets == current_selected:
-            self._set_status_text("sources unchanged", busy=False)
+            self._set_status_text(self.ui.text("app.status.sources_unchanged"), busy=False)
             self.refresh_view()
             return True
         for provider_id, enabled in enabled_by_provider.items():
@@ -516,12 +533,12 @@ class NewsReaderApp(App[None]):
             self.storage.set_selected_targets(provider_id, target_keys)
         if self.refresh_in_progress:
             self._set_status_text(
-                "sources saved; next refresh will use updated provider settings",
+                self.ui.text("app.status.sources_saved_next_refresh"),
                 busy=False,
             )
             self.refresh_view()
             return True
-        self._set_status_text("sources saved; refreshing enabled providers", busy=False)
+        self._set_status_text(self.ui.text("app.status.sources_saved_refreshing"), busy=False)
         self.refresh_view()
         self._start_refresh()
         return True
@@ -587,9 +604,13 @@ class NewsReaderApp(App[None]):
             self.storage.close()
 
     def set_status(self, value: str) -> None:
-        if value != "ready" and monotonic() < self._status_override_until:
+        localized_value = self.ui.status(value)
+        if localized_value != self.ui.text("app.status.ready") and monotonic() < self._status_override_until:
             return
-        self._set_status_text(value)
+        self._set_status_text(
+            localized_value,
+            busy=value.startswith(("fetching ", "extracting ", "translating ", "summarizing ")),
+        )
         self._call_from_thread_if_ready(self.refresh_view)
 
     def _set_status_text(
@@ -657,19 +678,24 @@ class NewsReaderApp(App[None]):
             return article.summary
         return article.translated_body or article.source_body
 
+    def _view_mode_label(self, article: ArticleRecord) -> str:
+        if self.reader_state.view_mode == ViewMode.SUMMARY and article.summary:
+            return self.ui.text("app.article.mode.summary")
+        return self.ui.text("app.article.mode.full")
+
     def _article_header(self, article: ArticleRecord) -> str:
         date_text = self._format_article_date(article)
         title = article.translated_title or article.title
-        mode = "summary" if self.reader_state.view_mode == ViewMode.SUMMARY and article.summary else "full"
+        mode = self._view_mode_label(article)
         article_position = self.current_index + 1
         lines = [
-            f"Article # {article_position} of {len(self.articles)}",
-            f"Date : {date_text}",
+            self.ui.text("app.article.position", current=article_position, total=len(self.articles)),
+            self.ui.text("app.article.date", date=date_text),
         ]
         lines.extend(
             [
-                f"Title: {title}",
-                f"Mode : {mode}",
+                self.ui.text("app.article.title", title=title),
+                self.ui.text("app.article.mode", mode=mode),
             ]
         )
         return "\n".join(lines)
@@ -776,12 +802,11 @@ class NewsReaderApp(App[None]):
             for provider in self.storage.list_providers()
         }
 
-    @classmethod
-    def _article_url_text(cls, article: ArticleRecord, width: int | None = None) -> str:
-        value = f"URL: {article.url}"
+    def _article_url_text(self, article: ArticleRecord, width: int | None = None) -> str:
+        value = self.ui.text("app.article.url", url=article.url)
         if width is None or width <= 0:
             return value
-        return cls._truncate_middle_cells(value, width)
+        return self._truncate_middle_cells(value, width)
 
     @staticmethod
     def _format_article_date(article: ArticleRecord) -> str:
@@ -876,7 +901,7 @@ class NewsReaderApp(App[None]):
         normalized_url = normalize_result_url(url)
         self.close_open_link_confirm()
         self._pending_open_link = (title, normalized_url)
-        screen = OpenLinkConfirmScreen(title, normalized_url)
+        screen = OpenLinkConfirmScreen(self.ui, title, normalized_url)
         self._open_link_confirm_screen = screen
         self.push_screen(screen)
 
@@ -910,7 +935,7 @@ class NewsReaderApp(App[None]):
                 existing.set_content(self._article_qa_transcript())
                 existing.set_sources(self._article_qa_source_links())
                 return existing
-        screen = ArticleQuestionScreen(article.translated_title or article.title)
+        screen = ArticleQuestionScreen(self.ui, article.translated_title or article.title)
         self._article_qa_screen = screen
         self._article_qa_article_id = article.article_id
         self.push_screen(screen)
@@ -1090,33 +1115,29 @@ class NewsReaderApp(App[None]):
 
     def _article_qa_transcript(self) -> str:
         if not self._article_qa_turns:
-            return (
-                "# Article Q&A\n\n"
-                "Ask anything about this article in any language.\n\n"
-                "Answers use the original article text plus live DuckDuckGo results.\n\n"
-                "Nothing in this chat is saved after you close the modal."
-            )
-        sections = ["# Article Q&A"]
+            return self.ui.text("article_qa.transcript.empty")
+        sections = [self.ui.text("article_qa.transcript.title")]
         for index, turn in enumerate(self._article_qa_turns, start=1):
-            sections.append(f"## Question {index}\n\n**You:** {turn.question}")
+            sections.append(self.ui.text("article_qa.transcript.question", index=index, question=turn.question))
             if turn.pending:
-                sections.append("_Searching the web and drafting an answer..._")
+                sections.append(self.ui.text("article_qa.transcript.pending"))
                 continue
             if turn.error_text is not None:
-                sections.append(
-                    "### Answer unavailable\n\n"
-                    "The question could not be answered right now.\n\n"
-                    f"Error: `{turn.error_text}`"
-                )
+                sections.append(self.ui.text("article_qa.transcript.answer_unavailable", error=turn.error_text))
                 continue
-            sections.append(f"### Answer\n\n{turn.answer or '_No answer returned._'}")
+            sections.append(
+                self.ui.text(
+                    "article_qa.transcript.answer",
+                    answer=turn.answer or self.ui.text("article_qa.transcript.no_answer"),
+                )
+            )
             sections.append(self._article_qa_sources_markdown(turn.sources))
         return "\n\n".join(sections)
 
     def _article_qa_sources_markdown(self, sources: list[SearchResult]) -> str:
         if not sources:
-            return "### Sources\n\n_No public search results were found for this question._"
-        lines = ["### Sources"]
+            return self.ui.text("article_qa.transcript.sources_empty")
+        lines = [self.ui.text("article_qa.transcript.sources_title")]
         for index, source in enumerate(sources, start=1):
             lines.append(f"{index}. [{source.title}]({source.url})")
         return "\n".join(lines)
@@ -1178,7 +1199,7 @@ class NewsReaderApp(App[None]):
                 existing.article_title = article.translated_title or article.title
                 existing.update_header()
                 return existing
-        screen = MoreInfoScreen(article.translated_title or article.title)
+        screen = MoreInfoScreen(self.ui, article.translated_title or article.title)
         self._more_info_screen = screen
         self._more_info_article_id = article.article_id
         self.push_screen(screen)
@@ -1212,7 +1233,7 @@ class NewsReaderApp(App[None]):
             self._schedule_more_info_progress(article, cancellation, "searching DuckDuckGo...")
             results = self.search_client.search(query, cancellation=cancellation)
             if not results:
-                more_info = "No additional public context was found for this article yet."
+                more_info = self.ui.text("more_info.body.no_results")
             else:
                 self._schedule_more_info_progress(article, cancellation, "asking configured llm to synthesize results...")
                 more_info = self.llm_client.synthesize_more_info(
@@ -1261,10 +1282,7 @@ class NewsReaderApp(App[None]):
         if self._more_info_screen is not None:
             self._more_info_screen.set_loading(False)
             self._more_info_screen.set_status("failed")
-            self._more_info_screen.set_content(
-                "# More info unavailable\n\n"
-                f"The additional lookup failed.\n\nError: `{error_text}`"
-            )
+            self._more_info_screen.set_content(self.ui.text("more_info.body.unavailable", error=error_text))
 
     def _cancel_more_info_lookup(self) -> None:
         cancellation = self._more_info_cancellation
@@ -1284,15 +1302,9 @@ class NewsReaderApp(App[None]):
         except ScreenStackError:
             pass
 
-    @staticmethod
-    def _more_info_loading_text(article: ArticleRecord, stage: str) -> str:
+    def _more_info_loading_text(self, article: ArticleRecord, stage: str) -> str:
         title = article.translated_title or article.title
-        return (
-            "# More Info\n\n"
-            "Gathering extra context for:\n\n"
-            f"**{title}**\n\n"
-            f"Current step: {stage}"
-        )
+        return self.ui.text("more_info.body.loading", title=title, stage=self.ui.status(stage))
 
     @staticmethod
     def _more_info_source_text(article: ArticleRecord) -> str:

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.binding import Binding
+from textual.binding import Binding, BindingsMap
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static
+
+from ...ui_text import UILocalizer
 
 
 class OpenLinkConfirmScreen(ModalScreen[None]):
@@ -38,27 +40,29 @@ class OpenLinkConfirmScreen(ModalScreen[None]):
     }
     """
 
-    BINDINGS = [
-        ("enter", "confirm_open", "Open"),
-        Binding("o", "confirm_open", "Open", show=False),
-        ("escape", "close_overlay", "Cancel"),
-    ]
+    BINDINGS = []
 
-    def __init__(self, source_title: str, url: str) -> None:
+    def __init__(self, ui: UILocalizer, source_title: str, url: str) -> None:
         super().__init__()
+        self._ui = ui
+        self._bindings = BindingsMap(self._build_bindings())
         self.source_title = source_title
         self.url = url
 
+    def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
+        return [
+            ("enter", "confirm_open", self._ui.text("open_link.binding.open")),
+            Binding("o", "confirm_open", self._ui.text("open_link.binding.open"), show=False),
+            ("escape", "close_overlay", self._ui.text("open_link.binding.cancel")),
+        ]
+
     def compose(self) -> ComposeResult:
         with Vertical(id="open-link-shell"):
-            yield Static("Open Source Link", id="open-link-header")
-            yield Static(
-                f"Open this source in your browser?\n\nTitle: {self.source_title}\nURL: {self.url}",
-                id="open-link-body",
-            )
+            yield Static(self._ui.text("open_link.header"), id="open-link-header")
+            yield Static(self._ui.text("open_link.body", title=self.source_title, url=self.url), id="open-link-body")
             with Horizontal(id="open-link-buttons"):
-                yield Button("Open", id="open-link-open", variant="primary")
-                yield Button("Cancel", id="open-link-cancel")
+                yield Button(self._ui.text("open_link.button.open"), id="open-link-open", variant="primary")
+                yield Button(self._ui.text("open_link.button.cancel"), id="open-link-cancel")
 
     def on_mount(self) -> None:
         self.query_one("#open-link-open", Button).focus()

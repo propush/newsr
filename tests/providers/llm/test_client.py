@@ -5,7 +5,15 @@ import json
 
 import pytest
 
-from newsr.config import AppConfig, ArticlesConfig, ExportConfig, ExportImageConfig, LLMConfig, TranslationConfig
+from newsr.config import (
+    AppConfig,
+    ArticlesConfig,
+    ExportConfig,
+    ExportImageConfig,
+    LLMConfig,
+    TranslationConfig,
+    UILocaleConfig,
+)
 from newsr.providers.llm import OpenAILLMClient
 
 
@@ -111,6 +119,7 @@ def make_config(
             request_retries=request_retries,
         ),
         translation=TranslationConfig(target_language="Russian"),
+        ui=UILocaleConfig(locale="en"),
         export=ExportConfig(image=ExportImageConfig(quality="hd")),
     )
 

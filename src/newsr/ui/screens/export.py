@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.binding import Binding
+from textual.binding import Binding, BindingsMap
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static
 
 from ...export import ExportAction
+from ...ui_text import UILocalizer
 
 
 class ExportScreen(ModalScreen[None]):
@@ -45,37 +46,37 @@ class ExportScreen(ModalScreen[None]):
     }
     """
 
-    BINDINGS = [
-        Binding("1", "choose_save_png", "Save PNG", show=False),
-        Binding("2", "choose_copy_png", "Copy PNG", show=False),
-        Binding("3", "choose_save_markdown", "Save MD", show=False),
-        Binding("4", "choose_copy_markdown", "Copy MD", show=False),
-        ("escape", "close_overlay", "Cancel"),
-    ]
+    BINDINGS = []
 
-    def __init__(self, article_title: str, mode_label: str) -> None:
+    def __init__(self, ui: UILocalizer, article_title: str, mode_label: str) -> None:
         super().__init__()
+        self._ui = ui
+        self._bindings = BindingsMap(self._build_bindings())
         self.article_title = article_title
         self.mode_label = mode_label
 
+    def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
+        return [
+            Binding("1", "choose_save_png", self._ui.text("export.binding.save_png"), show=False),
+            Binding("2", "choose_copy_png", self._ui.text("export.binding.copy_png"), show=False),
+            Binding("3", "choose_save_markdown", self._ui.text("export.binding.save_markdown"), show=False),
+            Binding("4", "choose_copy_markdown", self._ui.text("export.binding.copy_markdown"), show=False),
+            ("escape", "close_overlay", self._ui.text("export.binding.cancel")),
+        ]
+
     def compose(self) -> ComposeResult:
         with Vertical(id="export-shell"):
-            yield Static("Export Current View", id="export-header")
-            yield Static(
-                f"Title: {self.article_title}\nMode: {self.mode_label}\n\n"
-                "1: Save PNG   2: Copy PNG\n"
-                "3: Save Markdown   4: Copy Markdown",
-                id="export-body",
-            )
+            yield Static(self._ui.text("export.header"), id="export-header")
+            yield Static(self._ui.text("export.body", title=self.article_title, mode=self.mode_label), id="export-body")
             with Vertical(id="export-buttons"):
                 with Horizontal(classes="export-row"):
-                    yield Button("Save PNG", id="export-save-png", variant="primary")
-                    yield Button("Copy PNG", id="export-copy-png")
+                    yield Button(self._ui.text("export.button.save_png"), id="export-save-png", variant="primary")
+                    yield Button(self._ui.text("export.button.copy_png"), id="export-copy-png")
                 with Horizontal(classes="export-row"):
-                    yield Button("Save Markdown", id="export-save-markdown")
-                    yield Button("Copy Markdown", id="export-copy-markdown")
+                    yield Button(self._ui.text("export.button.save_markdown"), id="export-save-markdown")
+                    yield Button(self._ui.text("export.button.copy_markdown"), id="export-copy-markdown")
                 with Horizontal(classes="export-row"):
-                    yield Button("Cancel", id="export-cancel")
+                    yield Button(self._ui.text("export.button.cancel"), id="export-cancel")
 
     def on_mount(self) -> None:
         self.query_one("#export-save-png", Button).focus()

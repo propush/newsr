@@ -4,12 +4,13 @@ from threading import Thread
 
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.binding import Binding
+from textual.binding import Binding, BindingsMap
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Static
 
 from ...domain import ProviderRecord, ProviderTarget
+from ...ui_text import UILocalizer
 
 
 class SourceSelectionScreen(ModalScreen[None]):
@@ -84,16 +85,12 @@ class SourceSelectionScreen(ModalScreen[None]):
     }
     """
 
-    BINDINGS = [
-        ("escape", "close_overlay", "Close"),
-        Binding("tab", "switch_pane", "Pane", show=False),
-        Binding("space", "toggle_item", "Toggle", show=False),
-        ("r", "refresh_catalog", "Refresh"),
-        ("a", "save_selection", "Apply"),
-    ]
+    BINDINGS = []
 
-    def __init__(self) -> None:
+    def __init__(self, ui: UILocalizer) -> None:
         super().__init__()
+        self._ui = ui
+        self._bindings = BindingsMap(self._build_bindings())
         self._providers: list[ProviderRecord] = []
         self._targets_by_provider: dict[str, list[ProviderTarget]] = {}
         self._enabled_by_provider: dict[str, bool] = {}
@@ -102,19 +99,25 @@ class SourceSelectionScreen(ModalScreen[None]):
         self._load_thread: Thread | None = None
         self._refresh_thread: Thread | None = None
 
+    def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
+        return [
+            ("escape", "close_overlay", self._ui.text("source.binding.close")),
+            Binding("tab", "switch_pane", self._ui.text("source.binding.pane"), show=False),
+            Binding("space", "toggle_item", self._ui.text("source.binding.toggle"), show=False),
+            ("r", "refresh_catalog", self._ui.text("source.binding.refresh")),
+            ("a", "save_selection", self._ui.text("source.binding.apply")),
+        ]
+
     def compose(self) -> ComposeResult:
         with Vertical(id="source-shell"):
-            yield Static("Manage Sources", id="source-header")
-            yield Static("Loading providers and targets...", id="source-status")
-            yield Static("Loading sources...", id="source-loading")
+            yield Static(self._ui.text("source.header"), id="source-header")
+            yield Static(self._ui.text("source.loading.status"), id="source-status")
+            yield Static(self._ui.text("source.loading.body"), id="source-loading")
             yield Static("", id="source-error")
             with Horizontal(id="source-content"):
                 yield DataTable(id="provider-list", classes="source-table", cursor_type="row")
                 yield DataTable(id="target-list", classes="source-table", cursor_type="row")
-            yield Static(
-                "Tab: switch pane   Space: toggle   R: refresh catalog   A: apply   Esc: close",
-                id="source-hint",
-            )
+            yield Static(self._ui.text("source.hint"), id="source-hint")
 
     def on_mount(self) -> None:
         self.query_one("#source-error", Static).display = False
@@ -144,7 +147,7 @@ class SourceSelectionScreen(ModalScreen[None]):
 
     def action_toggle_item(self) -> None:
         if not self._providers:
-            self._set_status("Sources are still loading.")
+            self._set_status(self._ui.text("source.status.still_loading"))
             return
         provider_table = self.query_one("#provider-list", DataTable)
         if provider_table.has_focus:
@@ -171,7 +174,7 @@ class SourceSelectionScreen(ModalScreen[None]):
         provider = self._current_provider()
         if provider is None or self._refresh_thread is not None:
             return
-        self._set_status(f"Refreshing {provider.display_name} catalog...")
+        self._set_status(self._ui.text("source.status.refreshing_catalog", provider=provider.display_name))
         self._refresh_thread = Thread(
             target=self._refresh_provider_catalog,
             args=(provider.provider_id,),
@@ -182,7 +185,7 @@ class SourceSelectionScreen(ModalScreen[None]):
 
     def action_save_selection(self) -> None:
         if not self._providers:
-            self._set_status("Sources are still loading.")
+            self._set_status(self._ui.text("source.status.still_loading"))
             return
         enabled = dict(self._enabled_by_provider)
         selected = {
@@ -213,7 +216,7 @@ class SourceSelectionScreen(ModalScreen[None]):
                 targets_by_provider[provider.provider_id] = targets
         except Exception as exc:
             if self.app.is_running:
-                self.app.call_from_thread(self._show_error, f"Failed to load sources: {exc}")
+                self.app.call_from_thread(self._show_error, self._ui.text("source.status.failed_load", error=exc))
             return
         if self.app.is_running:
             self.app.call_from_thread(self._show_sources, providers, targets_by_provider)
@@ -223,7 +226,7 @@ class SourceSelectionScreen(ModalScreen[None]):
             targets = self.app.refresh_source_catalog(provider_id)
         except Exception as exc:
             if self.app.is_running:
-                self.app.call_from_thread(self._show_error, f"Failed to refresh sources: {exc}")
+                self.app.call_from_thread(self._show_error, self._ui.text("source.status.failed_refresh", error=exc))
                 self.app.call_from_thread(self._clear_refresh_thread)
             return
         if self.app.is_running:
@@ -241,7 +244,7 @@ class SourceSelectionScreen(ModalScreen[None]):
             None,
         )
         if provider is not None:
-            self._set_status(f"Refreshed {provider.display_name} catalog.")
+            self._set_status(self._ui.text("source.status.refreshed_catalog", provider=provider.display_name))
         self._clear_refresh_thread()
 
     def _clear_refresh_thread(self) -> None:
@@ -277,7 +280,7 @@ class SourceSelectionScreen(ModalScreen[None]):
         error = self.query_one("#source-error", Static)
         error.update(message)
         error.display = True
-        self._set_status("Unable to load sources.")
+        self._set_status(self._ui.text("source.status.unable_to_load"))
 
     def _set_status(self, message: str) -> None:
         self.query_one("#source-status", Static).update(message)
@@ -287,8 +290,8 @@ class SourceSelectionScreen(ModalScreen[None]):
         current_provider_id = self._current_provider_id()
         table.clear(columns=True)
         table.add_column(" ", width=3, key="marker")
-        table.add_column("Provider", key="provider", width=max(16, self.size.width // 3))
-        table.add_column("Targets", key="targets", width=10)
+        table.add_column(self._ui.text("source.table.provider"), key="provider", width=max(16, self.size.width // 3))
+        table.add_column(self._ui.text("source.table.targets"), key="targets", width=10)
         for provider in self._providers:
             enabled = self._enabled_by_provider.get(provider.provider_id, provider.enabled)
             selected_count = len(self._selected_by_provider.get(provider.provider_id, set()))
@@ -308,7 +311,7 @@ class SourceSelectionScreen(ModalScreen[None]):
         marker_render_width = marker_width + (2 * table.cell_padding)
         target_width = max(16, table.size.width - marker_render_width - (2 * table.cell_padding))
         table.add_column(" ", width=marker_width, key="marker")
-        table.add_column("Target", key="target", width=target_width)
+        table.add_column(self._ui.text("source.table.target"), key="target", width=target_width)
         selected_keys = self._selected_by_provider.get(provider_id, set())
         for target in self._targets_by_provider.get(provider_id, []):
             table.add_row(
@@ -345,7 +348,12 @@ class SourceSelectionScreen(ModalScreen[None]):
         if current_provider is not None:
             target_count = len(self._selected_by_provider.get(current_provider.provider_id, set()))
         self._set_status(
-            f"Loaded {len(self._providers)} providers. Enabled {enabled_count}. Selected {target_count} targets."
+            self._ui.text(
+                "source.status.counts",
+                providers=len(self._providers),
+                enabled=enabled_count,
+                selected=target_count,
+            )
         )
 
     def _current_provider(self) -> ProviderRecord | None:

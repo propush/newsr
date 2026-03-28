@@ -10,6 +10,15 @@ from typing import Callable, TextIO
 
 import yaml
 
+from ..ui_text import (
+    DEFAULT_UI_LOCALE,
+    available_ui_locale_names,
+    guess_ui_locale,
+    normalize_ui_locale,
+    parse_ui_locale,
+    resolve_ui_locale_name,
+)
+
 DEFAULT_ARTICLES_FETCH = 5
 DEFAULT_ARTICLES_STORE = 10
 DEFAULT_REQUEST_RETRIES = 2
@@ -52,6 +61,7 @@ PromptFunc = Callable[[str], str]
 
 @dataclass(slots=True)
 class BootstrapAnswers:
+    ui_locale: str
     llm_url: str
     llm_model: str
     translation_language: str
@@ -63,7 +73,7 @@ class BootstrapAnswers:
     export_image_quality: str = DEFAULT_EXPORT_IMAGE_QUALITY
 
 
-def ensure_config(path: Path) -> bool:
+def ensure_config(path: Path, *, ui_locale: str | None = None) -> bool:
     if path.exists():
         return False
     if not _is_interactive_terminal(sys.stdin, sys.stdout):
@@ -71,7 +81,49 @@ def ensure_config(path: Path) -> bool:
             f"{path.name} was not found and first-run setup requires an interactive terminal. "
             f"Create {path.name} manually and rerun NewsR."
         )
-    return bootstrap_config(path, input_func=input, secret_input_func=getpass.getpass, output=sys.stdout)
+    return bootstrap_config(
+        path,
+        input_func=input,
+        secret_input_func=getpass.getpass,
+        output=sys.stdout,
+        ui_locale=ui_locale,
+    )
+
+
+def ensure_ui_locale(
+    path: Path,
+    *,
+    input_func: PromptFunc = input,
+    output: TextIO = sys.stdout,
+    locale_name: str | None = None,
+) -> str | None:
+    if not path.exists():
+        return None
+    raw = _load_config_mapping(path)
+    existing_ui = raw.get("ui", {})
+    existing_locale = (
+        existing_ui.get("locale")
+        if isinstance(existing_ui, dict)
+        else None
+    )
+    resolved_locale = parse_ui_locale(existing_locale)
+    if resolved_locale is not None:
+        return resolved_locale
+    if not _is_interactive_terminal(sys.stdin, sys.stdout):
+        raise RuntimeError(
+            f"{path.name} is missing ui.locale and fixing it requires an interactive terminal. "
+            f"Edit {path.name} manually and rerun NewsR."
+        )
+    output.write(
+        f"{path.name} is missing a UI language. Let's choose it before continuing.\n"
+    )
+    selected_locale = _prompt_ui_locale(input_func, output, locale_name)
+    ui_section = dict(existing_ui) if isinstance(existing_ui, dict) else {}
+    ui_section["locale"] = selected_locale
+    raw["ui"] = ui_section
+    path.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    output.write(f"Saved UI language: {resolve_ui_locale_name(selected_locale)}\n")
+    return selected_locale
 
 
 def bootstrap_config(
@@ -81,12 +133,14 @@ def bootstrap_config(
     secret_input_func: PromptFunc,
     output: TextIO,
     locale_name: str | None = None,
+    ui_locale: str | None = None,
 ) -> bool:
     answers = prompt_bootstrap_answers(
         input_func=input_func,
         secret_input_func=secret_input_func,
         output=output,
         locale_name=locale_name,
+        ui_locale=ui_locale,
     )
     path.write_text(render_config(answers), encoding="utf-8")
     output.write(
@@ -103,8 +157,14 @@ def prompt_bootstrap_answers(
     secret_input_func: PromptFunc,
     output: TextIO,
     locale_name: str | None = None,
+    ui_locale: str | None = None,
 ) -> BootstrapAnswers:
     output.write("No newsr.yml found. Let's create it.\n\n")
+    resolved_ui_locale = normalize_ui_locale(ui_locale) if ui_locale is not None else _prompt_ui_locale(
+        input_func,
+        output,
+        locale_name,
+    )
     backend = _prompt_backend(input_func, output)
     if backend == "cloud":
         llm_url = _prompt_with_default(input_func, "Cloud API URL", DEFAULT_CLOUD_URL)
@@ -119,6 +179,7 @@ def prompt_bootstrap_answers(
 
     translation_language = _prompt_translation_language(input_func, output, locale_name)
     return BootstrapAnswers(
+        ui_locale=resolved_ui_locale,
         llm_url=llm_url,
         llm_model=llm_model,
         translation_language=translation_language,
@@ -148,6 +209,9 @@ def render_config(answers: BootstrapAnswers) -> str:
         "translation": {
             "target_language": answers.translation_language,
         },
+        "ui": {
+            "locale": answers.ui_locale,
+        },
         "export": {
             "image": {
                 "quality": answers.export_image_quality,
@@ -159,6 +223,7 @@ def render_config(answers: BootstrapAnswers) -> str:
 
 DEFAULT_CONFIG = render_config(
     BootstrapAnswers(
+        ui_locale=DEFAULT_UI_LOCALE,
         llm_url=DEFAULT_LOCAL_URL,
         llm_model=DEFAULT_LOCAL_MODEL,
         translation_language=DEFAULT_TRANSLATION_LANGUAGE,
@@ -173,6 +238,13 @@ def guess_translation_language(locale_name: str | None = None) -> str:
     normalized_locale = resolved_locale.split(".", 1)[0].split("@", 1)[0]
     language_code = normalized_locale.replace("-", "_").split("_", 1)[0].lower()
     return LANGUAGE_BY_LOCALE.get(language_code, DEFAULT_TRANSLATION_LANGUAGE)
+
+
+def _load_config_mapping(path: Path) -> dict[str, object]:
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(raw, dict):
+        raise ValueError("config root must be a mapping")
+    return raw
 
 
 def _detect_locale_name() -> str | None:
@@ -217,6 +289,22 @@ def _prompt_translation_language(input_func: PromptFunc, output: TextIO, locale_
     suggested_language = guess_translation_language(locale_name)
     output.write(f"Suggested translation language from locale: {suggested_language}\n")
     return _prompt_with_default(input_func, "Translation language", suggested_language)
+
+
+def _prompt_ui_locale(input_func: PromptFunc, output: TextIO, locale_name: str | None) -> str:
+    suggested_locale = guess_ui_locale(locale_name)
+    suggested_name = resolve_ui_locale_name(suggested_locale)
+    available_names = ", ".join(available_ui_locale_names())
+    output.write(f"Suggested UI language from locale: {suggested_name}\n")
+    output.write(f"Available UI languages: {available_names}\n")
+    while True:
+        response = input_func(f"UI language [{suggested_name}]: ").strip()
+        if not response:
+            return suggested_locale
+        parsed_locale = parse_ui_locale(response)
+        if parsed_locale is not None:
+            return parsed_locale
+        output.write(f"Please choose one of: {available_names}\n")
 
 
 def _prompt_optional_headers(input_func: PromptFunc, output: TextIO) -> dict[str, str]:

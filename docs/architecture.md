@@ -24,7 +24,7 @@ Provider catalogs are not uniform. See [Current Providers](current_providers.md)
 
 ## Runtime Flow
 
-1. `newsr.app.main` ensures `newsr.yml` exists in the current working directory, running an interactive terminal bootstrap when it is missing.
+1. `newsr.app.main` ensures `newsr.yml` has `ui.locale` before config load, patching older configs interactively when needed, and then runs an interactive bootstrap if the file is missing.
 2. `NewsReaderApp` opens `cache/newsr.sqlite3`, initializes schema, builds the provider registry, and bootstraps missing provider and target rows into SQLite.
 3. Bootstrap syncs provider rows for all built-in providers, enables `bbc` by default, and seeds each provider's initial selected targets from `default_targets()`.
 4. Startup prunes expired articles, restores saved reader state, loads cached articles, and shows them immediately when available.
@@ -36,7 +36,7 @@ Provider catalogs are not uniform. See [Current Providers](current_providers.md)
 
 ## Local State
 
-- `newsr.yml`: user config for refresh limits, LLM endpoint/model settings, translation language, and export quality
+- `newsr.yml`: user config for refresh limits, LLM endpoint/model settings, translation language, UI locale, and export quality
 - `cache/newsr.sqlite3`: provider registry state, discovered targets, selected targets, article source text, translated text, summaries, job state, and saved reader state
 - `cache/newsr-llm.log`: request log for LLM calls
 - `exports/`: saved Markdown and PNG exports
