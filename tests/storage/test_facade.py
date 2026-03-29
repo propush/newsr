@@ -204,3 +204,17 @@ def test_storage_delete_incomplete_articles_removes_partial_rows(storage, articl
 
     assert [article.article_id for article in articles] == ["bbc:done-1"]
     assert [job["article_id"] for job in jobs] == ["bbc:done-1", "bbc:done-1"]
+
+
+def test_storage_delete_incomplete_articles_preserves_failed_orphan_jobs(storage) -> None:
+    storage.set_job_status("bbc:gone-1", "fetch", "failed", error_text="network error", increment_attempt=True)
+    storage.set_job_status("bbc:gone-2", "fetch", "running")
+
+    storage.delete_incomplete_articles()
+
+    jobs = storage.connection.execute(
+        "SELECT article_id, status FROM jobs ORDER BY article_id"
+    ).fetchall()
+    assert len(jobs) == 1
+    assert jobs[0]["article_id"] == "bbc:gone-1"
+    assert jobs[0]["status"] == "failed"

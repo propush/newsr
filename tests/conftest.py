@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -16,6 +18,21 @@ from newsr.config import (
 )
 from newsr.domain import ArticleContent, ProviderRecord, ProviderTarget
 from newsr.storage import NewsStorage
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _isolate_llm_logger(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    """Prevent tests from writing to the real cache/newsr-llm.log file."""
+    logger = logging.getLogger("newsr.llm")
+    log_path = tmp_path_factory.mktemp("logs") / "newsr-llm.log"
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+    )
+    logger.addHandler(handler)
+    yield
+    logger.removeHandler(handler)
+    handler.close()
 
 
 @pytest.fixture

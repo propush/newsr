@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from threading import Lock
 
@@ -10,6 +11,9 @@ from ..providers.base import NewsProvider
 from ..providers.llm.client import OpenAILLMClient
 from ..storage.facade import NewsStorage
 from .types import ArticleReadyCallback, RefreshProgress, RefreshResult, StatusCallback
+
+
+_LOG = logging.getLogger("newsr.llm")
 
 
 class NewsPipeline:
@@ -72,7 +76,8 @@ class NewsPipeline:
                     content.body = self._validated_source_text(content.title, content.body)
                     self._raise_if_cancelled(cancellation)
                     self.storage.upsert_article_source(content)
-                    self._process_article_llm(
+                    self.storage.set_job_status(candidate.article_id, "fetch", "done")
+                    if self._process_article_llm(
                         content.article_id,
                         content.title,
                         content.body,
@@ -80,14 +85,18 @@ class NewsPipeline:
                         on_article_ready,
                         progress,
                         cancellation,
-                    )
-                    self._raise_if_cancelled(cancellation)
-                    new_articles += 1
+                    ):
+                        new_articles += 1
+                    else:
+                        failed_articles += 1
                 except RefreshCancelled:
                     self._emit(on_status, "refresh cancelled")
                     return RefreshResult(new_articles=new_articles, failed_articles=failed_articles)
                 except Exception as exc:
                     failed_articles += 1
+                    _LOG.warning(
+                        "fetch_failed article_id=%s error=%s", candidate.article_id, exc,
+                    )
                     self.storage.set_job_status(
                         candidate.article_id,
                         "fetch",
@@ -136,8 +145,8 @@ class NewsPipeline:
         on_article_ready: ArticleReadyCallback | None,
         progress: RefreshProgress,
         cancellation: RefreshCancellation | None,
-    ) -> None:
-        self._translate_article(
+    ) -> bool:
+        return self._translate_article(
             article_id,
             article_title,
             source_text,
@@ -156,7 +165,7 @@ class NewsPipeline:
         on_article_ready: ArticleReadyCallback | None,
         progress: RefreshProgress,
         cancellation: RefreshCancellation | None,
-    ) -> None:
+    ) -> bool:
         try:
             self._raise_if_cancelled(cancellation)
             self.storage.set_job_status(article_id, "translation", "running")
@@ -171,10 +180,11 @@ class NewsPipeline:
             self.storage.reset_translation(article_id)
             raise
         except Exception as exc:
+            _LOG.warning("translation_failed article_id=%s error=%s", article_id, exc)
             self.storage.fail_translation(article_id, str(exc))
-            return
+            return False
 
-        self._summarize_article(
+        return self._summarize_article(
             article_id,
             article_title,
             translated_text,
@@ -193,7 +203,7 @@ class NewsPipeline:
         on_article_ready: ArticleReadyCallback | None,
         progress: RefreshProgress,
         cancellation: RefreshCancellation | None,
-    ) -> None:
+    ) -> bool:
         try:
             self._raise_if_cancelled(cancellation)
             self.storage.set_job_status(article_id, "summary", "running")
@@ -203,11 +213,14 @@ class NewsPipeline:
             self.storage.complete_summary(article_id, summary)
             self._emit_article_ready(on_article_ready, article_id)
             progress.completed_articles += 1
+            return True
         except RefreshCancelled:
             self.storage.reset_summary(article_id)
             raise
         except Exception as exc:
+            _LOG.warning("summary_failed article_id=%s error=%s", article_id, exc)
             self.storage.fail_summary(article_id, str(exc))
+            return False
 
     @staticmethod
     def _emit(callback: StatusCallback | None, message: str) -> None:

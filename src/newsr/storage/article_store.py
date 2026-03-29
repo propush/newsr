@@ -20,6 +20,7 @@ class ArticleStore:
             )
             self._db.connection.execute(
                 "DELETE FROM jobs WHERE article_id NOT IN (SELECT article_id FROM articles)"
+                " AND status != 'failed'"
             )
 
     def delete_incomplete_articles(self) -> None:
@@ -32,6 +33,7 @@ class ArticleStore:
             )
             self._db.connection.execute(
                 "DELETE FROM jobs WHERE article_id NOT IN (SELECT article_id FROM articles)"
+                " AND status != 'failed'"
             )
 
     def has_article(self, article_id: str) -> bool:

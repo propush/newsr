@@ -488,3 +488,102 @@ def test_pipeline_refresh_cancellation_during_summary_preserves_translation(
     assert job is not None
     assert job["status"] == "pending"
     assert job["error_text"] is None
+
+
+class FailingTranslationLLM(FakeLLM):
+    def translate_title(
+        self, article_title: str, cancellation: RefreshCancellation | None = None
+    ) -> str:
+        raise RuntimeError("LLM unavailable")
+
+
+class FailingSummaryLLM(FakeLLM):
+    def summarize(
+        self,
+        article_title: str,
+        translated_text: str,
+        cancellation: RefreshCancellation | None = None,
+    ) -> str:
+        raise RuntimeError("LLM unavailable")
+
+
+def test_pipeline_refresh_translation_failure_counts_as_failed(app_config, storage) -> None:
+    storage.set_selected_targets("bbc", ["world"])
+    pipeline = NewsPipeline(app_config, storage, {"bbc": FakeProvider()}, FailingTranslationLLM())
+
+    result = pipeline.refresh()
+    article = storage.get_article("bbc:world-1")
+    fetch_job = storage.connection.execute(
+        "SELECT status FROM jobs WHERE article_id = ? AND job_type = 'fetch'",
+        ("bbc:world-1",),
+    ).fetchone()
+    translation_job = storage.connection.execute(
+        "SELECT status, error_text FROM jobs WHERE article_id = ? AND job_type = 'translation'",
+        ("bbc:world-1",),
+    ).fetchone()
+
+    assert result.new_articles == 0
+    assert result.failed_articles == 1
+    assert article is not None
+    assert article.translation_status == "failed"
+    assert fetch_job is not None
+    assert fetch_job["status"] == "done"
+    assert translation_job is not None
+    assert translation_job["status"] == "failed"
+    assert "LLM unavailable" in translation_job["error_text"]
+
+
+def test_pipeline_refresh_summary_failure_counts_as_failed(app_config, storage) -> None:
+    storage.set_selected_targets("bbc", ["world"])
+    pipeline = NewsPipeline(app_config, storage, {"bbc": FakeProvider()}, FailingSummaryLLM())
+
+    result = pipeline.refresh()
+    article = storage.get_article("bbc:world-1")
+    summary_job = storage.connection.execute(
+        "SELECT status, error_text FROM jobs WHERE article_id = ? AND job_type = 'summary'",
+        ("bbc:world-1",),
+    ).fetchone()
+
+    assert result.new_articles == 0
+    assert result.failed_articles == 1
+    assert article is not None
+    assert article.translation_status == "done"
+    assert article.summary_status == "failed"
+    assert summary_job is not None
+    assert summary_job["status"] == "failed"
+    assert "LLM unavailable" in summary_job["error_text"]
+
+
+def test_pipeline_refresh_tracks_fetch_job_on_success(app_config, storage) -> None:
+    storage.set_selected_targets("bbc", ["world"])
+    pipeline = NewsPipeline(app_config, storage, {"bbc": FakeProvider()}, FakeLLM())
+
+    pipeline.refresh()
+    fetch_job = storage.connection.execute(
+        "SELECT status FROM jobs WHERE article_id = ? AND job_type = 'fetch'",
+        ("bbc:world-1",),
+    ).fetchone()
+
+    assert fetch_job is not None
+    assert fetch_job["status"] == "done"
+
+
+def test_pipeline_refresh_logs_fetch_failure(app_config, storage, caplog) -> None:
+    import logging
+
+    logger = logging.getLogger("newsr.llm")
+    original_propagate = logger.propagate
+    logger.propagate = True
+    try:
+        storage.set_selected_targets("bbc", ["world"])
+        pipeline = NewsPipeline(app_config, storage, {"bbc": TitleOnlyBodyProvider()}, FakeLLM())
+
+        with caplog.at_level(logging.WARNING, logger="newsr.llm"):
+            pipeline.refresh()
+
+        assert any(
+            "fetch_failed" in record.message and "bbc:world-1" in record.message
+            for record in caplog.records
+        )
+    finally:
+        logger.propagate = original_propagate
