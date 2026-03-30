@@ -90,6 +90,13 @@ The current built-in news providers are defined in `src/newsr/providers/registry
 - default selected targets: `Cybersecurity & Tech`, `Surveillance & Privacy`
 - catalog behavior: static built-in topic catalog using live `/topics/*` targets for `Cybersecurity & Tech`, `Surveillance & Privacy`, `Intelligence`, and `Foreign Relations & International Law`, with listing extraction restricted to written article titles so podcast and multimedia entries are excluded
 
+### InfoQ
+
+- provider id: `infoq`
+- bootstrap state: disabled by default
+- default selected targets: `Software Architecture`, `Cloud Architecture`
+- catalog behavior: static built-in topic catalog using live InfoQ topic pages `/architecture/`, `/cloud-architecture/`, `/devops/`, `/ai-ml-data-eng/`, and `/java/`, with candidate extraction restricted to each topic page's `News` and `Articles` sections so podcasts, presentations, and guides are excluded
+
 ### Deloitte Insights
 
 - provider id: `deloitteinsights`

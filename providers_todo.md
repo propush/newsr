@@ -42,7 +42,7 @@ A provider iteration is done only when all of the following are true:
 | 7 | Canary Media | `canarymedia` | Climate/energy | Mixed | Medium | Done | 2026-03-30: implemented with a static live-vertical catalog (`grid-edge`, `energy-storage`, `solar`, `electrification`, `transportation`), path-derived `/articles/...` article ids, and disabled bootstrap |
 | 8 | Lawfare | `lawfare` | Legal/policy/tech governance | Mixed | Medium | Done | 2026-03-30: implemented with static live-topic catalog (`cybersecurity-tech`, `surveillance-privacy`, `intelligence`, `foreign-relations-international-law`), canonical `/article/<slug>` article ids, podcast/multimedia title rejection, and disabled bootstrap |
 | 9 | ScienceDaily | `sciencedaily` | Science/research | Static now, discovery later | Low-medium | Done | 2026-03-30: implemented with static live-category catalog (`health_medicine`, `computers_math`, `earth_climate`, `mind_brain`, `matter_energy`), normalized `releases/YYYY/MM/<id>` article ids, and disabled bootstrap |
-| 10 | InfoQ | `infoq` | Software engineering | Mixed | Medium-high | Todo | |
+| 10 | InfoQ | `infoq` | Software engineering | Mixed | Medium-high | Done | 2026-03-30: implemented with static live-topic catalog (`software-architecture`, `cloud-architecture`, `devops`, `ai-ml-data-engineering`, `java`), canonical `news/...` and `articles/...` path ids, and topic-page parsing limited to written `News` and `Articles` sections so podcasts, presentations, and guides are excluded |
 | 11 | Deloitte Insights | `deloitteinsights` | Consulting/research/business strategy | Mixed | Medium-high | Done | 2026-03-28: implemented with static live-topic catalog (`business-strategy-growth`, `technology-management`, `talent`, `operations`, `economy`), search-backed candidate discovery, research-hub-aware article parsing, and disabled bootstrap |
 | 12 | Harvard Business Review | `hbr` | Management/leadership/business | Static | High | Done | 2026-03-28: implemented with static live-subject catalog (`leadership`, `strategy`, `innovation`, `managing-people`, `managing-yourself`), strict digital-article filtering, and disabled bootstrap |
 
@@ -539,7 +539,7 @@ For mixed-format sources, add explicit negative tests for sponsor content, podca
 
 ### 10. InfoQ
 
-- Status: `todo`
+- Status: `done`
 - URL: `https://www.infoq.com/`
 - `provider_id`: `infoq`
 - Why: adds software architecture, DevOps, cloud, and engineering-practice coverage.
@@ -581,9 +581,10 @@ For mixed-format sources, add explicit negative tests for sponsor content, podca
 - Risks:
   - topic pages may mix articles, presentations, and event material
 - Acceptance checklist:
-  - [ ] non-article content is rejected
-  - [ ] topic context is preserved on candidates
-  - [ ] provider tests pass
+  - [x] non-article content is rejected
+  - [x] topic context is preserved on candidates
+  - [x] provider tests pass
+- Implementation note: the live site currently exposes the curated targets as topic pages rooted at `/architecture/`, `/cloud-architecture/`, `/devops/`, `/ai-ml-data-eng/`, and `/java/`; the provider treats those pages as static topic feeds and only ingests entries from their written `News` and `Articles` sections.
 
 ### 11. Deloitte Insights
 

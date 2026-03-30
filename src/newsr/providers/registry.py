@@ -9,6 +9,7 @@ from .deloitteinsights.provider import DeloitteInsightsProvider
 from .hrdive.provider import HRDiveProvider
 from .hbr.provider import HBRProvider
 from .hyperallergic.provider import HyperallergicProvider
+from .infoq.provider import InfoQProvider
 from .lawfare.provider import LawfareProvider
 from .marketingdive.provider import MarketingDiveProvider
 from .medcitynews.provider import MedCityNewsProvider
@@ -32,6 +33,7 @@ def build_provider_registry() -> dict[str, NewsProvider]:
         TomsHardwareProvider(),
         CanaryMediaProvider(),
         LawfareProvider(),
+        InfoQProvider(),
         DeloitteInsightsProvider(),
         HBRProvider(),
         ScienceDailyProvider(),
