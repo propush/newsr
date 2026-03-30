@@ -103,3 +103,10 @@ The current built-in news providers are defined in `src/newsr/providers/registry
 - bootstrap state: disabled by default
 - default selected targets: `Leadership`, `Strategy`
 - catalog behavior: static built-in subject catalog using live `topic/subject/*` targets for `Leadership`, `Strategy`, `Innovation`, `Managing People`, and `Managing Yourself`, with listing results restricted to HBR digital-article cards
+
+### ScienceDaily
+
+- provider id: `sciencedaily`
+- bootstrap state: disabled by default
+- default selected targets: `Health & Medicine`, `Computers & Math`
+- catalog behavior: static built-in live category catalog using exact ScienceDaily `news/*` paths for `Health & Medicine`, `Computers & Math`, `Earth & Climate`, `Mind & Brain`, and `Matter & Energy`, with candidate extraction scoped to the category-page headline modules and article parsing restricted to internal `releases/*` pages

@@ -12,6 +12,7 @@ from .hyperallergic.provider import HyperallergicProvider
 from .lawfare.provider import LawfareProvider
 from .marketingdive.provider import MarketingDiveProvider
 from .medcitynews.provider import MedCityNewsProvider
+from .sciencedaily.provider import ScienceDailyProvider
 from .techcrunch.provider import TechCrunchProvider
 from .thehackernews.provider import TheHackerNewsProvider
 from .tomshardware.provider import TomsHardwareProvider
@@ -33,5 +34,6 @@ def build_provider_registry() -> dict[str, NewsProvider]:
         LawfareProvider(),
         DeloitteInsightsProvider(),
         HBRProvider(),
+        ScienceDailyProvider(),
     ]
     return {provider.provider_id: provider for provider in providers}

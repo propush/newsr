@@ -41,7 +41,7 @@ A provider iteration is done only when all of the following are true:
 | 6 | Tom's Hardware | `tomshardware` | Hardware/PC/semiconductors | Static | Medium | Done | 2026-03-28: implemented with static section catalog (`pc-components`, `cpus`, `gpus`, `storage`, `laptops`, `desktops`, `software`, `artificial-intelligence`) and disabled bootstrap |
 | 7 | Canary Media | `canarymedia` | Climate/energy | Mixed | Medium | Done | 2026-03-30: implemented with a static live-vertical catalog (`grid-edge`, `energy-storage`, `solar`, `electrification`, `transportation`), path-derived `/articles/...` article ids, and disabled bootstrap |
 | 8 | Lawfare | `lawfare` | Legal/policy/tech governance | Mixed | Medium | Done | 2026-03-30: implemented with static live-topic catalog (`cybersecurity-tech`, `surveillance-privacy`, `intelligence`, `foreign-relations-international-law`), canonical `/article/<slug>` article ids, podcast/multimedia title rejection, and disabled bootstrap |
-| 9 | ScienceDaily | `sciencedaily` | Science/research | Static now, discovery later | Low-medium | Todo | |
+| 9 | ScienceDaily | `sciencedaily` | Science/research | Static now, discovery later | Low-medium | Done | 2026-03-30: implemented with static live-category catalog (`health_medicine`, `computers_math`, `earth_climate`, `mind_brain`, `matter_energy`), normalized `releases/YYYY/MM/<id>` article ids, and disabled bootstrap |
 | 10 | InfoQ | `infoq` | Software engineering | Mixed | Medium-high | Todo | |
 | 11 | Deloitte Insights | `deloitteinsights` | Consulting/research/business strategy | Mixed | Medium-high | Done | 2026-03-28: implemented with static live-topic catalog (`business-strategy-growth`, `technology-management`, `talent`, `operations`, `economy`), search-backed candidate discovery, research-hub-aware article parsing, and disabled bootstrap |
 | 12 | Harvard Business Review | `hbr` | Management/leadership/business | Static | High | Done | 2026-03-28: implemented with static live-subject catalog (`leadership`, `strategy`, `innovation`, `managing-people`, `managing-yourself`), strict digital-article filtering, and disabled bootstrap |
@@ -489,7 +489,7 @@ For mixed-format sources, add explicit negative tests for sponsor content, podca
 
 ### 9. ScienceDaily
 
-- Status: `todo`
+- Status: `done`
 - URL: `https://www.sciencedaily.com/`
 - `provider_id`: `sciencedaily`
 - Why: adds science and research summaries across health, technology, environment, and neuroscience.
@@ -532,9 +532,10 @@ For mixed-format sources, add explicit negative tests for sponsor content, podca
 - Risks:
   - some content may be shorter source summaries than standard news articles
 - Acceptance checklist:
-  - [ ] external links are rejected
-  - [ ] body extraction yields readable text
-  - [ ] provider tests pass
+  - [x] external links are rejected
+  - [x] body extraction yields readable text
+  - [x] provider tests pass
+- Implementation note: the live site labels and paths are used directly in v1, so the provider targets are `Health & Medicine`, `Computers & Math`, `Earth & Climate`, `Mind & Brain`, and `Matter & Energy` backed by `/news/<slug>/` pages.
 
 ### 10. InfoQ
 
