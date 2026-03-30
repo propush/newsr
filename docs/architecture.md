@@ -7,6 +7,7 @@ NewsR is a single-process local terminal application. It runs from the repositor
 - `newsr.app`: process bootstrap and CLI entrypoint used by `newsr` and `python -m newsr`
 - `newsr.config`: config dataclasses plus loading and validation for `newsr.yml`
 - `newsr.domain`: shared article, provider, and reader-state models used across UI, storage, and pipeline code
+- `newsr.ui_text`: built-in UI locale definitions plus localized labels, prompts, hints, and status text used by both bootstrap and the Textual app
 - `newsr.providers.base`: `NewsProvider` protocol used by the refresh pipeline
 - `newsr.providers.registry`: built-in provider registration; see [Current Providers](current_providers.md) for the current built-in news provider set
 - `newsr.providers.<provider_id>`: built-in provider packages for target discovery, section parsing, article extraction, and provider-specific URL helpers; see [Current Providers](current_providers.md)
@@ -24,19 +25,19 @@ Provider catalogs are not uniform. See [Current Providers](current_providers.md)
 
 ## Runtime Flow
 
-1. `newsr.app.main` ensures `newsr.yml` has `ui.locale` before config load, patching older configs interactively when needed, and then runs an interactive bootstrap if the file is missing.
+1. `newsr.app.main` first patches missing `ui.locale` into existing `newsr.yml` files when needed, then runs interactive first-run bootstrap only when `newsr.yml` does not exist yet.
 2. `NewsReaderApp` opens `cache/newsr.sqlite3`, initializes schema, builds the provider registry, and bootstraps missing provider and target rows into SQLite.
 3. Bootstrap syncs provider rows for all built-in providers, enables `bbc` by default, and seeds each provider's initial selected targets from `default_targets()`.
-4. Startup prunes expired articles, restores saved reader state, loads cached articles, and shows them immediately when available.
-5. The app starts a background refresh on launch. The refresh pipeline walks enabled providers and their selected targets from SQLite, fetches candidates, skips cached articles, extracts article bodies, stores source content, translates them through the configured LLM endpoint, and then generates summaries.
+4. Startup prunes expired articles, restores saved reader state including the selected theme, loads cached articles, and shows them immediately when available.
+5. The app starts a background refresh on launch. The refresh pipeline walks enabled providers and their selected targets from SQLite, fetches candidates, skips cached articles, extracts article bodies, stores source content, translates both titles and bodies through the configured LLM endpoint, and then generates summaries.
 6. The UI refreshes incrementally as translated articles and summaries become available. Status updates and terminal resizes only recompute width-sensitive chrome such as frame titles, URLs, and the status line; the main article markdown is only replaced when the article content actually changes.
 7. The source manager can refresh a provider catalog through `discover_targets()`, persist the replacement target list, and preserve still-valid selections.
 8. Reader state such as the current article, view mode, scroll offset, and selected theme is persisted back to SQLite.
-9. "More info", article Q&A, and export actions run outside the refresh pipeline but reuse the same stored article content and configured LLM endpoint.
+9. "More info", article Q&A, open-link confirmation, browser handoff, and export actions run outside the refresh pipeline but reuse the same stored article content, provider registry, and configured LLM endpoint.
 
 ## Local State
 
 - `newsr.yml`: user config for refresh limits, LLM endpoint/model settings, translation language, UI locale (`en` or `ru`), and export quality
 - `cache/newsr.sqlite3`: provider registry state, discovered targets, selected targets, article source text, translated text, summaries, job state, and saved reader state
 - `cache/newsr-llm.log`: request log for LLM calls
-- `exports/`: saved Markdown and PNG exports
+- `exports/`: saved Markdown and PNG exports, created on demand

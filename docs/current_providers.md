@@ -10,7 +10,7 @@ The current built-in news providers are defined in `src/newsr/providers/registry
 
 - provider id: `bbc`
 - bootstrap state: enabled by default
-- default selected targets: `World`, `Technology`, `Entertainment And Arts`, `Business`
+- default selected targets: `World`, `Technology`, `Business`, `Entertainment And Arts`
 - catalog behavior: live discovery that merges discovered categories with the built-in base catalog
 
 ### TechCrunch
@@ -66,7 +66,7 @@ The current built-in news providers are defined in `src/newsr/providers/registry
 
 - provider id: `marketingdive`
 - bootstrap state: disabled by default
-- default selected targets: `Social Media`, `Brand Strategy`
+- default selected targets: `Brand Strategy`, `Social Media`
 - catalog behavior: static built-in topic/latest catalog with `Marketing` mapped to the site root and topic-backed targets for `Brand Strategy`, `Mobile`, `Creative`, `Social Media`, `Video`, `Agencies`, `Data/Analytics`, `Influencer`, `Ad Tech`, and `CMO Corner`
 
 ### Tom's Hardware

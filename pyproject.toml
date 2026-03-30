@@ -1,7 +1,7 @@
 [project]
 name = "newsr"
 version = "0.1.0"
-description = "Local-first BBC news reader with translation and summaries"
+description = "Local-first terminal news reader with provider-backed sources, translation, and summaries"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

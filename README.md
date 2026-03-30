@@ -92,7 +92,7 @@ python -m newsr
 
 On first launch, if `newsr.yml` is missing, NewsR starts a terminal setup flow before opening the Textual UI. The setup asks for:
 
-- UI language, with a locale-based default from a predefined list (`English` in v1)
+- UI language, with a locale-based default from the built-in supported locales (`English` and `Русский`)
 - `local` or `cloud` LLM backend
 - an editable default URL for the chosen backend
 - a suggested model name
@@ -118,9 +118,9 @@ The `exports/` directory is created on demand when you save a Markdown or PNG ex
 The generated `newsr.yml` contains five sections:
 
 - `articles`: how many article candidates to fetch per selected target and how many days of articles to keep in SQLite
-- `llm`: the OpenAI-compatible base URL, optional auth settings, optional extra headers, and separate translation and summary model names
+- `llm`: the OpenAI-compatible base URL, optional auth settings, optional extra headers, plus a translation model for titles and article bodies and a summary model reused for summaries, "more info", search-query generation, and article Q&A
 - `translation`: the target language used for translated headlines, article text, summaries, "more info", and article Q&A answers
-- `ui`: the Textual UI locale used for built-in chrome such as hints, modal titles, and status text
+- `ui`: the Textual UI locale used for built-in chrome such as hints, modal titles, and status text; current built-in locales are `en` and `ru`
 - `export`: image export settings
 
 Example generated config for a local setup:
