@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .arstechnica.provider import ArsTechnicaProvider
 from .base import NewsProvider
+from .canarymedia.provider import CanaryMediaProvider
 from .edsurge.provider import EdSurgeProvider
 from .bbc.provider import BBCNewsProvider
 from .deloitteinsights.provider import DeloitteInsightsProvider
@@ -27,6 +28,7 @@ def build_provider_registry() -> dict[str, NewsProvider]:
         EdSurgeProvider(),
         MarketingDiveProvider(),
         TomsHardwareProvider(),
+        CanaryMediaProvider(),
         DeloitteInsightsProvider(),
         HBRProvider(),
     ]

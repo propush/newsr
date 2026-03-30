@@ -76,6 +76,13 @@ The current built-in news providers are defined in `src/newsr/providers/registry
 - default selected targets: `PC Components`, `CPUs`, `GPUs`
 - catalog behavior: static built-in hardware/software section catalog with `PC Components`, `CPUs`, `GPUs`, `Storage`, `Laptops`, `Desktops`, `Software`, and `Artificial Intelligence`
 
+### Canary Media
+
+- provider id: `canarymedia`
+- bootstrap state: disabled by default
+- default selected targets: `Grid Edge`, `Solar`
+- catalog behavior: static built-in climate-tech topic catalog using live `/articles/<topic>` vertical pages for `Grid Edge`, `Energy Storage`, `Solar`, `Electrification`, and `Transportation`
+
 ### Deloitte Insights
 
 - provider id: `deloitteinsights`

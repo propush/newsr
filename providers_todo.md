@@ -39,7 +39,7 @@ A provider iteration is done only when all of the following are true:
 | 4 | EdSurge | `edsurge` | Education | Static now, discovery later | Medium | Done | 2026-03-28: implemented with live `k-12`, `higher-ed`, and `artificial-intelligence` targets and disabled bootstrap |
 | 5 | Marketing Dive | `marketingdive` | Marketing/media | Static | Low-medium | Done | 2026-03-28: implemented with static topic/latest catalog (`brand-strategy`, `mobile`, `creative`, `social-media`, `video`, `agencies`, `data-analytics`, `influencer`, `marketing`, `ad-tech`, `cmo-corner`) and disabled bootstrap |
 | 6 | Tom's Hardware | `tomshardware` | Hardware/PC/semiconductors | Static | Medium | Done | 2026-03-28: implemented with static section catalog (`pc-components`, `cpus`, `gpus`, `storage`, `laptops`, `desktops`, `software`, `artificial-intelligence`) and disabled bootstrap |
-| 7 | Canary Media | `canarymedia` | Climate/energy | Mixed | Medium | Todo | |
+| 7 | Canary Media | `canarymedia` | Climate/energy | Mixed | Medium | Done | 2026-03-30: implemented with a static live-vertical catalog (`grid-edge`, `energy-storage`, `solar`, `electrification`, `transportation`), path-derived `/articles/...` article ids, and disabled bootstrap |
 | 8 | Lawfare | `lawfare` | Legal/policy/tech governance | Mixed | Medium | Todo | |
 | 9 | ScienceDaily | `sciencedaily` | Science/research | Static now, discovery later | Low-medium | Todo | |
 | 10 | InfoQ | `infoq` | Software engineering | Mixed | Medium-high | Todo | |
@@ -394,7 +394,7 @@ For mixed-format sources, add explicit negative tests for sponsor content, podca
 
 ### 7. Canary Media
 
-- Status: `todo`
+- Status: `done`
 - URL: `https://www.canarymedia.com/`
 - `provider_id`: `canarymedia`
 - Why: adds climate, electrification, utilities, and clean-energy coverage.
@@ -435,9 +435,10 @@ For mixed-format sources, add explicit negative tests for sponsor content, podca
 - Risks:
   - vertical taxonomy may need later refinement if the site navigation changes
 - Acceptance checklist:
-  - [ ] curated targets map to article-bearing pages
-  - [ ] non-article pages are rejected
-  - [ ] provider tests pass
+  - [x] curated targets map to article-bearing pages
+  - [x] non-article pages are rejected
+  - [x] provider tests pass
+- Implementation note: the provider uses static live article verticals rooted at `/articles/grid-edge`, `/articles/energy-storage`, `/articles/solar`, `/articles/electrification`, and `/articles/transportation`, while deriving stable ids from canonical `/articles/<topic>/<slug>` paths.
 
 ### 8. Lawfare
 
