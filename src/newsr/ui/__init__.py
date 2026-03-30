@@ -6,6 +6,8 @@ from .screens import (
     HelpScreen,
     MoreInfoScreen,
     OpenLinkConfirmScreen,
+    ProviderHomeRow,
+    ProviderHomeScreen,
     QuickNavScreen,
     SourceSelectionScreen,
 )
@@ -20,6 +22,8 @@ __all__ = [
     "NewsReaderApp",
     "OpenLinkConfirmScreen",
     "OLD_FIDO_THEME",
+    "ProviderHomeRow",
+    "ProviderHomeScreen",
     "QuickNavScreen",
     "SourceSelectionScreen",
 ]

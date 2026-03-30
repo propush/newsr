@@ -3,9 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from ..domain import AppOptions
 from ..domain.reader import ReaderState
 from .article_store import ArticleStore
 from .connection import StorageConnection
+from .options_store import OptionsStore
 from .provider_store import ProviderStore
 from .reader_state_store import ReaderStateStore
 from .schema import initialize_schema
@@ -17,6 +19,7 @@ class NewsStorage:
         self._db = StorageConnection(path)
         self.connection = self._db.connection
         self._articles = ArticleStore(self._db)
+        self._options = OptionsStore(self._db)
         self._providers = ProviderStore(self._db)
         self._reader_state = ReaderStateStore(self._db)
 
@@ -26,11 +29,17 @@ class NewsStorage:
     def initialize(self) -> None:
         initialize_schema(self._db)
 
-    def load_reader_state(self) -> ReaderState:
-        return self._reader_state.load()
+    def load_options(self) -> AppOptions:
+        return self._options.load()
 
-    def save_reader_state(self, state: ReaderState) -> None:
-        self._reader_state.save(state)
+    def save_options(self, options: AppOptions) -> None:
+        self._options.save(options)
+
+    def load_reader_state(self, scope_id: str) -> ReaderState:
+        return self._reader_state.load(scope_id)
+
+    def save_reader_state(self, scope_id: str, state: ReaderState) -> None:
+        self._reader_state.save(scope_id, state)
 
     def sync_providers(self, providers) -> None:
         self._providers.sync_providers(providers)

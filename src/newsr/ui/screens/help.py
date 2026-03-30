@@ -8,12 +8,12 @@ from ...ui_text import UILocalizer
 
 
 class HelpScreen(ModalScreen[None]):
-    def __init__(self, ui: UILocalizer) -> None:
+    def __init__(self, body: str) -> None:
         super().__init__()
-        self._ui = ui
+        self._body = body
 
     def compose(self) -> ComposeResult:
-        yield Static(self._ui.text("help.body"), id="help-text")
+        yield Static(self._body, id="help-text")
 
     def on_key(self) -> None:
         self.dismiss()

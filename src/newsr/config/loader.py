@@ -12,8 +12,9 @@ from .models import (
     ExportConfig,
     ExportImageConfig,
     LLMConfig,
+    ProviderSortConfig,
     TranslationConfig,
-    UILocaleConfig,
+    UIConfig,
 )
 
 
@@ -70,11 +71,26 @@ def _load_translation(raw: dict) -> TranslationConfig:
     return TranslationConfig(target_language=target_language)
 
 
-def _load_ui(raw: dict) -> UILocaleConfig:
+def _load_ui(raw: dict) -> UIConfig:
     locale = parse_ui_locale(raw.get("locale"))
     if locale is None:
         raise ValueError("ui.locale is required")
-    return UILocaleConfig(locale=locale)
+    return UIConfig(
+        locale=locale,
+        provider_sort=_load_provider_sort(raw.get("provider_sort", {})),
+    )
+
+
+def _load_provider_sort(raw: object) -> ProviderSortConfig:
+    if not isinstance(raw, dict):
+        raw = {}
+    primary = str(raw.get("primary", "unread")).strip().lower()
+    direction = str(raw.get("direction", "desc")).strip().lower()
+    if primary not in {"name", "unread"}:
+        raise ValueError("ui.provider_sort.primary must be one of: name, unread")
+    if direction not in {"asc", "desc"}:
+        raise ValueError("ui.provider_sort.direction must be one of: asc, desc")
+    return ProviderSortConfig(primary=primary, direction=direction)
 
 
 def _load_export(raw: dict) -> ExportConfig:

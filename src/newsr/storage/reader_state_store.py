@@ -10,10 +10,15 @@ class ReaderStateStore:
     def __init__(self, db: StorageConnection) -> None:
         self._db = db
 
-    def load(self) -> ReaderState:
+    def load(self, scope_id: str) -> ReaderState:
         with self._db._lock:
             row = self._db.connection.execute(
-                "SELECT article_id, view_mode, scroll_offset, theme_name FROM reader_state WHERE id = 1"
+                """
+                SELECT article_id, view_mode, scroll_offset
+                FROM reader_state
+                WHERE scope_id = ?
+                """,
+                (scope_id,),
             ).fetchone()
         if row is None:
             return ReaderState(article_id=None, view_mode=ViewMode.FULL, scroll_offset=0)
@@ -21,27 +26,25 @@ class ReaderStateStore:
             article_id=row["article_id"],
             view_mode=ViewMode(row["view_mode"]),
             scroll_offset=row["scroll_offset"],
-            theme_name=row["theme_name"],
         )
 
-    def save(self, state: ReaderState) -> None:
+    def save(self, scope_id: str, state: ReaderState) -> None:
         with self._db.transaction():
             self._db.connection.execute(
                 """
-                INSERT INTO reader_state (id, article_id, view_mode, scroll_offset, theme_name, updated_at)
-                VALUES (1, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
+                INSERT INTO reader_state (scope_id, article_id, view_mode, scroll_offset, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(scope_id) DO UPDATE SET
                     article_id = excluded.article_id,
                     view_mode = excluded.view_mode,
                     scroll_offset = excluded.scroll_offset,
-                    theme_name = excluded.theme_name,
                     updated_at = excluded.updated_at
                 """,
                 (
+                    scope_id,
                     state.article_id,
                     state.view_mode.value,
                     state.scroll_offset,
-                    state.theme_name,
                     datetime.now(UTC).isoformat(),
                 ),
             )

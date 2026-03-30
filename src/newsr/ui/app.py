@@ -14,7 +14,7 @@ from textual.app import ScreenStackError
 from textual.binding import Binding, BindingsMap
 from textual.css.query import NoMatches
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Footer, Header, LoadingIndicator, Markdown, Static
+from textual.widgets import DataTable, Footer, Header, LoadingIndicator, Markdown, Static
 
 from ..cancellation import RefreshCancellation, RefreshCancelled
 from ..config.models import AppConfig
@@ -33,10 +33,14 @@ from .screens import (
     HelpScreen,
     MoreInfoScreen,
     OpenLinkConfirmScreen,
+    ProviderHomeRow,
     QuickNavScreen,
     SourceSelectionScreen,
 )
 from .themes import OLD_FIDO_THEME
+
+
+ALL_PROVIDERS_SCOPE_ID = "[ALL]"
 
 
 @dataclass(slots=True)
@@ -69,6 +73,29 @@ class NewsReaderApp(App[None]):
     #article-frame {
         height: 1fr;
         border: heavy $primary;
+        background: $background;
+    }
+    #provider-home-table {
+        height: 1fr;
+        background: $background;
+        color: $foreground;
+        overflow-y: scroll;
+        overflow-x: auto;
+        scrollbar-size-vertical: 1;
+        scrollbar-size-horizontal: 1;
+        scrollbar-background: $panel;
+        scrollbar-background-hover: $panel;
+        scrollbar-background-active: $panel;
+        scrollbar-color: $accent;
+        scrollbar-color-hover: $primary;
+        scrollbar-color-active: $primary;
+        scrollbar-gutter: stable;
+        scrollbar-visibility: visible;
+    }
+    #provider-home-empty {
+        height: 1fr;
+        content-align: center middle;
+        color: $secondary;
         background: $background;
     }
     #article-pane {
@@ -174,15 +201,19 @@ class NewsReaderApp(App[None]):
         self._export_screen: ExportScreen | None = None
         self._open_link_confirm_screen: OpenLinkConfirmScreen | None = None
         self._pending_open_link: tuple[str, str] | None = None
-        self.reader_state = self.storage.load_reader_state()
+        self._provider_home_open = False
+        self._active_scope_id = ALL_PROVIDERS_SCOPE_ID
+        self._provider_home_selected_scope_id = ALL_PROVIDERS_SCOPE_ID
+        self.options = self.storage.load_options()
+        self.reader_state = self.storage.load_reader_state(self._active_scope_id)
         self._rendered_header_text: str | None = None
         self._rendered_body_text: str | None = None
         self._rendered_article_url: str | None = None
         self._rendered_status_text: str | None = None
-        if self.reader_state.theme_name and self.get_theme(self.reader_state.theme_name) is not None:
+        if self.options.theme_name and self.get_theme(self.options.theme_name) is not None:
             self._restoring_theme = True
             try:
-                self.theme = self.reader_state.theme_name
+                self.theme = self.options.theme_name
             finally:
                 self._restoring_theme = False
 
@@ -205,6 +236,8 @@ class NewsReaderApp(App[None]):
             ("o", "open_article", self.ui.text("app.binding.open")),
             ("d", "download_articles", self.ui.text("app.binding.download")),
             ("h", "show_help", self.ui.text("app.binding.help")),
+            Binding("ctrl+p", "command_palette", show=False),
+            Binding("escape", "return_to_provider_home", self.ui.text("app.binding.providers"), show=False),
             ("q", "quit_reader", self.ui.text("app.binding.quit")),
         ]
 
@@ -213,6 +246,8 @@ class NewsReaderApp(App[None]):
         with Vertical(id="chrome"):
             yield Static(id="article-header")
             with Vertical(id="article-frame"):
+                yield DataTable(id="provider-home-table", cursor_type="row")
+                yield Static(id="provider-home-empty")
                 with VerticalScroll(id="article-pane"):
                     yield Markdown(id="article-body")
                 yield Static(id="article-url")
@@ -226,8 +261,16 @@ class NewsReaderApp(App[None]):
         # side.  Without this, terminals that fail DEC-2026 detection (common
         # over SSH) display partial frames, causing border artifacts.
         self._sync_available = True
+        provider_table = self.query_one("#provider-home-table", DataTable)
+        provider_table.zebra_stripes = True
+        provider_table.show_header = True
+        provider_table.show_row_labels = False
+        provider_table.show_cursor = True
+        provider_table.display = False
+        self.query_one("#provider-home-empty", Static).display = False
         self.load_articles()
         self.call_after_refresh(self.refresh_view)
+        self.call_after_refresh(self.show_provider_home)
         self._start_refresh()
 
     def on_resize(self) -> None:
@@ -237,6 +280,8 @@ class NewsReaderApp(App[None]):
         """Clear width-dependent cached text so the next refresh_view picks up new sizes."""
         self._rendered_article_url = None
         self._rendered_status_text = None
+        if self.provider_home_open:
+            self._refresh_provider_home_rows()
 
     def _bootstrap_provider_state(self) -> None:
         provider_records = [
@@ -263,14 +308,20 @@ class NewsReaderApp(App[None]):
         *,
         preferred_article_id: str | None = None,
         auto_select_first: bool = False,
+        fallback_to_current_article: bool = True,
     ) -> None:
         current_article = self.current_article
         previous_count = len(self.articles)
-        self.articles = self.storage.list_articles()
+        self.articles = self._articles_for_scope(self._active_scope_id)
         if len(self.articles) > previous_count:
             self._auto_fetch_armed = True
         self.current_index = self._resolve_current_index(
-            preferred_article_id=preferred_article_id or (current_article.article_id if current_article else None),
+            preferred_article_id=preferred_article_id
+            or (
+                current_article.article_id
+                if current_article is not None and fallback_to_current_article
+                else None
+            ),
             auto_select_first=auto_select_first,
         )
         self._sync_reader_state_after_article_load()
@@ -279,32 +330,251 @@ class NewsReaderApp(App[None]):
         except (NoMatches, ScreenStackError):
             pass
 
+    def _articles_for_scope(self, scope_id: str) -> list[ArticleRecord]:
+        articles = [article for article in self.storage.list_articles() if self._article_is_translated(article)]
+        if scope_id == ALL_PROVIDERS_SCOPE_ID:
+            return articles
+        return [article for article in articles if article.provider_id == scope_id]
+
+    @staticmethod
+    def _article_is_translated(article: ArticleRecord) -> bool:
+        return article.translation_status == "done" and article.translated_body is not None
+
+    def provider_home_rows(self) -> list[ProviderHomeRow]:
+        all_articles = self._articles_for_scope(ALL_PROVIDERS_SCOPE_ID)
+        rows = [
+            ProviderHomeRow(
+                scope_id=ALL_PROVIDERS_SCOPE_ID,
+                display_name=ALL_PROVIDERS_SCOPE_ID,
+                unread_count=self._unread_count_for_scope(ALL_PROVIDERS_SCOPE_ID, all_articles),
+                total_count=len(all_articles),
+            )
+        ]
+        enabled_providers = self.storage.list_enabled_providers()
+        provider_rows = [
+            ProviderHomeRow(
+                scope_id=provider.provider_id,
+                display_name=provider.display_name,
+                unread_count=self._unread_count_for_scope(
+                    provider.provider_id,
+                    [article for article in all_articles if article.provider_id == provider.provider_id],
+                ),
+                total_count=sum(1 for article in all_articles if article.provider_id == provider.provider_id),
+            )
+            for provider in enabled_providers
+        ]
+        rows.extend(self._sort_provider_home_rows(provider_rows))
+        return rows
+
+    def _sort_provider_home_rows(self, rows: list[ProviderHomeRow]) -> list[ProviderHomeRow]:
+        primary = self.config.ui.provider_sort.primary
+        direction = self.config.ui.provider_sort.direction
+        if primary == "name":
+            return sorted(
+                rows,
+                key=lambda row: row.display_name.casefold(),
+                reverse=direction == "desc",
+            )
+        reverse = direction == "desc"
+        return sorted(
+            rows,
+            key=lambda row: (
+                -row.unread_count if reverse else row.unread_count,
+                row.display_name.casefold(),
+            ),
+        )
+
+    def _unread_count_for_scope(self, scope_id: str, articles: list[ArticleRecord]) -> int:
+        if not articles:
+            return 0
+        state = self.storage.load_reader_state(scope_id)
+        if state.article_id is None:
+            return len(articles)
+        for index, article in enumerate(articles):
+            if article.article_id == state.article_id:
+                return max(0, len(articles) - index - 1)
+        return len(articles)
+
+    def show_provider_home(self) -> None:
+        self._provider_home_selected_scope_id = self._active_scope_id
+        self._provider_home_open = True
+        self._refresh_provider_home_rows()
+        self._notify_bindings_changed()
+        self.refresh_view()
+        try:
+            self.query_one("#provider-home-table", DataTable).focus()
+        except NoMatches:
+            pass
+
+    def close_provider_home(self) -> None:
+        self._provider_home_open = False
+        self._notify_bindings_changed()
+        self.refresh_view()
+
+    def open_scope(self, scope_id: str) -> None:
+        self._persist_reader_state()
+        self._active_scope_id = scope_id
+        self._provider_home_selected_scope_id = scope_id
+        self.reader_state = self.storage.load_reader_state(scope_id)
+        self._state_persisted = False
+        self.load_articles(
+            preferred_article_id=self.reader_state.article_id,
+            fallback_to_current_article=False,
+        )
+        self.close_provider_home()
+        self.refresh_view()
+        self._maybe_auto_fetch()
+
+    @property
+    def provider_home_open(self) -> bool:
+        return self._provider_home_open
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if not self.provider_home_open:
+            return True
+        provider_home_actions = {
+            "scroll_up",
+            "scroll_down",
+            "page_up",
+            "page_down",
+            "show_source_manager",
+            "download_articles",
+            "show_help",
+            "quit_reader",
+            "command_palette",
+        }
+        hidden_in_provider_home = {
+            "previous_article",
+            "next_article",
+            "toggle_summary",
+            "show_or_refresh_more_info",
+            "show_article_qa",
+            "show_quick_nav",
+            "export_current",
+            "open_article",
+            "return_to_provider_home",
+        }
+        if action in provider_home_actions:
+            return True
+        if action in hidden_in_provider_home:
+            return False
+        return True
+
+    def _notify_bindings_changed(self) -> None:
+        try:
+            screen = self.screen
+        except ScreenStackError:
+            return
+        try:
+            screen.bindings_updated_signal.publish(screen)
+        except ScreenStackError:
+            return
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        if event.data_table.id != "provider-home-table":
+            return
+        rows = self.provider_home_rows()
+        if event.cursor_row < 0 or event.cursor_row >= len(rows):
+            return
+        self.open_scope(rows[event.cursor_row].scope_id)
+
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        if event.data_table.id != "provider-home-table":
+            return
+        rows = self.provider_home_rows()
+        if event.cursor_row < 0 or event.cursor_row >= len(rows):
+            return
+        self._provider_home_selected_scope_id = rows[event.cursor_row].scope_id
+        self.refresh_view()
+
+    def _refresh_provider_home_rows(self) -> None:
+        if not self.is_mounted:
+            return
+        table = self.query_one("#provider-home-table", DataTable)
+        rows = self.provider_home_rows()
+        previous_scope_id = self._provider_home_selected_scope_id
+        table.clear(columns=True)
+        provider_width = self._provider_home_provider_width(table)
+        counter_width = 6
+        counter_text_width = max(1, counter_width - (2 * table.cell_padding))
+        table.add_column(self.ui.text("provider_home.table.provider"), key="provider", width=provider_width)
+        table.add_column(self.ui.text("provider_home.table.unread"), key="unread", width=counter_width)
+        table.add_column(self.ui.text("provider_home.table.total"), key="total", width=counter_width)
+        selected_row = 0
+        for index, row in enumerate(rows):
+            table.add_row(
+                row.display_name,
+                f"{row.unread_count:>{counter_text_width}}",
+                f"{row.total_count:>{counter_text_width}}",
+                key=row.scope_id,
+            )
+            if row.scope_id == previous_scope_id:
+                selected_row = index
+        if rows:
+            self._provider_home_selected_scope_id = rows[selected_row].scope_id
+            table.move_cursor(row=selected_row, column=0, animate=False, scroll=True)
+        self._rendered_article_url = None
+
+    def _provider_home_provider_width(self, table: DataTable) -> int:
+        available_width = table.size.width
+        if available_width <= 0:
+            try:
+                available_width = self.query_one("#article-frame", Vertical).size.width
+            except NoMatches:
+                available_width = self.size.width
+        if available_width <= 0:
+            available_width = self.size.width
+        table_padding = 2 * table.cell_padding
+        counter_width = 6
+        reserved = (counter_width * 2) + (table_padding * 3) + 6
+        return max(12, available_width - reserved)
+
     def refresh_view(self) -> None:
         try:
             header = self.query_one("#article-header", Static)
+            provider_table = self.query_one("#provider-home-table", DataTable)
+            provider_empty = self.query_one("#provider-home-empty", Static)
             body = self.query_one("#article-body", Markdown)
+            article_pane = self.query_one("#article-pane", VerticalScroll)
             article_url = self.query_one("#article-url", Static)
             status = self.query_one("#status", Static)
             status_indicator = self.query_one("#status-indicator", LoadingIndicator)
+            footer = self.query_one(Footer)
         except NoMatches:
             return
-        article = self.current_article
-        if article is None:
+        footer.show_command_palette = not self.provider_home_open
+        header.display = not self.provider_home_open
+        if self.provider_home_open:
+            provider_table.display = bool(provider_table.row_count)
+            provider_empty.display = not provider_table.row_count
+            article_pane.display = False
+            article_url.display = True
             border_title = None
-            header_text = self.ui.text("app.empty.header")
-            body_text = self.ui.text("app.empty.body")
+            header_text = ""
+            body_text = self._rendered_body_text or ""
             article_url_text = ""
         else:
-            border_title = self._article_frame_title(article, header.size.width)
-            header_text = self._article_header(article)
-            body_text = self._article_text(article)
-            article_url_text = self._article_url_text(article, article_url.size.width)
+            provider_table.display = False
+            provider_empty.display = False
+            article_pane.display = True
+            article_url.display = True
+            article = self.current_article
+            if article is None:
+                border_title = None
+                header_text = self.ui.text("app.empty.header")
+                body_text = self.ui.text("app.empty.body")
+                article_url_text = ""
+            else:
+                border_title = self._article_frame_title(article, header.size.width)
+                header_text = self._article_header(article)
+                body_text = self._article_text(article)
+                article_url_text = self._article_url_text(article, article_url.size.width)
         if header.border_title != border_title:
             header.border_title = border_title
         if self._rendered_header_text != header_text:
             header.update(header_text)
             self._rendered_header_text = header_text
-        if self._rendered_body_text != body_text:
+        if not self.provider_home_open and self._rendered_body_text != body_text:
             body.update(body_text)
             self._rendered_body_text = body_text
         if self._rendered_article_url != article_url_text:
@@ -324,7 +594,7 @@ class NewsReaderApp(App[None]):
         return self.articles[self.current_index]
 
     def action_previous_article(self) -> None:
-        if self._article_qa_screen is not None:
+        if self.provider_home_open or self._article_qa_screen is not None:
             return
         if self.current_index == 0:
             return
@@ -336,9 +606,13 @@ class NewsReaderApp(App[None]):
         self._maybe_auto_fetch()
 
     def action_next_article(self) -> None:
-        if self._article_qa_screen is not None:
+        if self.provider_home_open or self._article_qa_screen is not None:
+            return
+        if not self.articles:
             return
         if self.current_index >= len(self.articles) - 1:
+            self._save_reader_state_now()
+            self.show_provider_home()
             return
         self.close_more_info()
         self.current_index += 1
@@ -348,6 +622,8 @@ class NewsReaderApp(App[None]):
         self._maybe_auto_fetch()
 
     def action_toggle_summary(self) -> None:
+        if self.provider_home_open:
+            return
         article = self.current_article
         if article is None or not article.summary:
             return
@@ -358,18 +634,32 @@ class NewsReaderApp(App[None]):
         self._save_reader_state_now()
 
     def action_scroll_up(self) -> None:
+        if self.provider_home_open:
+            self._move_provider_home_cursor(-1)
+            return
         self.query_one("#article-pane", VerticalScroll).scroll_relative(y=-3, animate=False)
 
     def action_scroll_down(self) -> None:
+        if self.provider_home_open:
+            self._move_provider_home_cursor(1)
+            return
         self.query_one("#article-pane", VerticalScroll).scroll_relative(y=3, animate=False)
 
     def action_page_up(self) -> None:
+        if self.provider_home_open:
+            self._move_provider_home_cursor(-10)
+            return
         self.query_one("#article-pane", VerticalScroll).scroll_page_up()
 
     def action_page_down(self) -> None:
+        if self.provider_home_open:
+            self._move_provider_home_cursor(10)
+            return
         self.query_one("#article-pane", VerticalScroll).scroll_page_down()
 
     def action_space_down(self) -> None:
+        if self.provider_home_open:
+            return
         pane = self.query_one("#article-pane", VerticalScroll)
         if pane.scroll_target_y >= max(0, pane.max_scroll_y - 1):
             self.action_next_article()
@@ -380,6 +670,8 @@ class NewsReaderApp(App[None]):
         self.action_page_up()
 
     def action_open_article(self) -> None:
+        if self.provider_home_open:
+            return
         article = self.current_article
         if article is None:
             return
@@ -431,13 +723,18 @@ class NewsReaderApp(App[None]):
             pass
 
     def action_show_help(self) -> None:
-        self.push_screen(HelpScreen(self.ui))
+        help_key = "help.body.provider_home" if self.provider_home_open else "help.body.reader"
+        self.push_screen(HelpScreen(self.ui.text(help_key)))
 
     def action_show_or_refresh_more_info(self) -> None:
+        if self.provider_home_open:
+            return
         self.close_article_qa()
         self.refresh_more_info(force_refresh=self._more_info_screen is not None)
 
     def action_show_article_qa(self) -> None:
+        if self.provider_home_open:
+            return
         article = self.current_article
         if article is None:
             return
@@ -446,6 +743,8 @@ class NewsReaderApp(App[None]):
         screen.focus_input()
 
     def action_show_quick_nav(self) -> None:
+        if self.provider_home_open:
+            return
         self.push_screen(
             QuickNavScreen(
                 self.ui,
@@ -462,6 +761,8 @@ class NewsReaderApp(App[None]):
         self.action_show_source_manager()
 
     def action_export_current(self) -> None:
+        if self.provider_home_open:
+            return
         if len(self.screen_stack) > 1:
             return
         article = self.current_article
@@ -489,6 +790,27 @@ class NewsReaderApp(App[None]):
 
     def action_download_articles(self) -> None:
         self._start_refresh()
+
+    def action_return_to_provider_home(self) -> None:
+        if self.provider_home_open:
+            return
+        if len(self.screen_stack) > 1:
+            return
+        self._save_reader_state_now()
+        self.show_provider_home()
+
+    def _move_provider_home_cursor(self, delta: int) -> None:
+        rows = self.provider_home_rows()
+        if not rows:
+            return
+        current_index = 0
+        for index, row in enumerate(rows):
+            if row.scope_id == self._provider_home_selected_scope_id:
+                current_index = index
+                break
+        next_index = min(max(0, current_index + delta), len(rows) - 1)
+        self._provider_home_selected_scope_id = rows[next_index].scope_id
+        self._refresh_provider_home_rows()
 
     def list_source_providers(self) -> list[ProviderRecord]:
         return self.storage.list_providers()
@@ -531,6 +853,13 @@ class NewsReaderApp(App[None]):
             self.storage.set_provider_enabled(provider_id, enabled)
         for provider_id, target_keys in selected_targets.items():
             self.storage.set_selected_targets(provider_id, target_keys)
+        if (
+            self._active_scope_id != ALL_PROVIDERS_SCOPE_ID
+            and not enabled_by_provider.get(self._active_scope_id, False)
+        ):
+            self.open_scope(ALL_PROVIDERS_SCOPE_ID)
+        if self.provider_home_open:
+            self._refresh_provider_home_rows()
         if self.refresh_in_progress:
             self._set_status_text(
                 self.ui.text("app.status.sources_saved_next_refresh"),
@@ -586,16 +915,17 @@ class NewsReaderApp(App[None]):
         self._status_busy = False
         if not self._shutdown_requested:
             self.load_articles()
+            if self.provider_home_open:
+                self._refresh_provider_home_rows()
         self._refresh_thread = None
         self._refresh_cancellation = None
 
     def _watch_theme(self, theme_name: str) -> None:
         super()._watch_theme(theme_name)
-        self.reader_state.theme_name = theme_name
+        self.options.theme_name = theme_name
         if self._restoring_theme:
             return
-        self.storage.save_reader_state(self._capture_reader_state())
-        self._state_persisted = False
+        self.storage.save_options(self.options)
 
     def on_unmount(self) -> None:
         self._cleanup_before_exit()
@@ -646,6 +976,8 @@ class NewsReaderApp(App[None]):
     def _load_ready_article(self, article_id: str) -> None:
         auto_select_first = self._auto_select_first_ready_article and not self.articles
         self.load_articles(auto_select_first=auto_select_first)
+        if self.provider_home_open:
+            self._refresh_provider_home_rows()
         if auto_select_first and self.articles:
             self._auto_select_first_ready_article = False
 
@@ -829,7 +1161,7 @@ class NewsReaderApp(App[None]):
     def _persist_reader_state(self) -> None:
         if self._state_persisted:
             return
-        self.storage.save_reader_state(self._capture_reader_state())
+        self.storage.save_reader_state(self._active_scope_id, self._capture_reader_state())
         self._state_persisted = True
 
     def _save_reader_state_now(self) -> None:
@@ -844,7 +1176,6 @@ class NewsReaderApp(App[None]):
             self.reader_state.scroll_offset = int(pane.scroll_y)
         except (NoMatches, ScreenStackError):
             pass
-        self.reader_state.theme_name = self.theme
         return self.reader_state
 
     def _shutdown_refresh(self) -> None:
@@ -860,8 +1191,9 @@ class NewsReaderApp(App[None]):
         self.close_open_link_confirm()
         self.close_article_qa()
         self.close_more_info()
+        self.close_provider_home()
         self.storage.delete_incomplete_articles()
-        self.articles = self.storage.list_articles()
+        self.articles = self._articles_for_scope(self._active_scope_id)
         if self.current_index >= len(self.articles):
             self.current_index = max(0, len(self.articles) - 1)
         self._state_persisted = False

@@ -21,4 +21,3 @@ class ReaderState:
     article_id: str | None
     view_mode: ViewMode
     scroll_offset: int
-    theme_name: str | None = None

@@ -9,15 +9,13 @@ from unittest.mock import patch
 from rich.cells import cell_len
 from textual.color import Color
 from textual.widgets import DataTable
-from textual.widgets import Input
-from textual.widgets import ListView
-from textual.widgets import LoadingIndicator
-from textual.widgets import Markdown
-from textual.widgets import Static
+from textual.widgets import Footer, Input, ListView, LoadingIndicator, Markdown, Static
 
 from newsr.export import ExportAction, ExportResult
 from newsr.cancellation import RefreshCancellation
-from newsr.domain import ArticleContent, ProviderTarget, ViewMode
+import pytest
+
+from newsr.domain import AppOptions, ArticleContent, ProviderTarget, ViewMode
 from newsr.providers.search import SearchResult
 from newsr.ui import (
     ArticleQuestionScreen,
@@ -189,6 +187,40 @@ def source_status_text(app: NewsReaderApp) -> str:
     screen = category_screen(app)
     assert screen is not None
     return str(screen.query_one("#source-status", Static).content)
+
+
+def provider_home_screen(app: NewsReaderApp):
+    return app if app.provider_home_open else None
+
+
+def provider_home_table(app: NewsReaderApp) -> DataTable:
+    assert app.provider_home_open
+    return app.query_one("#provider-home-table", DataTable)
+
+
+def provider_home_rows(app: NewsReaderApp) -> list[list[str]]:
+    table = provider_home_table(app)
+    rows: list[list[str]] = []
+    for row_index in range(table.row_count):
+        row = table.get_row_at(row_index)
+        rows.append([str(cell).strip() for cell in row])
+    return rows
+
+
+def provider_home_row_index(app: NewsReaderApp, display_name: str) -> int:
+    for row_index, row in enumerate(provider_home_rows(app)):
+        if row[0] == display_name:
+            return row_index
+    raise AssertionError(f"provider home row not found for {display_name}")
+
+
+def provider_home_footer_text(app: NewsReaderApp) -> str:
+    return str(app.query_one("#article-url", Static).content)
+
+
+def footer_bindings(app: NewsReaderApp) -> list[tuple[str, str, str]]:
+    footer = app.query_one(Footer)
+    return [(child.key_display, child.description, child.action) for child in footer.children]
 
 
 class FakeMoreInfoLLM:
@@ -423,6 +455,34 @@ def seed_translated_articles(app: NewsReaderApp, count: int) -> None:
         app.storage.update_summary(article.article_id, f"Summary {index + 1}", "done")
 
 
+def seed_provider_article(
+    app: NewsReaderApp,
+    *,
+    provider_id: str,
+    provider_article_id: str,
+    title: str,
+    body: str,
+    minute: int,
+    translated_title: str | None = None,
+) -> str:
+    article_id = f"{provider_id}:{provider_article_id}"
+    article = ArticleContent(
+        article_id=article_id,
+        provider_id=provider_id,
+        provider_article_id=provider_article_id,
+        url=f"https://example.com/{provider_id}/{provider_article_id}",
+        category="world",
+        title=title,
+        author="Reporter",
+        published_at=datetime(2026, 3, 25, 12, minute, tzinfo=UTC),
+        body=body,
+    )
+    app.storage.upsert_article_source(article)
+    app.storage.update_translation(article_id, translated_title or title, body, "done")
+    app.storage.update_summary(article_id, f"Summary for {title}", "done")
+    return article_id
+
+
 def disable_startup_refresh(app: NewsReaderApp) -> None:
     app._start_refresh = lambda: None  # type: ignore[method-assign]
 
@@ -453,6 +513,50 @@ def test_ui_renders_cached_article(app_config, tmp_path, article_content) -> Non
             assert "From :" not in header_widget.border_title
             assert "Translated text" in body
             assert url_source(app) == f"URL: {article_content.url}"
+
+    asyncio.run(runner())
+
+
+def test_ui_reader_only_loads_translated_articles(app_config, tmp_path) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    untranslated = ArticleContent(
+        article_id="bbc:pending-1",
+        provider_id="bbc",
+        provider_article_id="pending-1",
+        url="https://example.com/bbc/pending-1",
+        category="world",
+        title="Pending title",
+        author="Reporter",
+        published_at=datetime(2026, 3, 25, 12, 0, tzinfo=UTC),
+        body="Pending source text",
+    )
+    translated = ArticleContent(
+        article_id="bbc:done-1",
+        provider_id="bbc",
+        provider_article_id="done-1",
+        url="https://example.com/bbc/done-1",
+        category="technology",
+        title="Ready title",
+        author="Reporter",
+        published_at=datetime(2026, 3, 25, 12, 5, tzinfo=UTC),
+        body="Ready source text",
+    )
+    app.storage.upsert_article_source(untranslated)
+    app.storage.upsert_article_source(translated)
+    app.storage.update_translation(translated.article_id, "Ready translated title", "Ready translated text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            header = app.query_one("#article-header", Static).content
+            assert len(app.articles) == 1
+            assert app.current_article is not None
+            assert app.current_article.article_id == translated.article_id
+            assert "Article # 1 of 1" in header
+            assert "Ready translated text" in body_source(app)
+            assert "Pending source text" not in body_source(app)
 
     asyncio.run(runner())
 
@@ -661,6 +765,7 @@ def test_ui_uses_download_date_when_published_date_is_missing(app_config, tmp_pa
         body="Paragraph one.\n\nParagraph two.",
     )
     app.storage.upsert_article_source(article)
+    app.storage.update_translation(article.article_id, "Translated title", "Translated text", "done")
     stored_article = app.storage.get_article(article.article_id)
     assert stored_article is not None
     expected_date = stored_article.created_at.astimezone().strftime("%Y-%m-%d %H:%M %Z")
@@ -771,7 +876,7 @@ def test_ui_hides_space_hints_from_footer(app_config, tmp_path) -> None:
     assert bindings["b"].show is False
 
 
-def test_ui_filters_cached_section_pages(app_config, tmp_path, article_content) -> None:
+def test_ui_hides_untranslated_cached_section_pages(app_config, tmp_path, article_content) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
     app = NewsReaderApp(app_config, storage_path)
     app.storage.upsert_article_source(
@@ -788,7 +893,7 @@ def test_ui_filters_cached_section_pages(app_config, tmp_path, article_content) 
 
     app.load_articles()
 
-    assert [article.article_id for article in app.articles] == ["world"]
+    assert app.articles == []
 
 
 def test_ui_ignores_download_while_refresh_is_running(app_config, tmp_path, article_content) -> None:
@@ -2305,6 +2410,7 @@ def test_ui_falls_back_when_last_read_article_is_missing(app_config, tmp_path, a
     app.storage.update_translation(newer_article.article_id, "Newer translated title", "Newer text", "done")
     app.storage.update_summary(newer_article.article_id, "Newer summary", "done")
     app.storage.save_reader_state(
+        "[ALL]",
         app.reader_state.__class__(
             article_id=newer_article.article_id,
             view_mode=ViewMode.FULL,
@@ -2353,13 +2459,14 @@ def test_ui_restores_last_read_article_on_restart_with_saved_theme(
     )
     app.storage.update_summary(article_content.article_id, "Older summary", "done")
     app.storage.save_reader_state(
+        "[ALL]",
         app.reader_state.__class__(
             article_id=newer_article.article_id,
             view_mode=ViewMode.FULL,
             scroll_offset=0,
-            theme_name="old fido",
         )
     )
+    app.storage.save_options(AppOptions(theme_name="old fido"))
     app.storage.close()
 
     restarted = NewsReaderApp(app_config, storage_path)
@@ -2370,7 +2477,7 @@ def test_ui_restores_last_read_article_on_restart_with_saved_theme(
             assert restarted.theme == "old fido"
             assert restarted.current_article is not None
             assert restarted.current_article.article_id == newer_article.article_id
-            state = restarted.storage.load_reader_state()
+            state = restarted.storage.load_reader_state("[ALL]")
             assert state.article_id == newer_article.article_id
 
     asyncio.run(runner())
@@ -2774,7 +2881,9 @@ def test_ui_pressing_q_discards_incomplete_articles(app_config, tmp_path, articl
     async def runner() -> None:
         async with app.run_test() as pilot:
             await pilot.pause()
-            assert len(app.articles) == 2
+            assert len(app.articles) == 1
+            assert app.current_article is not None
+            assert app.current_article.article_id == "done-1"
             await pilot.press("q")
 
     asyncio.run(runner())
@@ -2783,7 +2892,7 @@ def test_ui_pressing_q_discards_incomplete_articles(app_config, tmp_path, articl
     storage.initialize()
     try:
         articles = storage.list_articles()
-        state = storage.load_reader_state()
+        state = storage.load_reader_state("[ALL]")
     finally:
         storage.close()
 
@@ -2791,7 +2900,7 @@ def test_ui_pressing_q_discards_incomplete_articles(app_config, tmp_path, articl
     assert state.article_id == "done-1"
 
 
-def test_ui_quit_rewrites_saved_article_when_selected_incomplete_article_is_removed(
+def test_ui_quit_rewrites_stale_saved_incomplete_article_when_it_is_removed(
     app_config, tmp_path, article_content
 ) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
@@ -2819,14 +2928,21 @@ def test_ui_quit_rewrites_saved_article_when_selected_incomplete_article_is_remo
     app.storage.complete_translation(completed.article_id, "Done translated", "Done translated body")
     app.storage.complete_summary(completed.article_id, "Done summary")
     app.storage.upsert_article_source(newest_incomplete)
+    app.storage.save_reader_state(
+        "[ALL]",
+        app.reader_state.__class__(
+            article_id=newest_incomplete.article_id,
+            view_mode=ViewMode.FULL,
+            scroll_offset=0,
+        ),
+    )
     app.load_articles()
 
     async def runner() -> None:
         async with app.run_test() as pilot:
             await pilot.pause()
-            await pilot.press("right", "right")
             assert app.current_article is not None
-            assert app.current_article.article_id == newest_incomplete.article_id
+            assert app.current_article.article_id == "done-1"
             await pilot.press("q")
 
     asyncio.run(runner())
@@ -2835,7 +2951,7 @@ def test_ui_quit_rewrites_saved_article_when_selected_incomplete_article_is_remo
     storage.initialize()
     try:
         articles = storage.list_articles()
-        state = storage.load_reader_state()
+        state = storage.load_reader_state("[ALL]")
     finally:
         storage.close()
 
@@ -2847,13 +2963,14 @@ def test_ui_applies_saved_theme_on_startup(app_config, tmp_path, article_content
     storage_path = tmp_path / "newsr.sqlite3"
     seeded_app = NewsReaderApp(app_config, storage_path)
     seeded_app.storage.save_reader_state(
+        "[ALL]",
         seeded_app.reader_state.__class__(
             article_id=None,
             view_mode=ViewMode.FULL,
             scroll_offset=0,
-            theme_name="gruvbox",
         )
     )
+    seeded_app.storage.save_options(AppOptions(theme_name="gruvbox"))
     seeded_app.storage.upsert_article_source(article_content)
     seeded_app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
     seeded_app.storage.close()
@@ -2878,8 +2995,8 @@ def test_ui_persists_theme_changes(app_config, tmp_path, article_content) -> Non
             await pilot.pause()
             app.theme = "gruvbox"
             await pilot.pause()
-            state = app.storage.load_reader_state()
-            assert state.theme_name == "gruvbox"
+            options = app.storage.load_options()
+            assert options.theme_name == "gruvbox"
 
     asyncio.run(runner())
 
@@ -2921,13 +3038,14 @@ def test_ui_ignores_invalid_saved_theme(app_config, tmp_path, article_content) -
     seeded_app = NewsReaderApp(app_config, storage_path)
     default_theme = seeded_app.theme
     seeded_app.storage.save_reader_state(
+        "[ALL]",
         seeded_app.reader_state.__class__(
             article_id=None,
             view_mode=ViewMode.FULL,
             scroll_offset=0,
-            theme_name="not-a-theme",
         )
     )
+    seeded_app.storage.save_options(AppOptions(theme_name="not-a-theme"))
     seeded_app.storage.upsert_article_source(article_content)
     seeded_app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
     seeded_app.storage.close()
@@ -2945,13 +3063,14 @@ def test_ui_applies_saved_old_fido_theme_on_startup(app_config, tmp_path, articl
     storage_path = tmp_path / "newsr.sqlite3"
     seeded_app = NewsReaderApp(app_config, storage_path)
     seeded_app.storage.save_reader_state(
+        "[ALL]",
         seeded_app.reader_state.__class__(
             article_id=None,
             view_mode=ViewMode.FULL,
             scroll_offset=0,
-            theme_name="old fido",
         )
     )
+    seeded_app.storage.save_options(AppOptions(theme_name="old fido"))
     seeded_app.storage.upsert_article_source(article_content)
     seeded_app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
     seeded_app.storage.close()
@@ -3157,6 +3276,472 @@ def test_ui_source_manager_save_defers_when_refresh_running(app_config, tmp_path
             assert len(launch_calls) == 0
             assert app.query_one("#article-header", Static).content == initial_header
             assert body_source(app) == initial_body
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_starts_with_all_then_enabled_providers_sorted_by_unread(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    seed_provider_article(app, provider_id="bbc", provider_article_id="bbc-1", title="BBC 1", body="BBC body 1", minute=0)
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body="TC body 1",
+        minute=1,
+    )
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-2",
+        title="TC 2",
+        body="TC body 2",
+        minute=2,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            rows = provider_home_rows(app)
+            assert rows[0] == ["[ALL]", "3", "3"]
+            assert rows[1] == ["TechCrunch", "2", "2"]
+            assert rows[2] == ["BBC News", "1", "1"]
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_counts_only_translated_articles(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    seed_provider_article(app, provider_id="bbc", provider_article_id="bbc-1", title="BBC 1", body="BBC body 1", minute=0)
+    pending = ArticleContent(
+        article_id="bbc:pending-1",
+        provider_id="bbc",
+        provider_article_id="pending-1",
+        url="https://example.com/bbc/pending-1",
+        category="world",
+        title="Pending BBC",
+        author="Reporter",
+        published_at=datetime(2026, 3, 25, 12, 1, tzinfo=UTC),
+        body="Pending BBC body",
+    )
+    app.storage.upsert_article_source(pending)
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body="TC body 1",
+        minute=2,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            rows = provider_home_rows(app)
+            assert rows[0] == ["[ALL]", "2", "2"]
+            assert rows[1] == ["BBC News", "1", "1"]
+            assert rows[2] == ["TechCrunch", "1", "1"]
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_uses_available_width_for_provider_column(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            table = provider_home_table(app)
+            provider_column = list(table.columns.values())[0]
+            assert provider_column.width > 12
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_hides_header_widget(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            header = app.query_one("#article-header", Static)
+            assert header.display is False
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_hides_selected_provider_summary_line(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    seed_provider_article(app, provider_id="bbc", provider_article_id="bbc-1", title="BBC 1", body="BBC body 1", minute=0)
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body="TC body 1",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert provider_home_footer_text(app) == ""
+
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "TechCrunch"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+
+            assert provider_home_footer_text(app) == ""
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_shows_current_app_status(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            status = app.query_one("#status", Static)
+            assert str(status.content) == "ready"
+
+            app._set_status_text("fetching BBC News: World")
+            app.refresh_view()
+            await pilot.pause()
+            assert str(status.content) == "fetching BBC News: World"
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_forwards_ctrl_p_to_command_palette(app_config, tmp_path, monkeypatch) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    calls: list[bool] = []
+
+    def fake_command_palette() -> None:
+        calls.append(True)
+
+    monkeypatch.setattr(app, "action_command_palette", fake_command_palette)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("ctrl+p")
+            await pilot.pause()
+            assert calls == [True]
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_hides_reader_only_bindings_from_footer(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert footer_bindings(app) == [
+                ("c", "Sources", "show_source_manager"),
+                ("d", "Download", "download_articles"),
+                ("h", "Help", "show_help"),
+                ("q", "Quit", "quit_reader"),
+            ]
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_help_shows_provider_only_bindings(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("h")
+            await pilot.pause()
+            help_text = app.screen.query_one("#help-text", Static).content
+            assert "Enter: open the selected provider" in help_text
+            assert "C: manage sources" in help_text
+            assert "D: download new articles" in help_text
+            assert "Ctrl+P: command palette / choose theme" in help_text
+            assert "Left/Right: previous/next article" not in help_text
+            assert "S: toggle summary" not in help_text
+            assert "M: more info" not in help_text
+            assert "L: article list" not in help_text
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_entering_reader_can_trigger_auto_refresh(app_config, tmp_path, article_content) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
+
+    calls: list[object] = []
+
+    def fake_launch_refresh_thread() -> object:
+        calls.append(app._run_refresh)
+        return object()
+
+    app._launch_refresh_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert len(calls) == 1
+            app.refresh_in_progress = False
+            app._auto_fetch_armed = True
+
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert provider_home_screen(app) is None
+            assert len(calls) == 2
+            assert app.refresh_in_progress is True
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_enter_all_opens_reader(app_config, tmp_path, article_content) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert provider_home_screen(app) is not None
+            await pilot.press("enter")
+            await pilot.pause()
+            assert provider_home_screen(app) is None
+            assert app.current_article is not None
+            assert app.current_article.article_id == article_content.article_id
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_provider_scope_filters_articles_and_escape_returns_home(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    seed_provider_article(app, provider_id="bbc", provider_article_id="bbc-1", title="BBC 1", body="BBC body", minute=0)
+    tech_article_id = seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body="TC body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "TechCrunch"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert provider_home_screen(app) is None
+            assert [article.provider_id for article in app.articles] == ["techcrunch"]
+            assert app.current_article is not None
+            assert app.current_article.article_id == tech_article_id
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert provider_home_screen(app) is not None
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_scope_reader_state_is_independent(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    seed_provider_article(app, provider_id="bbc", provider_article_id="bbc-1", title="BBC 1", body="BBC body 1", minute=0)
+    bbc_second = seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="bbc-2",
+        title="BBC 2",
+        body="BBC body 2",
+        minute=1,
+    )
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body="TC body 1",
+        minute=2,
+    )
+    tech_second = seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-2",
+        title="TC 2",
+        body="TC body 2",
+        minute=3,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "BBC News"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.press("right")
+            assert app.current_article is not None
+            assert app.current_article.article_id == bbc_second
+            await pilot.press("escape")
+            await pilot.pause()
+
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "TechCrunch"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.press("right")
+            assert app.current_article is not None
+            assert app.current_article.article_id == tech_second
+            await pilot.press("escape")
+            await pilot.pause()
+
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "BBC News"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert app.current_article is not None
+            assert app.current_article.article_id == bbc_second
+
+            assert app.storage.load_reader_state("bbc").article_id == bbc_second
+            assert app.storage.load_reader_state("techcrunch").article_id == tech_second
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_first_provider_entry_does_not_inherit_all_scope_article(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    bbc_first = seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="bbc-1",
+        title="BBC 1",
+        body="BBC body 1",
+        minute=0,
+    )
+    bbc_second = seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="bbc-2",
+        title="BBC 2",
+        body="BBC body 2",
+        minute=1,
+    )
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body="TC body 1",
+        minute=2,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.press("right")
+            assert app.current_article is not None
+            assert app.current_article.article_id == bbc_second
+
+            await pilot.press("escape")
+            await pilot.pause()
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "BBC News"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert app.current_article is not None
+            assert app.current_article.article_id == bbc_first
+            assert app.storage.load_reader_state("bbc").article_id is None
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_scope_next_past_last_returns_home(app_config, tmp_path, article_content) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "BBC News"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert provider_home_screen(app) is None
+
+            await pilot.press("right")
+            await pilot.pause()
+            assert provider_home_screen(app) is not None
 
     asyncio.run(runner())
 

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from threading import Thread
 from pathlib import Path
 
-from newsr.domain import ArticleContent
+from newsr.domain import AppOptions, ArticleContent
 from newsr.domain import ProviderRecord, ProviderTarget
 from newsr.domain import ReaderState, ViewMode
 
@@ -112,17 +112,30 @@ def test_storage_reupsert_does_not_move_existing_article_to_end(storage, article
 
 
 def test_storage_persists_reader_state(storage) -> None:
-    state = ReaderState(
+    all_state = ReaderState(
         article_id="test-1",
         view_mode=ViewMode.SUMMARY,
         scroll_offset=12,
-        theme_name="gruvbox",
+    )
+    provider_state = ReaderState(
+        article_id="bbc:test-2",
+        view_mode=ViewMode.FULL,
+        scroll_offset=3,
     )
 
-    storage.save_reader_state(state)
-    loaded = storage.load_reader_state()
+    storage.save_reader_state("[ALL]", all_state)
+    storage.save_reader_state("bbc", provider_state)
 
-    assert loaded == state
+    assert storage.load_reader_state("[ALL]") == all_state
+    assert storage.load_reader_state("bbc") == provider_state
+
+
+def test_storage_persists_options(storage) -> None:
+    options = AppOptions(theme_name="gruvbox")
+
+    storage.save_options(options)
+
+    assert storage.load_options() == options
 
 
 def test_storage_persists_provider_registry_and_targets(storage) -> None:

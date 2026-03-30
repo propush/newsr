@@ -26,3 +26,4 @@ Run `newsr` from the repository root. On first run it creates `newsr.yml` in the
 After implementing a feature, always update the tests, check that they run.
 Always keep the project documentation consistent in the docs dir.
 Treat [docs/current_providers.md](/Users/pushkin/projects/newsr/docs/current_providers.md) as the single source of truth for the implemented built-in provider list and documented bootstrap defaults. When built-in providers change, update that file and have other docs reference it instead of repeating the concrete provider list.
+When updating the documentation, don't use the wording "instead of" and don't reference the previous behavior: just document everything as it is, the current state.

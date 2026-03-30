@@ -13,8 +13,9 @@ from newsr.config import (
     ExportConfig,
     ExportImageConfig,
     LLMConfig,
+    ProviderSortConfig,
     TranslationConfig,
-    UILocaleConfig,
+    UIConfig,
 )
 from newsr.domain import ArticleContent, ProviderRecord, ProviderTarget
 from newsr.storage import NewsStorage
@@ -46,7 +47,10 @@ def app_config() -> AppConfig:
             headers={},
         ),
         translation=TranslationConfig(target_language="Russian"),
-        ui=UILocaleConfig(locale="en"),
+        ui=UIConfig(
+            locale="en",
+            provider_sort=ProviderSortConfig(primary="unread", direction="desc"),
+        ),
         export=ExportConfig(image=ExportImageConfig(quality="hd")),
     )
 

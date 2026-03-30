@@ -42,6 +42,8 @@ export:
     assert config.articles.store == 14
     assert config.translation.target_language == "Serbian"
     assert config.ui.locale == "en"
+    assert config.ui.provider_sort.primary == "unread"
+    assert config.ui.provider_sort.direction == "desc"
     assert config.export.image.quality == "fhd"
 
 
@@ -78,6 +80,7 @@ export:
     assert config.llm.headers == {"OpenAI-Organization": "org-test"}
     assert config.llm.request_retries == 3
     assert config.ui.locale == "en"
+    assert config.ui.provider_sort.primary == "unread"
 
 
 def test_load_config_accepts_russian_ui_locale(tmp_path: Path) -> None:
@@ -105,6 +108,38 @@ export:
     config = load_config(config_path)
 
     assert config.ui.locale == "ru"
+    assert config.ui.provider_sort.direction == "desc"
+
+
+def test_load_config_accepts_provider_sort_overrides(tmp_path: Path) -> None:
+    config_path = tmp_path / "newsr.yml"
+    config_path.write_text(
+        """
+articles:
+  fetch: 7
+  store: 14
+llm:
+  url: http://localhost:8081/v1
+  model_translation: translate
+  model_summary: summary
+translation:
+  target_language: Serbian
+ui:
+  locale: en
+  provider_sort:
+    primary: name
+    direction: asc
+export:
+  image:
+    quality: fhd
+""",
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.ui.provider_sort.primary == "name"
+    assert config.ui.provider_sort.direction == "asc"
 
 
 def test_load_config_rejects_invalid_article_fetch(tmp_path: Path) -> None:
@@ -235,4 +270,60 @@ export:
     )
 
     with pytest.raises(ValueError, match="ui.locale"):
+        load_config(config_path)
+
+
+def test_load_config_rejects_invalid_provider_sort_primary(tmp_path: Path) -> None:
+    config_path = tmp_path / "newsr.yml"
+    config_path.write_text(
+        """
+articles:
+  fetch: 5
+  store: 10
+llm:
+  url: http://localhost:8081/v1
+  model_translation: translate
+  model_summary: summary
+translation:
+  target_language: Russian
+ui:
+  locale: en
+  provider_sort:
+    primary: newest
+export:
+  image:
+    quality: fhd
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="ui.provider_sort.primary"):
+        load_config(config_path)
+
+
+def test_load_config_rejects_invalid_provider_sort_direction(tmp_path: Path) -> None:
+    config_path = tmp_path / "newsr.yml"
+    config_path.write_text(
+        """
+articles:
+  fetch: 5
+  store: 10
+llm:
+  url: http://localhost:8081/v1
+  model_translation: translate
+  model_summary: summary
+translation:
+  target_language: Russian
+ui:
+  locale: en
+  provider_sort:
+    direction: sideways
+export:
+  image:
+    quality: fhd
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="ui.provider_sort.direction"):
         load_config(config_path)

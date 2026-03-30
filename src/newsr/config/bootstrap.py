@@ -211,6 +211,10 @@ def render_config(answers: BootstrapAnswers) -> str:
         },
         "ui": {
             "locale": answers.ui_locale,
+            "provider_sort": {
+                "primary": "unread",
+                "direction": "desc",
+            },
         },
         "export": {
             "image": {

@@ -4,6 +4,7 @@ from .export import ExportScreen
 from .help import HelpScreen
 from .more_info import MoreInfoScreen
 from .open_link_confirm import OpenLinkConfirmScreen
+from .provider_home import ProviderHomeRow, ProviderHomeScreen
 from .quick_nav import QuickNavScreen
 
 CategorySelectionScreen = SourceSelectionScreen
@@ -15,6 +16,8 @@ __all__ = [
     "HelpScreen",
     "MoreInfoScreen",
     "OpenLinkConfirmScreen",
+    "ProviderHomeRow",
+    "ProviderHomeScreen",
     "QuickNavScreen",
     "SourceSelectionScreen",
 ]

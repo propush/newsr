@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from .connection import StorageConnection
 
 
@@ -63,13 +65,107 @@ def initialize_schema(db: StorageConnection) -> None:
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (article_id, job_type)
             );
-            CREATE TABLE IF NOT EXISTS reader_state (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                article_id TEXT,
-                view_mode TEXT NOT NULL,
-                scroll_offset INTEGER NOT NULL,
-                theme_name TEXT,
-                updated_at TEXT NOT NULL
-            );
             """
         )
+        legacy_theme_name = _migrate_reader_state_schema(db)
+        _initialize_options_schema(db, legacy_theme_name)
+
+
+def _migrate_reader_state_schema(db: StorageConnection) -> str | None:
+    tables = {
+        row["name"]
+        for row in db.connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
+    if "reader_state" not in tables:
+        _create_reader_state_table(db)
+        return None
+
+    columns = {
+        row["name"]
+        for row in db.connection.execute("PRAGMA table_info(reader_state)").fetchall()
+    }
+    if "scope_id" in columns:
+        return None
+
+    legacy_row = db.connection.execute(
+        """
+        SELECT article_id, view_mode, scroll_offset, theme_name, updated_at
+        FROM reader_state
+        WHERE id = 1
+        """
+    ).fetchone()
+    db.connection.execute(
+        """
+        CREATE TABLE reader_state_new (
+            scope_id TEXT PRIMARY KEY,
+            article_id TEXT,
+            view_mode TEXT NOT NULL,
+            scroll_offset INTEGER NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    legacy_theme_name = None
+    if legacy_row is not None:
+        legacy_theme_name = legacy_row["theme_name"]
+        db.connection.execute(
+            """
+            INSERT INTO reader_state_new (scope_id, article_id, view_mode, scroll_offset, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                "[ALL]",
+                legacy_row["article_id"],
+                legacy_row["view_mode"],
+                legacy_row["scroll_offset"],
+                legacy_row["updated_at"],
+            ),
+        )
+    db.connection.execute("DROP TABLE reader_state")
+    db.connection.execute("ALTER TABLE reader_state_new RENAME TO reader_state")
+    return legacy_theme_name
+
+
+def _create_reader_state_table(db: StorageConnection) -> None:
+    db.connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS reader_state (
+            scope_id TEXT PRIMARY KEY,
+            article_id TEXT,
+            view_mode TEXT NOT NULL,
+            scroll_offset INTEGER NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+
+def _initialize_options_schema(db: StorageConnection, legacy_theme_name: str | None) -> None:
+    db.connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS options (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            theme_name TEXT,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    if legacy_theme_name is None:
+        return
+    existing = db.connection.execute(
+        "SELECT theme_name FROM options WHERE id = 1"
+    ).fetchone()
+    if existing is not None:
+        return
+    db.connection.execute(
+        """
+        INSERT INTO options (id, theme_name, updated_at)
+        VALUES (1, ?, ?)
+        """,
+        (
+            legacy_theme_name,
+            datetime.now(UTC).isoformat(),
+        ),
+    )

@@ -1,6 +1,6 @@
 # Current Providers
 
-This page is the canonical reference for NewsR's currently implemented built-in news providers. When the built-in provider set or its documented bootstrap defaults change, update this page and have other docs link here instead of repeating the concrete list.
+This page is the canonical reference for NewsR's currently implemented built-in news providers. When the built-in provider set or its documented bootstrap defaults change, update this page and have other docs link here for the concrete list.
 
 The current built-in news providers are defined in `src/newsr/providers/registry.py`.
 

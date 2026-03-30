@@ -25,8 +25,15 @@ class TranslationConfig:
 
 
 @dataclass(slots=True)
-class UILocaleConfig:
+class ProviderSortConfig:
+    primary: str
+    direction: str
+
+
+@dataclass(slots=True)
+class UIConfig:
     locale: str
+    provider_sort: ProviderSortConfig
 
 
 @dataclass(slots=True)
@@ -44,5 +51,5 @@ class AppConfig:
     articles: ArticlesConfig
     llm: LLMConfig
     translation: TranslationConfig
-    ui: UILocaleConfig
+    ui: UIConfig
     export: ExportConfig

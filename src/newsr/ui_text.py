@@ -53,6 +53,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.open": "Open",
         "app.binding.download": "Download",
         "app.binding.help": "Help",
+        "app.binding.providers": "Providers",
         "app.binding.quit": "Quit",
         "app.empty.header": "No cached articles",
         "app.empty.body": "Press D to fetch articles.",
@@ -78,7 +79,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.status.sources_unchanged": "sources unchanged",
         "app.status.sources_saved_next_refresh": "sources saved; next refresh will use updated provider settings",
         "app.status.sources_saved_refreshing": "sources saved; refreshing enabled providers",
-        "help.body": (
+        "help.body.reader": (
             "Left/Right: previous/next article\n"
             "Up/Down/PgUp/PgDn/B: scroll\n"
             "Space: page down or next article\n"
@@ -86,6 +87,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "M: more info\n"
             "?: ask about article\n"
             "L: article list\n"
+            "Esc: back to providers\n"
             "C: sources\n"
             "E: export current view\n"
             "O: open article in browser\n"
@@ -94,6 +96,22 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "H: help\n"
             "Q: quit"
         ),
+        "help.body.provider_home": (
+            "Up/Down/PgUp/PgDn/B: move through providers\n"
+            "Enter: open the selected provider\n"
+            "C: manage sources\n"
+            "D: download new articles\n"
+            "Ctrl+P: command palette / choose theme\n"
+            "H: help\n"
+            "Q: quit"
+        ),
+        "provider_home.empty": "No enabled providers. Press C to manage sources.",
+        "provider_home.hint": "Up/Down: select   Enter: open provider   C: sources   D: refresh   H: help",
+        "provider_home.status.empty": "No provider is available.",
+        "provider_home.status.selection": "{provider}: {unread} unread, {total} total",
+        "provider_home.table.provider": "Provider",
+        "provider_home.table.unread": "Unread",
+        "provider_home.table.total": "Total",
         "source.binding.close": "Close",
         "source.binding.pane": "Pane",
         "source.binding.toggle": "Toggle",
@@ -211,6 +229,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.open": "Открыть",
         "app.binding.download": "Загрузить",
         "app.binding.help": "Справка",
+        "app.binding.providers": "Провайдеры",
         "app.binding.quit": "Выход",
         "app.empty.header": "Нет статей в кеше",
         "app.empty.body": "Нажмите D, чтобы загрузить статьи.",
@@ -236,7 +255,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.status.sources_unchanged": "источники не изменились",
         "app.status.sources_saved_next_refresh": "источники сохранены; следующее обновление применит новые настройки провайдеров",
         "app.status.sources_saved_refreshing": "источники сохранены; обновляются включённые провайдеры",
-        "help.body": (
+        "help.body.reader": (
             "Left/Right: предыдущая/следующая статья\n"
             "Up/Down/PgUp/PgDn/B: прокрутка\n"
             "Space: страница вниз или следующая статья\n"
@@ -244,6 +263,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "M: подробнее\n"
             "?: спросить о статье\n"
             "L: список статей\n"
+            "Esc: назад к провайдерам\n"
             "C: источники\n"
             "E: экспорт текущего вида\n"
             "O: открыть статью в браузере\n"
@@ -252,6 +272,22 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "H: справка\n"
             "Q: выход"
         ),
+        "help.body.provider_home": (
+            "Up/Down/PgUp/PgDn/B: перемещение по провайдерам\n"
+            "Enter: открыть выбранного провайдера\n"
+            "C: управление источниками\n"
+            "D: загрузить новые статьи\n"
+            "Ctrl+P: палитра команд / выбор темы\n"
+            "H: справка\n"
+            "Q: выход"
+        ),
+        "provider_home.empty": "Нет включённых провайдеров. Нажмите C для управления источниками.",
+        "provider_home.hint": "Up/Down: выбор   Enter: открыть провайдер   C: источники   D: обновить   H: справка",
+        "provider_home.status.empty": "Нет доступных провайдеров.",
+        "provider_home.status.selection": "{provider}: непрочитано {unread}, всего {total}",
+        "provider_home.table.provider": "Провайдер",
+        "provider_home.table.unread": "Непрочитано",
+        "provider_home.table.total": "Всего",
         "source.binding.close": "Закрыть",
         "source.binding.pane": "Панель",
         "source.binding.toggle": "Переключить",

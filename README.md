@@ -8,6 +8,7 @@ NewsR currently requires Python 3.12 or newer.
 
 - built-in support for multiple news providers; see [Current Providers](docs/current_providers.md)
 - background refresh with cached startup content
+- provider home with `[ALL]` plus enabled providers, unread/total counters, and configurable sort order
 - translated full articles plus summaries
 - "more info" and article Q&A overlays backed by DuckDuckGo search and the configured LLM
 - source management for enabling providers, refreshing catalogs, and choosing targets
@@ -60,7 +61,7 @@ The simplest way to start NewsR from the repository root is:
 
 `newsr.sh` uses the Python interpreter already available on your `PATH` (`python3` first, then `python`). If that interpreter is Python 3.12 or newer, the script creates `./venv` when needed, installs NewsR there, and launches the app.
 
-If no compatible Python is available on `PATH`, the script exits with an error instead of trying to install or discover another interpreter.
+If no compatible Python is available on `PATH`, the script exits with an error.
 
 For development work, you can still create and manage the virtualenv manually:
 
@@ -105,6 +106,8 @@ After writing `newsr.yml`, NewsR tells you that more settings can be tuned by ed
 
 To reconfigure the app from scratch, delete `newsr.yml` and start NewsR again. That reruns the terminal setup flow and writes a fresh config file.
 
+After startup, NewsR opens the provider home. `[ALL]` shows the cross-provider translated article stream, and each enabled provider gets its own row with unread and total counters. Press `Enter` to open a scope, and press `Esc` from the reader to return to the provider home.
+
 The first launch also creates:
 
 - `newsr.yml`: local config
@@ -120,7 +123,7 @@ The generated `newsr.yml` contains five sections:
 - `articles`: how many article candidates to fetch per selected target and how many days of articles to keep in SQLite
 - `llm`: the OpenAI-compatible base URL, optional auth settings, optional extra headers, plus a translation model for titles and article bodies and a summary model reused for summaries, "more info", search-query generation, and article Q&A
 - `translation`: the target language used for translated headlines, article text, summaries, "more info", and article Q&A answers
-- `ui`: the Textual UI locale used for built-in chrome such as hints, modal titles, and status text; current built-in locales are `en` and `ru`
+- `ui`: the Textual UI locale plus provider-home ordering; current built-in locales are `en` and `ru`
 - `export`: image export settings
 
 Example generated config for a local setup:
@@ -138,11 +141,16 @@ translation:
   target_language: English
 ui:
   locale: en
+  provider_sort:
+    primary: unread
+    direction: desc
 export:
   image:
     quality: fhd
 ```
 
+`ui.provider_sort.primary` accepts `unread` or `name`.
+`ui.provider_sort.direction` accepts `asc` or `desc`.
 `export.image.quality` accepts `hd` or `fhd`.
 `llm.api_key` is optional for local unauthenticated servers. `llm.headers` can be used for extra OpenAI-compatible provider headers, and `llm.request_retries` controls how many times NewsR retries transient transport failures before surfacing an error.
 
@@ -162,6 +170,17 @@ llm:
 If you launch NewsR without an interactive terminal and `newsr.yml` is missing, startup fails with a message telling you to create the config file manually.
 
 Source selection is managed in `cache/newsr.sqlite3`. Providers, discovered targets, and the current enabled and selected source state live there and are managed from the TUI.
+
+## Provider Home
+
+NewsR starts in a provider home view.
+
+- `[ALL]` opens the shared reader across all enabled providers.
+- Enabled providers appear under `[ALL]` with unread and total counters.
+- Counters only include articles whose translation has completed.
+- `Up` / `Down` / `PgUp` / `PgDn` / `B` move through the list.
+- `Enter` opens the highlighted scope.
+- `C`, `D`, `H`, `Ctrl+P`, and `Q` stay available from this view.
 
 ## Sources
 
@@ -185,6 +204,7 @@ Saving source changes starts a refresh immediately when no refresh is already ru
 - `Up` / `Down`: scroll by a few lines
 - `PgUp` / `PgDn` / `B`: page scroll
 - `Space`: page down, then move to the next article when already at the end
+- `Esc`: return to the provider home
 - `S`: toggle between full article and summary when a summary exists
 - `M`: open or refresh the "more info" panel for the current article
 - `?`: ask a follow-up question about the current article
@@ -196,6 +216,8 @@ Saving source changes starts a refresh immediately when no refresh is already ru
 - `Ctrl+P`: open the command palette and switch themes
 - `H`: show the in-app help screen
 - `Q`: quit
+
+Press `Right` on the last article in the current scope to return to the provider home.
 
 ## Overlays
 
@@ -226,6 +248,7 @@ Clipboard export support depends on the platform:
 ## Refresh Behavior
 
 - Startup loads cached articles first, then immediately starts a background refresh.
+- The provider-home counters update as translated articles become ready.
 - Refresh iterates enabled providers and their selected targets from SQLite-backed source state.
 - Refresh work runs in the background and updates the UI as translations and summaries finish.
 - Already cached articles are skipped before fetch and LLM work.

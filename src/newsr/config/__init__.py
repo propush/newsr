@@ -12,8 +12,9 @@ from .models import (
     ExportConfig,
     ExportImageConfig,
     LLMConfig,
+    ProviderSortConfig,
     TranslationConfig,
-    UILocaleConfig,
+    UIConfig,
 )
 
 __all__ = [
@@ -23,8 +24,9 @@ __all__ = [
     "ExportConfig",
     "ExportImageConfig",
     "LLMConfig",
+    "ProviderSortConfig",
     "TranslationConfig",
-    "UILocaleConfig",
+    "UIConfig",
     "bootstrap_config",
     "ensure_config",
     "ensure_ui_locale",
