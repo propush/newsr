@@ -484,7 +484,7 @@ def seed_provider_article(
 
 
 def disable_startup_refresh(app: NewsReaderApp) -> None:
-    app._start_refresh = lambda: None  # type: ignore[method-assign]
+    app._refresh.start = lambda: None  # type: ignore[method-assign]
 
 
 def test_ui_renders_cached_article(app_config, tmp_path, article_content) -> None:
@@ -857,7 +857,8 @@ def test_ui_space_advances_to_next_article_at_bottom(app_config, tmp_path, artic
         async with app.run_test() as pilot:
             await pilot.pause()
             pane = app.query_one("#article-pane")
-            pane.scroll_target_y = pane.max_scroll_y
+            pane.scroll_to(y=pane.max_scroll_y, animate=False)
+            await pilot.pause()
             await pilot.press("space")
             await pilot.pause()
 
@@ -907,10 +908,10 @@ def test_ui_ignores_download_while_refresh_is_running(app_config, tmp_path, arti
     calls: list[object] = []
 
     def fake_launch_refresh_thread() -> object:
-        calls.append(app._run_refresh)
+        calls.append(app._refresh._run)
         return object()
 
-    app._launch_refresh_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
     app.refresh_in_progress = True
 
     async def runner() -> None:
@@ -930,10 +931,10 @@ def test_ui_startup_refresh_blocks_extra_download(app_config, tmp_path) -> None:
     calls: list[object] = []
 
     def fake_launch_refresh_thread() -> object:
-        calls.append(app._run_refresh)
+        calls.append(app._refresh._run)
         return object()
 
-    app._launch_refresh_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
 
     async def runner() -> None:
         async with app.run_test() as pilot:
@@ -955,10 +956,10 @@ def test_ui_startup_refresh_runs_when_cached_articles_exist(app_config, tmp_path
     calls: list[object] = []
 
     def fake_launch_refresh_thread() -> object:
-        calls.append(app._run_refresh)
+        calls.append(app._refresh._run)
         return object()
 
-    app._launch_refresh_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
 
     async def runner() -> None:
         async with app.run_test() as pilot:
@@ -981,10 +982,10 @@ def test_ui_navigation_does_not_start_extra_refresh_while_startup_refresh_is_run
     calls: list[object] = []
 
     def fake_launch_refresh_thread() -> object:
-        calls.append(app._run_refresh)
+        calls.append(app._refresh._run)
         return object()
 
-    app._launch_refresh_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
 
     async def runner() -> None:
         async with app.run_test() as pilot:
@@ -1012,10 +1013,10 @@ def test_ui_rearms_auto_fetch_after_article_list_grows(app_config, tmp_path) -> 
     calls: list[object] = []
 
     def fake_launch_refresh_thread() -> object:
-        calls.append(app._run_refresh)
+        calls.append(app._refresh._run)
         return object()
 
-    app._launch_refresh_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
 
     async def runner() -> None:
         async with app.run_test() as pilot:
@@ -2697,7 +2698,7 @@ def test_ui_pressing_o_without_current_article_is_ignored(app_config, tmp_path, 
         calls.append(url)
         return True
 
-    app._launch_refresh_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
     monkeypatch.setattr(webbrowser, "open", fake_open)
 
     async def runner() -> None:
@@ -3201,14 +3202,14 @@ def test_ui_source_manager_refreshes_provider_catalog(app_config, tmp_path) -> N
 def test_ui_source_manager_save_persists_selection_and_starts_refresh(app_config, tmp_path) -> None:
     launch_calls: list[object] = []
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
-    original_start_refresh = app._start_refresh
+    original_start_refresh = app._refresh.start
     disable_startup_refresh(app)
 
     def fake_launch_refresh_thread() -> object:
         launch_calls.append(object())
         return launch_calls[-1]
 
-    app._launch_refresh_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
 
     async def runner() -> None:
         async with app.run_test() as pilot:
@@ -3223,7 +3224,7 @@ def test_ui_source_manager_save_persists_selection_and_starts_refresh(app_config
             assert screen is not None
             provider_list(app).move_cursor(row=provider_row_index(app, "BBC News"), column=0, animate=False)
             await pilot.pause()
-            app._start_refresh = original_start_refresh  # type: ignore[method-assign]
+            app._refresh.start = original_start_refresh  # type: ignore[method-assign]
             screen.action_toggle_item()
             screen.action_save_selection()
             await pilot.pause()
@@ -3247,7 +3248,7 @@ def test_ui_source_manager_save_defers_when_refresh_running(app_config, tmp_path
         launch_calls.append(object())
         return launch_calls[-1]
 
-    app._launch_refresh_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
 
     async def runner() -> None:
         async with app.run_test() as pilot:
@@ -3424,7 +3425,7 @@ def test_ui_provider_home_shows_current_app_status(app_config, tmp_path) -> None
             status = app.query_one("#status", Static)
             assert str(status.content) == "ready"
 
-            app._set_status_text("fetching BBC News: World")
+            app._refresh.set_status_text("fetching BBC News: World")
             app.refresh_view()
             await pilot.pause()
             assert str(status.content) == "fetching BBC News: World"
@@ -3503,10 +3504,10 @@ def test_ui_entering_reader_can_trigger_auto_refresh(app_config, tmp_path, artic
     calls: list[object] = []
 
     def fake_launch_refresh_thread() -> object:
-        calls.append(app._run_refresh)
+        calls.append(app._refresh._run)
         return object()
 
-    app._launch_refresh_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
 
     async def runner() -> None:
         async with app.run_test() as pilot:

@@ -17,7 +17,8 @@ NewsR is a single-process local terminal application. It runs from the repositor
 - `newsr.export`: Markdown and PNG export services plus clipboard integration
 - `newsr.storage`: SQLite connection, schema setup, article persistence, provider/target persistence, scoped reader state, and single-row global options. The `NewsStorage` facade delegates article methods to `ArticleStore` via `__getattr__` and defines provider, reader-state, options, and lifecycle methods explicitly.
 - `newsr.pipeline`: refresh orchestration that walks enabled providers and selected targets, stores source content, then runs translation and summary jobs
-- `newsr.ui`: the Textual app, themes, and modal screens for help, sources, quick navigation, export, article Q&A, open-link confirmation, and "more info"
+- `newsr.ui`: the Textual app, themes, controllers, and modal screens for help, sources, quick navigation, export, article Q&A, open-link confirmation, and "more info"
+- `newsr.ui.controllers`: controller objects that encapsulate feature-specific state and logic — article Q&A, "more info", article rendering, navigation, provider home management, and background refresh — keeping the main `NewsReaderApp` class thin with forwarding methods
 
 All network-facing providers use `cancellable_read` from `newsr.cancellation` for chunked HTTP reads with cooperative cancellation support.
 
