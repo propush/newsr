@@ -40,7 +40,7 @@ A provider iteration is done only when all of the following are true:
 | 5 | Marketing Dive | `marketingdive` | Marketing/media | Static | Low-medium | Done | 2026-03-28: implemented with static topic/latest catalog (`brand-strategy`, `mobile`, `creative`, `social-media`, `video`, `agencies`, `data-analytics`, `influencer`, `marketing`, `ad-tech`, `cmo-corner`) and disabled bootstrap |
 | 6 | Tom's Hardware | `tomshardware` | Hardware/PC/semiconductors | Static | Medium | Done | 2026-03-28: implemented with static section catalog (`pc-components`, `cpus`, `gpus`, `storage`, `laptops`, `desktops`, `software`, `artificial-intelligence`) and disabled bootstrap |
 | 7 | Canary Media | `canarymedia` | Climate/energy | Mixed | Medium | Done | 2026-03-30: implemented with a static live-vertical catalog (`grid-edge`, `energy-storage`, `solar`, `electrification`, `transportation`), path-derived `/articles/...` article ids, and disabled bootstrap |
-| 8 | Lawfare | `lawfare` | Legal/policy/tech governance | Mixed | Medium | Todo | |
+| 8 | Lawfare | `lawfare` | Legal/policy/tech governance | Mixed | Medium | Done | 2026-03-30: implemented with static live-topic catalog (`cybersecurity-tech`, `surveillance-privacy`, `intelligence`, `foreign-relations-international-law`), canonical `/article/<slug>` article ids, podcast/multimedia title rejection, and disabled bootstrap |
 | 9 | ScienceDaily | `sciencedaily` | Science/research | Static now, discovery later | Low-medium | Todo | |
 | 10 | InfoQ | `infoq` | Software engineering | Mixed | Medium-high | Todo | |
 | 11 | Deloitte Insights | `deloitteinsights` | Consulting/research/business strategy | Mixed | Medium-high | Done | 2026-03-28: implemented with static live-topic catalog (`business-strategy-growth`, `technology-management`, `talent`, `operations`, `economy`), search-backed candidate discovery, research-hub-aware article parsing, and disabled bootstrap |
@@ -442,7 +442,7 @@ For mixed-format sources, add explicit negative tests for sponsor content, podca
 
 ### 8. Lawfare
 
-- Status: `todo`
+- Status: `done`
 - URL: `https://www.lawfaremedia.org/`
 - `provider_id`: `lawfare`
 - Why: adds law, national security, cyber policy, and surveillance/privacy coverage.
@@ -482,9 +482,10 @@ For mixed-format sources, add explicit negative tests for sponsor content, podca
 - Risks:
   - topic pages may mix podcasts and essays heavily
 - Acceptance checklist:
-  - [ ] podcasts are excluded from candidate extraction
-  - [ ] standard written articles parse cleanly
-  - [ ] provider tests pass
+  - [x] podcasts are excluded from candidate extraction
+  - [x] standard written articles parse cleanly
+  - [x] provider tests pass
+- Implementation note: the provider uses the live `/topics/cybersecurity-tech`, `/topics/surveillance-privacy`, `/topics/intelligence`, and `/topics/foreign-relations-international-law` paths, derives stable article ids from canonical `/article/<slug>` URLs, and rejects Lawfare podcast and multimedia entries by title pattern during candidate extraction.
 
 ### 9. ScienceDaily
 

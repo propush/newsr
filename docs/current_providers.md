@@ -83,6 +83,13 @@ The current built-in news providers are defined in `src/newsr/providers/registry
 - default selected targets: `Grid Edge`, `Solar`
 - catalog behavior: static built-in climate-tech topic catalog using live `/articles/<topic>` vertical pages for `Grid Edge`, `Energy Storage`, `Solar`, `Electrification`, and `Transportation`
 
+### Lawfare
+
+- provider id: `lawfare`
+- bootstrap state: disabled by default
+- default selected targets: `Cybersecurity & Tech`, `Surveillance & Privacy`
+- catalog behavior: static built-in topic catalog using live `/topics/*` targets for `Cybersecurity & Tech`, `Surveillance & Privacy`, `Intelligence`, and `Foreign Relations & International Law`, with listing extraction restricted to written article titles so podcast and multimedia entries are excluded
+
 ### Deloitte Insights
 
 - provider id: `deloitteinsights`
