@@ -140,6 +140,7 @@ class ProviderHomeController:
             preferred_article_id=self._app.reader_state.article_id,
             fallback_to_current_article=False,
         )
+        self._app._navigation.queue_scroll_restore()
         self.close()
         self._app.refresh_view()
         self._app._navigation.maybe_auto_fetch()

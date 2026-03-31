@@ -110,7 +110,7 @@ class ArticleQuestionScreen(ModalScreen[None]):
         with Vertical(id="article-qa-shell"):
             yield Static(id="article-qa-header")
             yield LoadingIndicator(id="article-qa-loading")
-            with VerticalScroll(id="article-qa-pane"):
+            with VerticalScroll(id="article-qa-pane", can_focus=False):
                 yield Markdown(id="article-qa-body", open_links=False)
             yield Static(self._ui.text("article_qa.label.sources"), id="article-qa-sources-label")
             yield ListView(id="article-qa-source-list")
@@ -216,7 +216,7 @@ class ArticleQuestionScreen(ModalScreen[None]):
         self.app.close_article_qa()
 
     def action_page_up_overlay(self) -> None:
-        self.query_one("#article-qa-pane", VerticalScroll).scroll_page_up()
+        self.query_one("#article-qa-pane", VerticalScroll).scroll_page_up(animate=False)
 
     def action_page_down_overlay(self) -> None:
-        self.query_one("#article-qa-pane", VerticalScroll).scroll_page_down()
+        self.query_one("#article-qa-pane", VerticalScroll).scroll_page_down(animate=False)

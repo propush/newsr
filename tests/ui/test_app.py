@@ -33,6 +33,10 @@ def body_source(app: NewsReaderApp) -> str:
     return app.query_one("#article-body", Markdown).source
 
 
+def article_pane(app: NewsReaderApp):
+    return app.query_one("#article-pane")
+
+
 def url_source(app: NewsReaderApp) -> str:
     return app.query_one("#article-url", Static).content
 
@@ -3659,6 +3663,112 @@ def test_ui_provider_scope_reader_state_is_independent(app_config, tmp_path) -> 
 
             assert app.storage.load_reader_state("bbc").article_id == bbc_second
             assert app.storage.load_reader_state("techcrunch").article_id == tech_second
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_scope_scroll_offset_is_independent(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    tall_body = "\n\n".join(f"Paragraph {index}" for index in range(250))
+    seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="bbc-1",
+        title="BBC 1",
+        body=tall_body,
+        minute=0,
+    )
+    seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="bbc-2",
+        title="BBC 2",
+        body=tall_body,
+        minute=1,
+    )
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body=tall_body,
+        minute=2,
+    )
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-2",
+        title="TC 2",
+        body=tall_body,
+        minute=3,
+    )
+
+    async def open_scope_and_scroll(pilot, display_name: str, target_offset: int) -> int:  # type: ignore[no-untyped-def]
+        provider_home_table(app).move_cursor(
+            row=provider_home_row_index(app, display_name),
+            column=0,
+            animate=False,
+        )
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        pane = article_pane(app)
+        assert pane.max_scroll_y >= target_offset
+        pane.scroll_to(y=target_offset, animate=False)
+        await pilot.pause()
+        saved_offset = int(pane.scroll_y)
+        await pilot.press("escape")
+        await pilot.pause()
+        return saved_offset
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+
+            all_offset = await open_scope_and_scroll(pilot, "[ALL]", 12)
+            bbc_offset = await open_scope_and_scroll(pilot, "BBC News", 28)
+            tech_offset = await open_scope_and_scroll(pilot, "TechCrunch", 44)
+
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "[ALL]"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert int(article_pane(app).scroll_y) == all_offset
+            await pilot.press("escape")
+            await pilot.pause()
+
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "BBC News"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert int(article_pane(app).scroll_y) == bbc_offset
+            await pilot.press("escape")
+            await pilot.pause()
+
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "TechCrunch"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert int(article_pane(app).scroll_y) == tech_offset
+
+            assert app.storage.load_reader_state("[ALL]").scroll_offset == all_offset
+            assert app.storage.load_reader_state("bbc").scroll_offset == bbc_offset
+            assert app.storage.load_reader_state("techcrunch").scroll_offset == tech_offset
 
     asyncio.run(runner())
 

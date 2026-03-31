@@ -214,7 +214,7 @@ class NewsReaderApp(App[None]):
             with Vertical(id="article-frame"):
                 yield DataTable(id="provider-home-table", cursor_type="row")
                 yield Static(id="provider-home-empty")
-                with VerticalScroll(id="article-pane"):
+                with VerticalScroll(id="article-pane", can_focus=False):
                     yield Markdown(id="article-body")
                 yield Static(id="article-url")
             with Horizontal(id="status-bar"):
@@ -577,6 +577,8 @@ class NewsReaderApp(App[None]):
         if nav._rendered_article_url != url_text:
             article_url_widget.update(url_text)
             nav._rendered_article_url = url_text
+        if not self.provider_home_open and nav._pending_scroll_restore:
+            self.call_after_refresh(nav.restore_scroll_if_needed)
         if status_indicator.display != self._refresh.status_busy:
             status_indicator.display = self._refresh.status_busy
         status_text_value = visible_status_text(self.status_text, self.size.width, self._refresh.status_busy)

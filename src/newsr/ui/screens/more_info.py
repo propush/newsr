@@ -86,7 +86,7 @@ class MoreInfoScreen(ModalScreen[None]):
         with Vertical(id="more-info-shell"):
             yield Static(id="more-info-header")
             yield LoadingIndicator(id="more-info-loading")
-            with VerticalScroll(id="more-info-pane"):
+            with VerticalScroll(id="more-info-pane", can_focus=False):
                 yield Markdown(id="more-info-body")
             yield Static(self._ui.text("more_info.hint"), id="more-info-hint")
 
@@ -135,7 +135,7 @@ class MoreInfoScreen(ModalScreen[None]):
         self.app.action_next_article()
 
     def action_page_up_overlay(self) -> None:
-        self.query_one("#more-info-pane", VerticalScroll).scroll_page_up()
+        self.query_one("#more-info-pane", VerticalScroll).scroll_page_up(animate=False)
 
     def action_page_down_overlay(self) -> None:
-        self.query_one("#more-info-pane", VerticalScroll).scroll_page_down()
+        self.query_one("#more-info-pane", VerticalScroll).scroll_page_down(animate=False)

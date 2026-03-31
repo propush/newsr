@@ -21,6 +21,7 @@ class NavigationController:
         self.articles: list[ArticleRecord] = []
         self.current_index: int = 0
         self._auto_fetch_armed: bool = True
+        self._pending_scroll_restore: bool = False
         self._state_persisted: bool = False
         self._rendered_header_text: str | None = None
         self._rendered_body_text: str | None = None
@@ -131,6 +132,19 @@ class NavigationController:
         except (NoMatches, ScreenStackError):
             pass
         return self._app.reader_state
+
+    def queue_scroll_restore(self) -> None:
+        self._pending_scroll_restore = True
+
+    def restore_scroll_if_needed(self) -> None:
+        if not self._pending_scroll_restore or self._app.provider_home_open:
+            return
+        try:
+            pane = self._app.query_one("#article-pane", VerticalScroll)
+        except (NoMatches, ScreenStackError):
+            return
+        pane.scroll_to(y=max(0, self._app.reader_state.scroll_offset), animate=False)
+        self._pending_scroll_restore = False
 
     # ------------------------------------------------------------------
     # Render cache
@@ -267,6 +281,7 @@ class NavigationController:
             return
 
     def reset_scroll(self) -> None:
+        self._pending_scroll_restore = False
         self._app.reader_state.scroll_offset = 0
         self._app.query_one("#article-pane", VerticalScroll).scroll_to(y=0, animate=False)
 
