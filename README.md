@@ -17,6 +17,12 @@ NewsR currently requires Python 3.12 or newer.
 
 ## Screenshots
 
+### Home Screen
+
+Provider home on startup:
+
+![Provider home](docs/images/provider_select.png)
+
 ### Reading Views
 
 Full article view:
@@ -106,7 +112,7 @@ After writing `newsr.yml`, NewsR tells you that more settings can be tuned by ed
 
 To reconfigure the app from scratch, delete `newsr.yml` and start NewsR again. That reruns the terminal setup flow and writes a fresh config file.
 
-After startup, NewsR opens the provider home. `[ALL]` shows the cross-provider translated article stream, and each enabled provider gets its own row with unread and total counters. Press `Enter` to open a scope, and press `Esc` from the reader to return to the provider home.
+After startup, NewsR opens the provider home. This is the app's home screen. `[ALL]` shows the cross-provider translated article stream, and each enabled provider gets its own row with unread and total counters. Press `Enter` to open a scope, and press `Esc` from the reader to return to the provider home.
 
 The first launch also creates:
 
@@ -173,7 +179,7 @@ Source selection is managed in `cache/newsr.sqlite3`. Providers, discovered targ
 
 ## Provider Home
 
-NewsR starts in a provider home view.
+NewsR starts in a provider home view. This is the default home screen shown after setup and on every launch.
 
 - `[ALL]` opens the shared reader across all enabled providers.
 - Enabled providers appear under `[ALL]` with unread and total counters.
