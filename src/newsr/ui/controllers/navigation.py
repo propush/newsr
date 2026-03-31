@@ -244,7 +244,7 @@ class NavigationController:
         article = self.current_article
         if article is None:
             return
-        self.open_external_url(article.url)
+        self.request_open_link(article.translated_title or article.title, article.url)
 
     def open_external_url(self, url: str) -> None:
         from ...providers.search.duckduckgo import normalize_result_url
@@ -326,3 +326,4 @@ class NavigationController:
             screen.dismiss()
         except ScreenStackError:
             pass
+        self._app.call_after_refresh(self._app.set_focus, None)

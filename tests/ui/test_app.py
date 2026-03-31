@@ -2661,7 +2661,7 @@ def test_ui_body_uses_markdown_widget_and_visible_scrollbar(app_config, tmp_path
     asyncio.run(runner())
 
 
-def test_ui_pressing_o_opens_current_article_in_browser(
+def test_ui_pressing_o_requests_confirmation_before_opening_current_article_in_browser(
     app_config, tmp_path, article_content, monkeypatch
 ) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
@@ -2683,8 +2683,49 @@ def test_ui_pressing_o_opens_current_article_in_browser(
         async with app.run_test() as pilot:
             await pilot.pause()
             await pilot.press("o")
-            assert opened_urls == [(article_content.url, 2)]
+            confirm = open_link_confirm_screen(app)
+            assert confirm is not None
+            assert f"URL: {article_content.url}" in confirm.query_one("#open-link-body", Static).content
+            assert opened_urls == []
+            await pilot.press("enter")
+            await pilot.pause()
             assert app.query_one("#status", Static).content == "opened article in browser"
+
+    asyncio.run(runner())
+
+    assert opened_urls == [(article_content.url, 2)]
+
+
+def test_ui_dismissing_open_link_confirmation_returns_to_article_view(
+    app_config, tmp_path, article_content, monkeypatch
+) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(
+        article_content.article_id, "Translated title", "Translated text", "done"
+    )
+
+    opened_urls: list[tuple[str, int]] = []
+    monkeypatch.setattr(webbrowser, "open", lambda url, new=0: opened_urls.append((url, new)) or True)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app.provider_home_open is False
+            await pilot.press("o")
+            await pilot.pause()
+            assert open_link_confirm_screen(app) is not None
+
+            await pilot.press("escape")
+            await pilot.pause()
+
+            assert open_link_confirm_screen(app) is None
+            assert app.provider_home_open is False
+            assert getattr(app.focused, "id", None) != "provider-home-table"
+            assert body_source(app) == "Translated text"
+            assert url_source(app) == f"URL: {article_content.url}"
+            assert opened_urls == []
 
     asyncio.run(runner())
 
