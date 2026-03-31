@@ -839,6 +839,26 @@ def test_ui_space_pagedown_and_b_pageup(app_config, tmp_path, article_content) -
     asyncio.run(runner())
 
 
+def test_ui_reader_footer_hides_pgup_and_pgdn(app_config, tmp_path, article_content) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            bindings = footer_bindings(app)
+            actions = {action for _, _, action in bindings}
+
+            assert "page_up" not in actions
+            assert "page_down" not in actions
+            assert "toggle_summary" in actions
+            assert "show_or_refresh_more_info" in actions
+
+    asyncio.run(runner())
+
+
 def test_ui_space_advances_to_next_article_at_bottom(app_config, tmp_path, article_content) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
     app = NewsReaderApp(app_config, storage_path)
@@ -2004,6 +2024,39 @@ def test_ui_help_lists_article_qa_shortcut(app_config, tmp_path) -> None:
             await pilot.pause()
             help_text = app.screen.query_one("#help-text", Static).content
             assert "?: ask about article" in help_text
+
+    asyncio.run(runner())
+
+
+def test_ui_closing_help_with_escape_keeps_article_view(app_config, tmp_path, article_content) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
+    app.storage.update_summary(article_content.article_id, "Summary text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app.provider_home_open is False
+
+            await pilot.press("s")
+            await pilot.pause()
+            assert body_source(app) == "Summary text"
+
+            await pilot.press("h")
+            await pilot.pause()
+            assert app.screen.query_one("#help-text", Static).content
+
+            await pilot.press("escape")
+            await pilot.pause()
+
+            assert app.provider_home_open is False
+            assert len(app.screen_stack) == 1
+            assert body_source(app) == "Summary text"
+            assert app.current_article is not None
+            assert app.current_article.article_id == article_content.article_id
 
     asyncio.run(runner())
 
