@@ -22,6 +22,8 @@ class NavigationController:
         self.current_index: int = 0
         self._auto_fetch_armed: bool = True
         self._pending_scroll_restore: bool = False
+        self._scroll_restore_attempts_remaining: int = 0
+        self._scroll_restore_scheduled: bool = False
         self._state_persisted: bool = False
         self._rendered_header_text: str | None = None
         self._rendered_body_text: str | None = None
@@ -135,16 +137,44 @@ class NavigationController:
 
     def queue_scroll_restore(self) -> None:
         self._pending_scroll_restore = True
+        self._scroll_restore_attempts_remaining = 20
+        self.schedule_scroll_restore()
+
+    def schedule_scroll_restore(self) -> None:
+        if not self._pending_scroll_restore or self._scroll_restore_scheduled:
+            return
+        self._scroll_restore_scheduled = True
+        self._app.set_timer(0.01, self._run_scheduled_scroll_restore)
+
+    def _run_scheduled_scroll_restore(self) -> None:
+        self._scroll_restore_scheduled = False
+        self.restore_scroll_if_needed()
 
     def restore_scroll_if_needed(self) -> None:
-        if not self._pending_scroll_restore or self._app.provider_home_open:
+        if not self._pending_scroll_restore:
+            return
+        if self._app.provider_home_open:
+            self.schedule_scroll_restore()
             return
         try:
             pane = self._app.query_one("#article-pane", VerticalScroll)
         except (NoMatches, ScreenStackError):
+            self.schedule_scroll_restore()
             return
-        pane.scroll_to(y=max(0, self._app.reader_state.scroll_offset), animate=False)
+        requested_offset = max(0, self._app.reader_state.scroll_offset)
+        self._scroll_restore_attempts_remaining = max(0, self._scroll_restore_attempts_remaining - 1)
+        max_offset = int(pane.max_scroll_y)
+        if requested_offset > 0 and max_offset == 0 and self._scroll_restore_attempts_remaining > 0:
+            self.schedule_scroll_restore()
+            return
+        target_offset = min(requested_offset, max_offset)
+        pane.scroll_to(y=target_offset, animate=False)
+        if self._scroll_restore_attempts_remaining > 0:
+            self.schedule_scroll_restore()
+            return
         self._pending_scroll_restore = False
+        self._scroll_restore_attempts_remaining = 0
+        self._scroll_restore_scheduled = False
 
     # ------------------------------------------------------------------
     # Render cache
@@ -282,6 +312,8 @@ class NavigationController:
 
     def reset_scroll(self) -> None:
         self._pending_scroll_restore = False
+        self._scroll_restore_attempts_remaining = 0
+        self._scroll_restore_scheduled = False
         self._app.reader_state.scroll_offset = 0
         self._app.query_one("#article-pane", VerticalScroll).scroll_to(y=0, animate=False)
 

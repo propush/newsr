@@ -578,7 +578,7 @@ class NewsReaderApp(App[None]):
             article_url_widget.update(url_text)
             nav._rendered_article_url = url_text
         if not self.provider_home_open and nav._pending_scroll_restore:
-            self.call_after_refresh(nav.restore_scroll_if_needed)
+            nav.schedule_scroll_restore()
         if status_indicator.display != self._refresh.status_busy:
             status_indicator.display = self._refresh.status_busy
         status_text_value = visible_status_text(self.status_text, self.size.width, self._refresh.status_busy)
