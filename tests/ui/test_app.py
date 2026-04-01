@@ -3617,7 +3617,7 @@ def test_ui_provider_home_help_shows_provider_only_bindings(app_config, tmp_path
             await pilot.press("h")
             await pilot.pause()
             help_text = app.screen.query_one("#help-text", Static).content
-            assert "Enter: open the selected provider" in help_text
+            assert "Enter/Space: open the selected provider" in help_text
             assert "C: manage sources" in help_text
             assert "D: download new articles" in help_text
             assert "Ctrl+P: command palette / choose theme" in help_text
@@ -3714,6 +3714,40 @@ def test_ui_provider_home_provider_scope_filters_articles_and_escape_returns_hom
             await pilot.press("escape")
             await pilot.pause()
             assert provider_home_screen(app) is not None
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_space_opens_selected_provider(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    seed_provider_article(app, provider_id="bbc", provider_article_id="bbc-1", title="BBC 1", body="BBC body", minute=0)
+    tech_article_id = seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body="TC body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "TechCrunch"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("space")
+            await pilot.pause()
+            assert provider_home_screen(app) is None
+            assert [article.provider_id for article in app.articles] == ["techcrunch"]
+            assert app.current_article is not None
+            assert app.current_article.article_id == tech_article_id
 
     asyncio.run(runner())
 

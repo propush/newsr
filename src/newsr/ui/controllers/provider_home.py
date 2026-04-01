@@ -147,6 +147,16 @@ class ProviderHomeController:
         self._app.refresh_view()
         self._app._navigation.maybe_auto_fetch()
 
+    def open_selected_scope(self) -> None:
+        try:
+            table = self._app.query_one("#provider-home-table", DataTable)
+        except NoMatches:
+            return
+        home_rows = self.rows()
+        if table.cursor_row < 0 or table.cursor_row >= len(home_rows):
+            return
+        self.open_scope(home_rows[table.cursor_row].scope_id)
+
     def refresh_rows(self) -> None:
         if not self._app.is_mounted:
             return

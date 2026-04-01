@@ -349,6 +349,9 @@ class NewsReaderApp(App[None]):
         self._navigation.page_down()
 
     def action_space_down(self) -> None:
+        if self.provider_home_open:
+            self._provider_home.open_selected_scope()
+            return
         self._navigation.space_down()
 
     def action_space_up(self) -> None:

@@ -98,7 +98,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         ),
         "help.body.provider_home": (
             "Up/Down/PgUp/PgDn/B: move through providers\n"
-            "Enter: open the selected provider\n"
+            "Enter/Space: open the selected provider\n"
             "C: manage sources\n"
             "D: download new articles\n"
             "Ctrl+P: command palette / choose theme\n"
@@ -106,7 +106,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Q: quit"
         ),
         "provider_home.empty": "No enabled providers. Press C to manage sources.",
-        "provider_home.hint": "Up/Down: select   Enter: open provider   C: sources   D: refresh   H: help",
+        "provider_home.hint": "Up/Down: select   Enter/Space: open provider   C: sources   D: refresh   H: help",
         "provider_home.status.empty": "No provider is available.",
         "provider_home.status.selection": "{provider}: {unread} unread, {total} total",
         "provider_home.table.provider": "Provider",
@@ -274,7 +274,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         ),
         "help.body.provider_home": (
             "Up/Down/PgUp/PgDn/B: перемещение по провайдерам\n"
-            "Enter: открыть выбранного провайдера\n"
+            "Enter/Space: открыть выбранного провайдера\n"
             "C: управление источниками\n"
             "D: загрузить новые статьи\n"
             "Ctrl+P: палитра команд / выбор темы\n"
@@ -282,7 +282,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Q: выход"
         ),
         "provider_home.empty": "Нет включённых провайдеров. Нажмите C для управления источниками.",
-        "provider_home.hint": "Up/Down: выбор   Enter: открыть провайдер   C: источники   D: обновить   H: справка",
+        "provider_home.hint": "Up/Down: выбор   Enter/Space: открыть провайдер   C: источники   D: обновить   H: справка",
         "provider_home.status.empty": "Нет доступных провайдеров.",
         "provider_home.status.selection": "{provider}: непрочитано {unread}, всего {total}",
         "provider_home.table.provider": "Провайдер",

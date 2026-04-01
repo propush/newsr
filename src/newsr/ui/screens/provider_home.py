@@ -86,6 +86,7 @@ class ProviderHomeScreen(ModalScreen[None]):
         self._bindings.bind("ctrl+p", "show_command_palette", show=False)
         self._bindings.bind("d", "refresh_articles", ui.text("app.binding.download"))
         self._bindings.bind("h", "show_help", ui.text("app.binding.help"))
+        self._bindings.bind("space", "open_selected_provider", ui.text("app.binding.space"), show=False)
         self._ui = ui
         self._rows = rows
         self._selected_scope_id = selected_scope_id
@@ -134,6 +135,12 @@ class ProviderHomeScreen(ModalScreen[None]):
 
     def action_show_command_palette(self) -> None:
         self.app.action_command_palette()
+
+    def action_open_selected_provider(self) -> None:
+        table = self.query_one("#provider-home-table", DataTable)
+        if not self._rows or table.cursor_row < 0 or table.cursor_row >= len(self._rows):
+            return
+        self.app.open_scope(self._rows[table.cursor_row].scope_id)
 
     def _configure_table(self) -> None:
         table = self.query_one("#provider-home-table", DataTable)
