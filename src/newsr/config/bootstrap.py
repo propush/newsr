@@ -211,6 +211,7 @@ def render_config(answers: BootstrapAnswers) -> str:
         },
         "ui": {
             "locale": answers.ui_locale,
+            "show-all": True,
             "provider_sort": {
                 "primary": "unread",
                 "direction": "desc",

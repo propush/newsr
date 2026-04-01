@@ -129,7 +129,7 @@ The generated `newsr.yml` contains five sections:
 - `articles`: how many article candidates to fetch per selected target and how many days of articles to keep in SQLite
 - `llm`: the OpenAI-compatible base URL, optional auth settings, optional extra headers, plus a translation model for titles and article bodies and a summary model reused for summaries, "more info", search-query generation, and article Q&A
 - `translation`: the target language used for translated headlines, article text, summaries, "more info", and article Q&A answers
-- `ui`: the Textual UI locale plus provider-home ordering; current built-in locales are `en` and `ru`
+- `ui`: the Textual UI locale, `[ALL]` visibility in provider home, and provider-home ordering; current built-in locales are `en` and `ru`
 - `export`: image export settings
 
 Example generated config for a local setup:
@@ -147,6 +147,7 @@ translation:
   target_language: English
 ui:
   locale: en
+  show-all: true
   provider_sort:
     primary: unread
     direction: desc
@@ -157,6 +158,7 @@ export:
 
 `ui.provider_sort.primary` accepts `unread` or `name`.
 `ui.provider_sort.direction` accepts `asc` or `desc`.
+`ui.show-all` accepts `true` or `false` and controls whether `[ALL]` is shown in provider home.
 `export.image.quality` accepts `hd` or `fhd`.
 `llm.api_key` is optional for local unauthenticated servers. `llm.headers` can be used for extra OpenAI-compatible provider headers, and `llm.request_retries` controls how many times NewsR retries transient transport failures before surfacing an error.
 

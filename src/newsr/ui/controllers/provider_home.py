@@ -61,14 +61,16 @@ class ProviderHomeController:
 
     def rows(self) -> list[ProviderHomeRow]:
         all_articles = self._app._articles_for_scope(ALL_PROVIDERS_SCOPE_ID)
-        result = [
-            ProviderHomeRow(
-                scope_id=ALL_PROVIDERS_SCOPE_ID,
-                display_name=ALL_PROVIDERS_SCOPE_ID,
-                unread_count=self._unread_count_for_scope(ALL_PROVIDERS_SCOPE_ID, all_articles),
-                total_count=len(all_articles),
+        result: list[ProviderHomeRow] = []
+        if self._app.config.ui.show_all:
+            result.append(
+                ProviderHomeRow(
+                    scope_id=ALL_PROVIDERS_SCOPE_ID,
+                    display_name=ALL_PROVIDERS_SCOPE_ID,
+                    unread_count=self._unread_count_for_scope(ALL_PROVIDERS_SCOPE_ID, all_articles),
+                    total_count=len(all_articles),
+                )
             )
-        ]
         enabled_providers = self._app.storage.list_enabled_providers()
         provider_rows = [
             ProviderHomeRow(

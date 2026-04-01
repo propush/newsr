@@ -122,6 +122,7 @@ def make_config(
         translation=TranslationConfig(target_language="Russian"),
         ui=UIConfig(
             locale="en",
+            show_all=True,
             provider_sort=ProviderSortConfig(primary="unread", direction="desc"),
         ),
         export=ExportConfig(image=ExportImageConfig(quality="hd")),

@@ -3452,6 +3452,42 @@ def test_ui_provider_home_counts_only_translated_articles(app_config, tmp_path) 
 
 
 @pytest.mark.provider_home
+def test_ui_provider_home_hides_all_row_when_configured(app_config, tmp_path) -> None:
+    app_config.ui.show_all = False
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    seed_provider_article(app, provider_id="bbc", provider_article_id="bbc-1", title="BBC 1", body="BBC body 1", minute=0)
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body="TC body 1",
+        minute=1,
+    )
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-2",
+        title="TC 2",
+        body="TC body 2",
+        minute=2,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            rows = provider_home_rows(app)
+            assert rows == [
+                ["TechCrunch", "2", "2"],
+                ["BBC News", "1", "1"],
+            ]
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
 def test_ui_provider_home_uses_available_width_for_provider_column(app_config, tmp_path) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
@@ -3678,6 +3714,38 @@ def test_ui_provider_home_provider_scope_filters_articles_and_escape_returns_hom
             await pilot.press("escape")
             await pilot.pause()
             assert provider_home_screen(app) is not None
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_hidden_all_row_does_not_break_return_to_provider_home(app_config, tmp_path, article_content) -> None:
+    app_config.ui.show_all = False
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert provider_home_rows(app) == [["BBC News", "1", "1"]]
+
+            app.open_scope("[ALL]")
+            await pilot.pause()
+            assert provider_home_screen(app) is None
+            assert app._provider_home.active_scope_id == "[ALL]"
+            assert app.current_article is not None
+            assert app.current_article.article_id == article_content.article_id
+
+            await pilot.press("escape")
+            await pilot.pause()
+
+            table = provider_home_table(app)
+            assert provider_home_rows(app) == [["BBC News", "1", "1"]]
+            assert table.cursor_row == 0
+            assert app._provider_home.active_scope_id == "[ALL]"
+            assert app._provider_home.selected_scope_id == "bbc"
 
     asyncio.run(runner())
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 import newsr.config.bootstrap as bootstrap_module
-from newsr.config import bootstrap_config, guess_translation_language, load_config
+from newsr.config import DEFAULT_CONFIG, bootstrap_config, guess_translation_language, load_config
 
 
 class PromptStub:
@@ -46,6 +46,7 @@ def test_bootstrap_config_creates_local_config_with_locale_suggestion(tmp_path: 
 
     assert created is True
     assert config.ui.locale == "en"
+    assert config.ui.show_all is True
     assert config.llm.url == "http://localhost:8081/v1"
     assert config.llm.model_translation == "local-translate"
     assert config.llm.model_summary == "local-translate"
@@ -75,6 +76,7 @@ def test_bootstrap_config_accepts_russian_ui_locale_display_name(tmp_path: Path)
     config = load_config(config_path)
 
     assert config.ui.locale == "ru"
+    assert config.ui.show_all is True
     assert "Available UI languages: English, Русский" in output.getvalue()
 
 
@@ -110,6 +112,7 @@ def test_bootstrap_config_creates_cloud_config_and_retries_bad_headers(tmp_path:
     assert config.llm.model_summary == "gpt-4.1-mini"
     assert config.llm.api_key == "sk-test"
     assert config.ui.locale == "en"
+    assert config.ui.show_all is True
     assert config.llm.headers == {
         "OpenAI-Organization": "org-test",
         "X-Custom": "value",
@@ -173,6 +176,7 @@ export:
 
     assert selected_locale == "en"
     assert config.ui.locale == "en"
+    assert config.ui.show_all is True
     assert prompt.prompts == ["UI language [English]: "]
     assert "Saved UI language: English" in output.getvalue()
 
@@ -215,6 +219,15 @@ export:
 
     assert selected_locale == "ru"
     assert config.ui.locale == "ru"
+    assert config.ui.show_all is True
     assert prompt.prompts == ["UI language [Русский]: "]
     assert "Suggested UI language from locale: Русский" in output.getvalue()
     assert "Saved UI language: Русский" in output.getvalue()
+
+
+def test_default_config_includes_show_all_enabled(tmp_path: Path) -> None:
+    config_path = tmp_path / "newsr.yml"
+    config_path.write_text(DEFAULT_CONFIG, encoding="utf-8")
+    config = load_config(config_path)
+
+    assert config.ui.show_all is True

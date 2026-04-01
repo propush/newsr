@@ -33,6 +33,7 @@ class ProviderSortConfig:
 @dataclass(slots=True)
 class UIConfig:
     locale: str
+    show_all: bool
     provider_sort: ProviderSortConfig
 
 

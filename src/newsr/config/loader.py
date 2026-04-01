@@ -77,6 +77,7 @@ def _load_ui(raw: dict) -> UIConfig:
         raise ValueError("ui.locale is required")
     return UIConfig(
         locale=locale,
+        show_all=_load_bool(raw.get("show-all"), default=True, field_name="ui.show-all"),
         provider_sort=_load_provider_sort(raw.get("provider_sort", {})),
     )
 
@@ -134,3 +135,11 @@ def _load_headers(value: Any) -> dict[str, str]:
             raise ValueError("llm.headers keys and values must be non-empty strings")
         headers[header_name] = header_text
     return headers
+
+
+def _load_bool(value: Any, *, default: bool, field_name: str) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    raise ValueError(f"{field_name} must be true or false")
