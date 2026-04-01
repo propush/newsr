@@ -7,7 +7,7 @@ NewsR currently requires Python 3.12 or newer.
 ## Features
 
 - built-in support for multiple news providers; see [Current Providers](docs/current_providers.md)
-- background refresh with cached startup content
+- background refresh with cached startup content and LLM responsiveness preflight
 - provider home with `[ALL]` plus enabled providers, unread/total counters, and configurable sort order
 - translated full articles plus summaries
 - "more info" and article Q&A overlays backed by DuckDuckGo search and the configured LLM
@@ -255,7 +255,7 @@ Clipboard export support depends on the platform:
 
 ## Refresh Behavior
 
-- Startup loads cached articles first, then immediately starts a background refresh.
+- Startup loads cached articles first, then immediately starts a background refresh after a lightweight LLM responsiveness check succeeds or the retry dialog is confirmed.
 - The provider-home counters update as translated articles become ready.
 - Refresh iterates enabled providers and their selected targets from SQLite-backed source state.
 - Refresh work runs in the background and updates the UI as translations and summaries finish.

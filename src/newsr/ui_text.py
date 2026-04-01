@@ -80,10 +80,15 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.status.browser_opened": "opened article in browser",
         "app.status.browser_not_confirmed": "browser did not confirm open request",
         "app.status.no_article_to_export": "no article to export",
+        "app.status.checking_llm": "checking llm responsiveness...",
         "app.status.exiting": "Exiting...",
         "app.status.sources_unchanged": "sources unchanged",
         "app.status.sources_saved_next_refresh": "sources saved; next refresh will use updated provider settings",
         "app.status.sources_saved_refreshing": "sources saved; refreshing enabled providers",
+        "confirm_dialog.llm_unresponsive.header": "LLM Unavailable",
+        "confirm_dialog.llm_unresponsive.body": "LLM is not responsive: {error}. Try again?",
+        "confirm_dialog.button.retry": "Retry",
+        "confirm_dialog.button.cancel": "Cancel",
         "help.body.reader": (
             "Left/Right: previous/next article\n"
             "Up/Down/PgUp/PgDn/B: scroll\n"
@@ -262,10 +267,15 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.status.browser_opened": "статья открыта в браузере",
         "app.status.browser_not_confirmed": "браузер не подтвердил запрос на открытие",
         "app.status.no_article_to_export": "нет статьи для экспорта",
+        "app.status.checking_llm": "проверка доступности llm...",
         "app.status.exiting": "Выход...",
         "app.status.sources_unchanged": "источники не изменились",
         "app.status.sources_saved_next_refresh": "источники сохранены; следующее обновление применит новые настройки провайдеров",
         "app.status.sources_saved_refreshing": "источники сохранены; обновляются включённые провайдеры",
+        "confirm_dialog.llm_unresponsive.header": "LLM недоступна",
+        "confirm_dialog.llm_unresponsive.body": "LLM не отвечает: {error}. Повторить?",
+        "confirm_dialog.button.retry": "Повторить",
+        "confirm_dialog.button.cancel": "Отмена",
         "help.body.reader": (
             "Left/Right: предыдущая/следующая статья\n"
             "Up/Down/PgUp/PgDn/B: прокрутка\n"
@@ -489,6 +499,7 @@ class UILocalizer:
         "opened article in browser": "app.status.browser_opened",
         "browser did not confirm open request": "app.status.browser_not_confirmed",
         "no article to export": "app.status.no_article_to_export",
+        "checking llm responsiveness...": "app.status.checking_llm",
         "Exiting...": "app.status.exiting",
         "sources unchanged": "app.status.sources_unchanged",
         "sources saved; next refresh will use updated provider settings": "app.status.sources_saved_next_refresh",

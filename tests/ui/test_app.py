@@ -22,6 +22,7 @@ from newsr.providers.search import SearchResult
 from newsr.ui import (
     ArticleQuestionScreen,
     CategorySelectionScreen,
+    ConfirmDialogScreen,
     ExportScreen,
     OLD_FIDO_THEME,
     MoreInfoScreen,
@@ -112,6 +113,24 @@ def open_link_confirm_screen(app: NewsReaderApp) -> OpenLinkConfirmScreen | None
         if isinstance(screen, OpenLinkConfirmScreen):
             return screen
     return None
+
+
+def confirm_dialog_screen(app: NewsReaderApp) -> ConfirmDialogScreen | None:
+    for screen in reversed(app.screen_stack):
+        if isinstance(screen, ConfirmDialogScreen):
+            return screen
+    return None
+
+
+def confirm_dialog_body(app: NewsReaderApp) -> str:
+    screen = confirm_dialog_screen(app)
+    assert screen is not None
+    return str(screen.query_one("#confirm-dialog-body", Static).content)
+
+
+def confirm_dialog_focused_button_id(app: NewsReaderApp) -> str | None:
+    focused = app.focused
+    return getattr(focused, "id", None)
 
 
 def export_screen(app: NewsReaderApp) -> ExportScreen | None:
@@ -244,6 +263,9 @@ class FakeMoreInfoLLM:
         self.query_calls: list[tuple[str, str]] = []
         self.synthesis_calls: list[tuple[str, str, list[SearchResult]]] = []
 
+    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
+        return None
+
     def build_search_query(
         self,
         article_title: str,
@@ -282,6 +304,9 @@ class FakeCategorizationLLM:
         self.responses = responses or [("SCIENCE", "TECHNOLOGIES")]
         self.calls: list[tuple[str, str]] = []
 
+    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
+        return None
+
     def classify_article_categories(
         self,
         article_title: str,
@@ -297,6 +322,9 @@ class BlockingQueryLLM:
     def __init__(self) -> None:
         self.started = Event()
         self.cancelled = Event()
+
+    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
+        return None
 
     def build_search_query(
         self,
@@ -322,12 +350,43 @@ class BlockingQueryLLM:
         raise AssertionError("synthesize_more_info should not run after cancellation")
 
 
+class SequenceResponsiveLLM:
+    def __init__(self, responses: list[Exception | None]) -> None:
+        self.responses = responses
+        self.calls = 0
+
+    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
+        index = min(self.calls, len(self.responses) - 1)
+        self.calls += 1
+        response = self.responses[index]
+        if response is not None:
+            raise response
+
+
+class BlockingResponsiveLLM:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.started = Event()
+        self.release = Event()
+
+    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
+        assert cancellation is not None
+        self.calls += 1
+        self.started.set()
+        while not self.release.wait(timeout=0.05):
+            cancellation.raise_if_cancelled()
+        cancellation.raise_if_cancelled()
+
+
 class FakeArticleQALLM:
     def __init__(self, *, query: str = "latest context", answers: list[str] | None = None) -> None:
         self.query = query
         self.answers = answers or ["Article answer"]
         self.query_calls: list[tuple[str, str, str, str, list[tuple[str, str]]]] = []
         self.answer_calls: list[tuple[str, str, str, str, list[tuple[str, str]], list[SearchResult]]] = []
+
+    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
+        return None
 
     def build_article_question_query(
         self,
@@ -394,6 +453,9 @@ class BlockingArticleQALLM:
     def __init__(self) -> None:
         self.started = Event()
         self.cancelled = Event()
+
+    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
+        return None
 
     def build_article_question_query(
         self,
@@ -515,6 +577,20 @@ def seed_provider_article(
 
 def disable_startup_refresh(app: NewsReaderApp) -> None:
     app._refresh.start = lambda: None  # type: ignore[method-assign]
+
+
+def skip_first_refresh_start(app: NewsReaderApp) -> None:
+    original_start = app._refresh.start
+    skipped = False
+
+    def start_once() -> None:
+        nonlocal skipped
+        if not skipped:
+            skipped = True
+            return
+        original_start()
+
+    app._refresh.start = start_once  # type: ignore[method-assign]
 
 
 def test_ui_renders_cached_article(app_config, tmp_path, article_content) -> None:
@@ -1020,6 +1096,80 @@ def test_ui_startup_refresh_runs_when_cached_articles_exist(app_config, tmp_path
     asyncio.run(runner())
 
 
+def test_ui_startup_refresh_retries_llm_preflight_before_launching_refresh(app_config, tmp_path) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    app.llm_client = SequenceResponsiveLLM([RuntimeError("synthetic timeout"), None])  # type: ignore[assignment]
+
+    calls: list[object] = []
+
+    def fake_launch_refresh_thread() -> object:
+        calls.append(app._refresh._run)
+        return object()
+
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            for _ in range(20):
+                await pilot.pause()
+                if confirm_dialog_screen(app) is not None:
+                    break
+            assert confirm_dialog_body(app) == "LLM is not responsive: synthetic timeout. Try again?"
+            await pilot.press("enter")
+            for _ in range(20):
+                await pilot.pause()
+                if calls:
+                    break
+            assert calls == [app._refresh._run]
+            assert app.llm_client.calls == 2  # type: ignore[union-attr]
+            assert app.refresh_in_progress is True
+
+    asyncio.run(runner())
+
+
+def test_ui_confirm_dialog_supports_tab_and_arrow_navigation(app_config, tmp_path) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    skip_first_refresh_start(app)
+    app.llm_client = SequenceResponsiveLLM([RuntimeError("synthetic timeout"), RuntimeError("synthetic timeout")])  # type: ignore[assignment]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("d")
+            for _ in range(20):
+                await pilot.pause()
+                if confirm_dialog_screen(app) is not None:
+                    break
+
+            assert confirm_dialog_focused_button_id(app) == "confirm-dialog-confirm"
+
+            await pilot.press("tab")
+            await pilot.pause()
+            assert confirm_dialog_focused_button_id(app) == "confirm-dialog-cancel"
+
+            await pilot.press("left")
+            await pilot.pause()
+            assert confirm_dialog_focused_button_id(app) == "confirm-dialog-confirm"
+
+            await pilot.press("right")
+            await pilot.pause()
+            assert confirm_dialog_focused_button_id(app) == "confirm-dialog-cancel"
+
+            await pilot.press("enter")
+            for _ in range(20):
+                await pilot.pause()
+                if confirm_dialog_screen(app) is None:
+                    break
+
+            assert confirm_dialog_screen(app) is None
+            assert app.refresh_in_progress is False
+            assert app.status_text == "ready"
+
+    asyncio.run(runner())
+
+
 def test_ui_navigation_does_not_start_extra_refresh_while_startup_refresh_is_running(app_config, tmp_path) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
     app = NewsReaderApp(app_config, storage_path)
@@ -1230,6 +1380,79 @@ def test_ui_keeps_current_article_selected_when_new_article_becomes_ready(
             assert "Existing translation" in body_source(app)
             pipeline.release_refresh.set()
             await pilot.pause()
+
+    asyncio.run(runner())
+
+
+def test_ui_canceling_llm_preflight_stops_manual_refresh(app_config, tmp_path) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    skip_first_refresh_start(app)
+    app.llm_client = SequenceResponsiveLLM([RuntimeError("synthetic timeout")])  # type: ignore[assignment]
+
+    calls: list[object] = []
+
+    def fake_launch_refresh_thread() -> object:
+        calls.append(app._refresh._run)
+        return object()
+
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("d")
+            for _ in range(20):
+                await pilot.pause()
+                if confirm_dialog_screen(app) is not None:
+                    break
+            assert confirm_dialog_body(app) == "LLM is not responsive: synthetic timeout. Try again?"
+            await pilot.press("escape")
+            for _ in range(20):
+                await pilot.pause()
+                if confirm_dialog_screen(app) is None:
+                    break
+            assert confirm_dialog_screen(app) is None
+            assert calls == []
+            assert app.refresh_in_progress is False
+            assert app.status_text == "ready"
+
+    asyncio.run(runner())
+
+
+def test_ui_ignores_duplicate_download_while_llm_preflight_is_running(app_config, tmp_path) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    skip_first_refresh_start(app)
+    app.llm_client = BlockingResponsiveLLM()  # type: ignore[assignment]
+
+    calls: list[object] = []
+
+    def fake_launch_refresh_thread() -> object:
+        calls.append(app._refresh._run)
+        return object()
+
+    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("d")
+            for _ in range(20):
+                await pilot.pause()
+                if app.llm_client.started.is_set():  # type: ignore[union-attr]
+                    break
+            assert app.llm_client.started.is_set()  # type: ignore[union-attr]
+            await pilot.press("d")
+            await pilot.pause()
+            assert app.llm_client.calls == 1  # type: ignore[union-attr]
+            app.llm_client.release.set()  # type: ignore[union-attr]
+            for _ in range(20):
+                await pilot.pause()
+                if calls:
+                    break
+            assert calls == [app._refresh._run]
+            assert app.refresh_in_progress is True
 
     asyncio.run(runner())
 

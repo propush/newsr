@@ -75,6 +75,16 @@ class OpenAILLMClient:
         )
         return self._chat(self.translation_model, prompt, article_title, cancellation)
 
+    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
+        response = self._chat(
+            self.translation_model,
+            "Reply with OK only.",
+            "ping",
+            cancellation,
+        )
+        if not response.strip():
+            raise RuntimeError("LLM returned an empty response")
+
     def summarize(
         self,
         article_title: str,

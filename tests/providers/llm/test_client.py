@@ -188,6 +188,31 @@ def test_llm_client_retries_transient_transport_failures() -> None:
     assert FakeHTTPConnection.instances[0].closed is True
 
 
+def test_llm_client_check_responsive_uses_translation_model() -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "OK"}}]}),
+    ]
+    client = OpenAILLMClient(make_config())
+
+    client.check_responsive()
+
+    request = FakeHTTPConnection.requests[0]
+    payload = json.loads(request["body"].decode("utf-8"))
+    assert payload["model"] == "translate"
+    assert payload["messages"][0]["content"] == "Reply with OK only."
+    assert payload["messages"][1]["content"] == "ping"
+
+
+def test_llm_client_check_responsive_rejects_empty_response() -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "   "}}]}),
+    ]
+    client = OpenAILLMClient(make_config())
+
+    with pytest.raises(RuntimeError, match="LLM returned an empty response"):
+        client.check_responsive()
+
+
 def test_llm_client_raises_http_errors_without_retrying() -> None:
     FakeHTTPConnection.plan = [
         FakeResponse({"error": {"message": "bad api key"}}, status=401),

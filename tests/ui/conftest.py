@@ -30,6 +30,11 @@ def isolate_ui_tests_from_live_services(monkeypatch: pytest.MonkeyPatch) -> None
     ) -> str:  # type: ignore[no-untyped-def]
         raise AssertionError("UI tests must not call the real local LLM")
 
+    def fake_check_responsive(
+        self: OpenAILLMClient, cancellation=None
+    ) -> None:  # type: ignore[no-untyped-def]
+        return None
+
     def fail_search(
         self: DuckDuckGoSearchClient, query, limit=5, cancellation=None
     ) -> list:  # type: ignore[no-untyped-def]
@@ -38,6 +43,7 @@ def isolate_ui_tests_from_live_services(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(BBCNewsProvider, "discover_targets", fake_discover_targets)
     monkeypatch.setattr(BBCNewsProvider, "fetch_candidates", fake_fetch_candidates)
     monkeypatch.setattr(BBCNewsProvider, "fetch_article", fail_fetch_article)
+    monkeypatch.setattr(OpenAILLMClient, "check_responsive", fake_check_responsive)
     monkeypatch.setattr(OpenAILLMClient, "_chat", fail_llm_chat)
     monkeypatch.setattr(DuckDuckGoSearchClient, "search", fail_search)
 
