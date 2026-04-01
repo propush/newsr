@@ -67,8 +67,17 @@ def initialize_schema(db: StorageConnection) -> None:
             );
             """
         )
+        _initialize_article_schema(db)
         legacy_theme_name = _migrate_reader_state_schema(db)
         _initialize_options_schema(db, legacy_theme_name)
+
+
+def _initialize_article_schema(db: StorageConnection) -> None:
+    db.ensure_column(
+        "articles",
+        "assigned_categories_json",
+        """TEXT NOT NULL DEFAULT '[]'""",
+    )
 
 
 def _migrate_reader_state_schema(db: StorageConnection) -> str | None:

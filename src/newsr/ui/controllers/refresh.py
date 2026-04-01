@@ -88,7 +88,7 @@ class RefreshController:
             return
         self.set_status_text(
             localized_value,
-            busy=value.startswith(("fetching ", "extracting ", "translating ", "summarizing ")),
+            busy=value.startswith(("fetching ", "extracting ", "classifying ", "translating ", "summarizing ")),
         )
         self._call_from_thread_if_ready(self._app.refresh_view)
 
@@ -105,7 +105,7 @@ class RefreshController:
 
     @staticmethod
     def _status_busy_for(value: str) -> bool:
-        return value.startswith(("fetching ", "extracting ", "translating ", "summarizing "))
+        return value.startswith(("fetching ", "extracting ", "classifying ", "translating ", "summarizing "))
 
     def shutdown(self) -> None:
         self._app._shutdown_requested = True

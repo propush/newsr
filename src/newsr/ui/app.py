@@ -20,6 +20,7 @@ from ..providers.search.duckduckgo import DuckDuckGoSearchClient
 from ..storage.facade import NewsStorage
 from ..ui_text import UILocalizer
 from .controllers.article_qa import ArticleQAController
+from .controllers.article_categorization import ArticleCategorizationController
 from .controllers.article_rendering import (
     article_frame_title,
     article_header,
@@ -164,6 +165,7 @@ class NewsReaderApp(App[None]):
         self._refresh = RefreshController(self)
         self._provider_home = ProviderHomeController(self)
         self._article_qa = ArticleQAController(self)
+        self._article_categories = ArticleCategorizationController(self)
         self._more_info = MoreInfoController(self)
         self._navigation = NavigationController(self)
         self._export = ExportController(self)
@@ -192,6 +194,7 @@ class NewsReaderApp(App[None]):
             Binding("pageup", "page_up", self.ui.text("app.binding.pgup"), show=False),
             Binding("pagedown", "page_down", self.ui.text("app.binding.pgdn"), show=False),
             Binding("b", "page_up", self.ui.text("app.binding.back"), show=False),
+            ("k", "classify_article_categories", self.ui.text("app.binding.classify")),
             Binding("space", "space_down", self.ui.text("app.binding.space"), show=False),
             ("s", "toggle_summary", self.ui.text("app.binding.summary")),
             ("m", "show_or_refresh_more_info", self.ui.text("app.binding.more_info")),
@@ -336,6 +339,9 @@ class NewsReaderApp(App[None]):
     def action_toggle_summary(self) -> None:
         self._navigation.toggle_summary()
 
+    def action_classify_article_categories(self) -> None:
+        self._article_categories.categorize_current()
+
     def action_scroll_up(self) -> None:
         self._navigation.scroll_up()
 
@@ -405,6 +411,7 @@ class NewsReaderApp(App[None]):
         self._refresh.shutdown()
         self._more_info.cancel()
         self._article_qa.cancel()
+        self._article_categories.cancel()
         self._cleanup_before_exit()
         self._persist_reader_state()
         self.exit()
@@ -559,8 +566,14 @@ class NewsReaderApp(App[None]):
                 url_text = ""
             else:
                 border_title = article_frame_title(article, header.size.width, self.providers)
+                active_theme = self.get_theme(self.theme)
                 header_text = article_header(
-                    self.ui, self.current_index, len(self.articles), article, self.reader_state
+                    self.ui,
+                    self.current_index,
+                    len(self.articles),
+                    article,
+                    self.reader_state,
+                    active_theme.accent if active_theme is not None else "#ffffff",
                 )
                 body_text = article_text(self.reader_state, article)
                 url_text = article_url_text(self.ui, article, article_url_widget.size.width)
@@ -599,6 +612,7 @@ class NewsReaderApp(App[None]):
         self.close_export_screen()
         self.close_open_link_confirm()
         self.close_article_qa()
+        self._article_categories.cancel()
         self.close_more_info()
         self.close_provider_home()
         self.storage.delete_incomplete_articles()

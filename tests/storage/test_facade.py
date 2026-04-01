@@ -8,6 +8,7 @@ from pathlib import Path
 from newsr.domain import AppOptions, ArticleContent
 from newsr.domain import ProviderRecord, ProviderTarget
 from newsr.domain import ReaderState, ViewMode
+from newsr.storage import NewsStorage
 
 
 def test_storage_dedupes_articles(storage, article_content) -> None:
@@ -39,6 +40,27 @@ def test_storage_persists_more_info(storage, article_content) -> None:
 
     assert article is not None
     assert article.more_info == "Background context"
+
+
+def test_storage_persists_assigned_categories(storage, article_content) -> None:
+    storage.upsert_article_source(article_content)
+    storage.replace_categories(article_content.article_id, ["SCIENCE", "TECHNOLOGIES"])
+
+    article = storage.get_article(article_content.article_id)
+
+    assert article is not None
+    assert article.categories == ("TECHNOLOGIES", "SCIENCE")
+
+
+def test_storage_replaces_assigned_categories(storage, article_content) -> None:
+    storage.upsert_article_source(article_content)
+    storage.replace_categories(article_content.article_id, ["SCIENCE", "TECHNOLOGIES"])
+    storage.replace_categories(article_content.article_id, ["BUSINESS"])
+
+    article = storage.get_article(article_content.article_id)
+
+    assert article is not None
+    assert article.categories == ("BUSINESS",)
 
 
 def test_storage_exposes_article_created_at(storage, article_content) -> None:
@@ -231,3 +253,46 @@ def test_storage_delete_incomplete_articles_preserves_failed_orphan_jobs(storage
     assert len(jobs) == 1
     assert jobs[0]["article_id"] == "bbc:gone-1"
     assert jobs[0]["status"] == "failed"
+
+
+def test_storage_migrates_existing_articles_table_to_include_assigned_categories(tmp_path: Path) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    connection = sqlite3.connect(storage_path)
+    try:
+        connection.execute(
+            """
+            CREATE TABLE articles (
+                article_id TEXT PRIMARY KEY,
+                provider_id TEXT NOT NULL,
+                provider_article_id TEXT NOT NULL,
+                url TEXT NOT NULL,
+                category TEXT NOT NULL,
+                title TEXT NOT NULL,
+                translated_title TEXT,
+                author TEXT,
+                published_at TEXT,
+                source_body TEXT NOT NULL,
+                translated_body TEXT,
+                summary TEXT,
+                more_info TEXT,
+                translation_status TEXT NOT NULL,
+                summary_status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    storage = NewsStorage(storage_path)
+    try:
+        storage.initialize()
+        columns = {
+            row["name"]
+            for row in storage.connection.execute("PRAGMA table_info(articles)").fetchall()
+        }
+        assert "assigned_categories_json" in columns
+    finally:
+        storage.close()

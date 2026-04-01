@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import UTC, datetime, timedelta
 
+from ..domain import normalize_article_categories
 from ..domain.articles import ArticleContent, ArticleRecord
 from .connection import StorageConnection
 
@@ -51,9 +53,9 @@ class ArticleStore:
                 """
                 INSERT INTO articles (
                     article_id, provider_id, provider_article_id, url, category, title, translated_title, author, published_at,
-                    source_body, translated_body, summary, more_info, translation_status,
+                    source_body, translated_body, summary, more_info, assigned_categories_json, translation_status,
                     summary_status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, NULL, 'pending', 'pending', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, NULL, '[]', 'pending', 'pending', ?, ?)
                 ON CONFLICT(article_id) DO UPDATE SET
                     provider_id = excluded.provider_id,
                     provider_article_id = excluded.provider_article_id,
@@ -123,6 +125,21 @@ class ArticleStore:
                 WHERE article_id = ?
                 """,
                 (summary, status, datetime.now(UTC).isoformat(), article_id),
+            )
+
+    def replace_categories(self, article_id: str, categories: tuple[str, ...] | list[str]) -> None:
+        with self._db.transaction():
+            self._db.connection.execute(
+                """
+                UPDATE articles
+                SET assigned_categories_json = ?, updated_at = ?
+                WHERE article_id = ?
+                """,
+                (
+                    _serialize_categories(categories),
+                    datetime.now(UTC).isoformat(),
+                    article_id,
+                ),
             )
 
     def update_more_info(self, article_id: str, more_info: str) -> None:
@@ -214,7 +231,7 @@ class ArticleStore:
                 """
                 SELECT article_id, provider_id, provider_article_id, url, category, title, translated_title, author,
                        published_at, source_body, translated_body, summary, more_info, translation_status,
-                       summary_status, created_at
+                       summary_status, created_at, assigned_categories_json
                 FROM articles
                 ORDER BY rowid ASC
                 """
@@ -227,7 +244,7 @@ class ArticleStore:
                 """
                 SELECT article_id, provider_id, provider_article_id, url, category, title, translated_title, author,
                        published_at, source_body, translated_body, summary, more_info, translation_status,
-                       summary_status, created_at
+                       summary_status, created_at, assigned_categories_json
                 FROM articles
                 WHERE article_id = ?
                 """,
@@ -258,4 +275,21 @@ class ArticleStore:
             translation_status=row["translation_status"],
             summary_status=row["summary_status"],
             created_at=datetime.fromisoformat(created_at),
+            categories=_deserialize_categories(row["assigned_categories_json"]),
         )
+
+
+def _serialize_categories(categories: tuple[str, ...] | list[str]) -> str:
+    return json.dumps(list(normalize_article_categories(categories)))
+
+
+def _deserialize_categories(value: str | None) -> tuple[str, ...]:
+    if not value:
+        return ()
+    try:
+        raw = json.loads(value)
+    except json.JSONDecodeError:
+        return ()
+    if not isinstance(raw, list):
+        return ()
+    return normalize_article_categories(item for item in raw if isinstance(item, str))

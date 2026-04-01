@@ -50,6 +50,14 @@ class FakeProvider:
 
 
 class FakeLLM:
+    def classify_article_categories(
+        self,
+        article_title: str,
+        article_text: str,
+        cancellation: RefreshCancellation | None = None,
+    ) -> tuple[str, ...]:
+        return ("TECHNOLOGIES",)
+
     def translate_title(
         self, article_title: str, cancellation: RefreshCancellation | None = None
     ) -> str:
@@ -86,11 +94,21 @@ def test_pipeline_refresh_processes_new_articles(app_config, storage) -> None:
     }
     assert {article.translated_body for article in articles} == {"translated source body"}
     assert {article.summary for article in articles} == {"summary translated source body"}
+    assert {article.categories for article in articles} == {("TECHNOLOGIES",)}
 
 
 class RecordingLLM:
     def __init__(self) -> None:
         self.calls: list[str] = []
+
+    def classify_article_categories(
+        self,
+        article_title: str,
+        article_text: str,
+        cancellation: RefreshCancellation | None = None,
+    ) -> tuple[str, ...]:
+        self.calls.append(f"classify:{article_title}")
+        return ("TECHNOLOGIES",)
 
     def translate_title(
         self, article_title: str, cancellation: RefreshCancellation | None = None
@@ -125,9 +143,11 @@ def test_pipeline_refresh_runs_llm_steps_sequentially(app_config, storage) -> No
 
     assert result.new_articles == 2
     assert llm.calls == [
+        "classify:world article",
         "translate_title:world article",
         "translate:world article",
         "summarize:world article",
+        "classify:technology article",
         "translate_title:technology article",
         "translate:technology article",
         "summarize:technology article",
@@ -145,9 +165,11 @@ def test_pipeline_refresh_emits_progress_aware_statuses(app_config, storage) -> 
         "fetching BBC News: World",
         "fetching BBC News: Technology",
         "extracting bbc:world-1",
+        "classifying bbc:world-1, done 0 of 2",
         "translating bbc:world-1, done 0 of 2",
         "summarizing bbc:world-1, done 0 of 2",
         "extracting bbc:technology-1",
+        "classifying bbc:technology-1, done 1 of 2",
         "translating bbc:technology-1, done 1 of 2",
         "summarizing bbc:technology-1, done 1 of 2",
         "ready",
@@ -182,6 +204,7 @@ def test_pipeline_refresh_excludes_cached_articles_from_progress_total(
         "fetching BBC News: World",
         "fetching BBC News: Technology",
         "extracting bbc:technology-1",
+        "classifying bbc:technology-1, done 0 of 1",
         "translating bbc:technology-1, done 0 of 1",
         "summarizing bbc:technology-1, done 0 of 1",
         "ready",
@@ -253,9 +276,23 @@ def test_pipeline_refresh_rejects_empty_or_title_only_source_text(app_config, st
 
 class BlockingLLM:
     def __init__(self) -> None:
+        self.classification_started = Event()
+        self.release_classification = Event()
         self.translation_started = Event()
         self.release_translation = Event()
+        self.classification_calls = 0
         self.translation_calls = 0
+
+    def classify_article_categories(
+        self,
+        article_title: str,
+        article_text: str,
+        cancellation: RefreshCancellation | None = None,
+    ) -> tuple[str, ...]:
+        self.classification_calls += 1
+        self.classification_started.set()
+        self.release_classification.wait(timeout=5)
+        return ("TECHNOLOGIES",)
 
     def translate_title(
         self, article_title: str, cancellation: RefreshCancellation | None = None
@@ -295,10 +332,11 @@ def test_pipeline_refresh_ignores_overlapping_calls(app_config, storage) -> None
 
     thread = Thread(target=run_first)
     thread.start()
-    assert llm.translation_started.wait(timeout=5)
+    assert llm.classification_started.wait(timeout=5)
 
     second = pipeline.refresh(second_statuses.append)
 
+    llm.release_classification.set()
     llm.release_translation.set()
     thread.join(timeout=5)
 
@@ -306,6 +344,7 @@ def test_pipeline_refresh_ignores_overlapping_calls(app_config, storage) -> None
     assert second.new_articles == 0
     assert second.failed_articles == 0
     assert second_statuses == ["refresh already running"]
+    assert llm.classification_calls == 1
     assert llm.translation_calls == 2
 
 
@@ -313,6 +352,14 @@ class BlockingSummaryLLM:
     def __init__(self) -> None:
         self.summary_started = Event()
         self.release_summary = Event()
+
+    def classify_article_categories(
+        self,
+        article_title: str,
+        article_text: str,
+        cancellation: RefreshCancellation | None = None,
+    ) -> tuple[str, ...]:
+        return ("TECHNOLOGIES",)
 
     def translate_title(
         self, article_title: str, cancellation: RefreshCancellation | None = None
@@ -358,6 +405,7 @@ def test_pipeline_refresh_emits_article_ready_after_translation_before_summary(
 
     assert ready_article_ids == ["bbc:world-1"]
     assert article is not None
+    assert article.categories == ("TECHNOLOGIES",)
     assert article.translated_title == "translated world article"
     assert article.translated_body == "translated source body"
     assert article.summary is None
@@ -507,6 +555,16 @@ class FailingSummaryLLM(FakeLLM):
         raise RuntimeError("LLM unavailable")
 
 
+class FailingClassificationLLM(FakeLLM):
+    def classify_article_categories(
+        self,
+        article_title: str,
+        article_text: str,
+        cancellation: RefreshCancellation | None = None,
+    ) -> tuple[str, ...]:
+        raise RuntimeError("LLM unavailable")
+
+
 def test_pipeline_refresh_translation_failure_counts_as_failed(app_config, storage) -> None:
     storage.set_selected_targets("bbc", ["world"])
     pipeline = NewsPipeline(app_config, storage, {"bbc": FakeProvider()}, FailingTranslationLLM())
@@ -531,6 +589,28 @@ def test_pipeline_refresh_translation_failure_counts_as_failed(app_config, stora
     assert translation_job is not None
     assert translation_job["status"] == "failed"
     assert "LLM unavailable" in translation_job["error_text"]
+
+
+def test_pipeline_refresh_continues_when_classification_fails(app_config, storage) -> None:
+    storage.set_selected_targets("bbc", ["world"])
+    pipeline = NewsPipeline(app_config, storage, {"bbc": FakeProvider()}, FailingClassificationLLM())
+
+    result = pipeline.refresh()
+    article = storage.get_article("bbc:world-1")
+    classification_job = storage.connection.execute(
+        "SELECT status, error_text FROM jobs WHERE article_id = ? AND job_type = 'classification'",
+        ("bbc:world-1",),
+    ).fetchone()
+
+    assert result.new_articles == 1
+    assert result.failed_articles == 0
+    assert article is not None
+    assert article.categories == ()
+    assert article.translation_status == "done"
+    assert article.summary_status == "done"
+    assert classification_job is not None
+    assert classification_job["status"] == "failed"
+    assert "LLM unavailable" in classification_job["error_text"]
 
 
 def test_pipeline_refresh_summary_failure_counts_as_failed(app_config, storage) -> None:

@@ -198,3 +198,31 @@ def test_llm_client_raises_http_errors_without_retrying() -> None:
         client.translate_title("Headline")
 
     assert len(FakeHTTPConnection.requests) == 1
+
+
+def test_llm_client_classifies_articles_with_translation_model_and_json_array_response() -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "[\"SCIENCE\", \"TECHNOLOGIES\"]"}}]}),
+    ]
+    client = OpenAILLMClient(make_config())
+
+    result = client.classify_article_categories("Headline", "Article body")
+
+    assert result == ("TECHNOLOGIES", "SCIENCE")
+    request = FakeHTTPConnection.requests[0]
+    payload = json.loads(request["body"].decode("utf-8"))
+    assert payload["model"] == "translate"
+    assert "Return a JSON array" in payload["messages"][0]["content"]
+    assert "AI" in payload["messages"][0]["content"]
+    assert "WAR" in payload["messages"][0]["content"]
+
+
+def test_llm_client_classification_parser_accepts_plain_comma_separated_labels() -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "SCIENCE, TECHNOLOGIES"}}]}),
+    ]
+    client = OpenAILLMClient(make_config())
+
+    result = client.classify_article_categories("Headline", "Article body")
+
+    assert result == ("TECHNOLOGIES", "SCIENCE")

@@ -233,6 +233,7 @@ class ProviderHomeController:
         hidden_in_provider_home = {
             "previous_article",
             "next_article",
+            "classify_article_categories",
             "toggle_summary",
             "show_or_refresh_more_info",
             "show_article_qa",

@@ -43,6 +43,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.pgup": "PgUp",
         "app.binding.pgdn": "PgDn",
         "app.binding.back": "Back",
+        "app.binding.classify": "Classify",
         "app.binding.space": "Space",
         "app.binding.summary": "Summary",
         "app.binding.more_info": "More Info",
@@ -69,8 +70,12 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.status.fetching_target": "fetching {provider}: {target}",
         "app.status.failed_to_fetch_target": "failed to fetch {provider}: {target}: {error}",
         "app.status.extracting_article": "extracting {article_id}",
+        "app.status.classifying_article": "classifying {article_id}, done {done} of {total}",
         "app.status.translating_article": "translating {article_id}, done {done} of {total}",
         "app.status.summarizing_article": "summarizing {article_id}, done {done} of {total}",
+        "app.status.classifying_current_article": "classifying article categories...",
+        "app.status.article_categories_updated": "article categories updated",
+        "app.status.article_categories_update_failed": "failed to classify article categories: {error}",
         "app.status.browser_open_failed": "failed to open browser: {error}",
         "app.status.browser_opened": "opened article in browser",
         "app.status.browser_not_confirmed": "browser did not confirm open request",
@@ -82,6 +87,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "help.body.reader": (
             "Left/Right: previous/next article\n"
             "Up/Down/PgUp/PgDn/B: scroll\n"
+            "K: classify categories\n"
             "Space: page down or next article\n"
             "S: toggle summary\n"
             "M: more info\n"
@@ -219,6 +225,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.pgup": "PgUp",
         "app.binding.pgdn": "PgDn",
         "app.binding.back": "Назад",
+        "app.binding.classify": "Категории",
         "app.binding.space": "Space",
         "app.binding.summary": "Сводка",
         "app.binding.more_info": "Подробнее",
@@ -245,8 +252,12 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.status.fetching_target": "загрузка {provider}: {target}",
         "app.status.failed_to_fetch_target": "не удалось загрузить {provider}: {target}: {error}",
         "app.status.extracting_article": "извлечение {article_id}",
+        "app.status.classifying_article": "классификация {article_id}, выполнено {done} из {total}",
         "app.status.translating_article": "перевод {article_id}, выполнено {done} из {total}",
         "app.status.summarizing_article": "создание сводки {article_id}, выполнено {done} из {total}",
+        "app.status.classifying_current_article": "классификация категорий статьи...",
+        "app.status.article_categories_updated": "категории статьи обновлены",
+        "app.status.article_categories_update_failed": "не удалось классифицировать категории статьи: {error}",
         "app.status.browser_open_failed": "не удалось открыть браузер: {error}",
         "app.status.browser_opened": "статья открыта в браузере",
         "app.status.browser_not_confirmed": "браузер не подтвердил запрос на открытие",
@@ -258,6 +269,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "help.body.reader": (
             "Left/Right: предыдущая/следующая статья\n"
             "Up/Down/PgUp/PgDn/B: прокрутка\n"
+            "K: классифицировать категории\n"
             "Space: страница вниз или следующая статья\n"
             "S: переключить сводку\n"
             "M: подробнее\n"
@@ -445,6 +457,10 @@ class UILocalizer:
         ),
         (re.compile(r"^extracting (?P<article_id>.+)$"), "app.status.extracting_article"),
         (
+            re.compile(r"^classifying (?P<article_id>.+), done (?P<done>\d+) of (?P<total>\d+)$"),
+            "app.status.classifying_article",
+        ),
+        (
             re.compile(r"^translating (?P<article_id>.+), done (?P<done>\d+) of (?P<total>\d+)$"),
             "app.status.translating_article",
         ),
@@ -468,6 +484,8 @@ class UILocalizer:
     _STATUS_KEYS: Final[dict[str, str]] = {
         "ready": "app.status.ready",
         "refresh already running": "app.status.refresh_already_running",
+        "classifying article categories...": "app.status.classifying_current_article",
+        "article categories updated": "app.status.article_categories_updated",
         "opened article in browser": "app.status.browser_opened",
         "browser did not confirm open request": "app.status.browser_not_confirmed",
         "no article to export": "app.status.no_article_to_export",

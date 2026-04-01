@@ -146,6 +146,47 @@ class NewsPipeline:
         progress: RefreshProgress,
         cancellation: RefreshCancellation | None,
     ) -> bool:
+        return self._classify_article(
+            article_id,
+            article_title,
+            source_text,
+            on_status,
+            on_article_ready,
+            progress,
+            cancellation,
+        )
+
+    def _classify_article(
+        self,
+        article_id: str,
+        article_title: str,
+        source_text: str,
+        on_status: StatusCallback | None,
+        on_article_ready: ArticleReadyCallback | None,
+        progress: RefreshProgress,
+        cancellation: RefreshCancellation | None,
+    ) -> bool:
+        try:
+            self._raise_if_cancelled(cancellation)
+            self.storage.set_job_status(article_id, "classification", "running")
+            self._emit_stage_status(on_status, "classifying", article_id, progress)
+            categories = self.llm_client.classify_article_categories(article_title, source_text, cancellation)
+            self._raise_if_cancelled(cancellation)
+            self.storage.replace_categories(article_id, categories)
+            self.storage.set_job_status(article_id, "classification", "done")
+        except RefreshCancelled:
+            self.storage.set_job_status(article_id, "classification", "pending")
+            raise
+        except Exception as exc:
+            _LOG.warning("classification_failed article_id=%s error=%s", article_id, exc)
+            self.storage.set_job_status(
+                article_id,
+                "classification",
+                "failed",
+                error_text=str(exc),
+                increment_attempt=True,
+            )
+
         return self._translate_article(
             article_id,
             article_title,

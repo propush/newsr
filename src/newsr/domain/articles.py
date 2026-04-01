@@ -22,6 +22,7 @@ class ArticleRecord:
     created_at: datetime
     provider_id: str = ""
     provider_article_id: str = ""
+    categories: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)

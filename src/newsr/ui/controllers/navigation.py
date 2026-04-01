@@ -3,6 +3,7 @@ from __future__ import annotations
 import webbrowser
 from typing import TYPE_CHECKING
 
+from rich.text import Text
 from textual.app import ScreenStackError
 from textual.containers import VerticalScroll
 from textual.css.query import NoMatches
@@ -25,7 +26,7 @@ class NavigationController:
         self._scroll_restore_attempts_remaining: int = 0
         self._scroll_restore_scheduled: bool = False
         self._state_persisted: bool = False
-        self._rendered_header_text: str | None = None
+        self._rendered_header_text: Text | None = None
         self._rendered_body_text: str | None = None
         self._rendered_article_url: str | None = None
         self._rendered_status_text: str | None = None

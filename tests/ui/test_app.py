@@ -41,6 +41,14 @@ def url_source(app: NewsReaderApp) -> str:
     return app.query_one("#article-url", Static).content
 
 
+def plain_content(value) -> str:  # type: ignore[no-untyped-def]
+    return value.plain if hasattr(value, "plain") else str(value)
+
+
+def header_text(app: NewsReaderApp) -> str:
+    return plain_content(app.query_one("#article-header", Static).content)
+
+
 def more_info_screen(app: NewsReaderApp) -> MoreInfoScreen | None:
     for screen in reversed(app.screen_stack):
         if isinstance(screen, MoreInfoScreen):
@@ -265,6 +273,22 @@ class FakeSearchClient:
     ) -> list[SearchResult]:
         self.calls.append(query)
         return self.results[:limit]
+
+
+class FakeCategorizationLLM:
+    def __init__(self, responses: list[tuple[str, ...]] | None = None) -> None:
+        self.responses = responses or [("SCIENCE", "TECHNOLOGIES")]
+        self.calls: list[tuple[str, str]] = []
+
+    def classify_article_categories(
+        self,
+        article_title: str,
+        article_text: str,
+        cancellation: RefreshCancellation | None = None,
+    ) -> tuple[str, ...]:
+        self.calls.append((article_title, article_text))
+        index = min(len(self.calls) - 1, len(self.responses) - 1)
+        return self.responses[index]
 
 
 class BlockingQueryLLM:
@@ -505,13 +529,12 @@ def test_ui_renders_cached_article(app_config, tmp_path, article_content) -> Non
         async with app.run_test() as pilot:
             await pilot.pause()
             header_widget = app.query_one("#article-header", Static)
-            header = header_widget.content
             body = body_source(app)
-            assert "Article # 1 of 1" in header
-            assert f"Date : {expected_date}" in header
-            assert "From : Reporter" not in header
-            assert "Title: Translated title" in header
-            assert "Area :" not in header
+            assert "Article # 1 of 1" in header_text(app)
+            assert f"Date : {expected_date}" in header_text(app)
+            assert "From : Reporter" not in header_text(app)
+            assert "Title: Translated title" in header_text(app)
+            assert "Area :" not in header_text(app)
             assert "Reporter @ BBC News " in header_widget.border_title
             assert "world" in header_widget.border_title
             assert "From :" not in header_widget.border_title
@@ -554,11 +577,10 @@ def test_ui_reader_only_loads_translated_articles(app_config, tmp_path) -> None:
     async def runner() -> None:
         async with app.run_test() as pilot:
             await pilot.pause()
-            header = app.query_one("#article-header", Static).content
             assert len(app.articles) == 1
             assert app.current_article is not None
             assert app.current_article.article_id == translated.article_id
-            assert "Article # 1 of 1" in header
+            assert "Article # 1 of 1" in header_text(app)
             assert "Ready translated text" in body_source(app)
             assert "Pending source text" not in body_source(app)
 
@@ -662,13 +684,12 @@ def test_ui_hides_author_row_when_author_is_missing(app_config, tmp_path, articl
         async with app.run_test() as pilot:
             await pilot.pause()
             header_widget = app.query_one("#article-header", Static)
-            header = header_widget.content
-            assert f"Date : {expected_date}" in header
-            assert "From : bbc" not in header
+            assert f"Date : {expected_date}" in header_text(app)
+            assert "From : bbc" not in header_text(app)
             assert "BBC News " in header_widget.border_title
             assert "world" in header_widget.border_title
             assert "From :" not in header_widget.border_title
-            assert "Area :" not in header
+            assert "Area :" not in header_text(app)
 
     asyncio.run(runner())
 
@@ -749,8 +770,7 @@ def test_ui_hides_from_row_when_author_and_provider_are_missing(app_config, tmp_
         async with app.run_test() as pilot:
             await pilot.pause()
             header_widget = app.query_one("#article-header", Static)
-            header = header_widget.content
-            assert "From :" not in header
+            assert "From :" not in header_text(app)
             assert header_widget.border_title == "world"
 
     asyncio.run(runner())
@@ -777,9 +797,8 @@ def test_ui_uses_download_date_when_published_date_is_missing(app_config, tmp_pa
     async def runner() -> None:
         async with app.run_test() as pilot:
             await pilot.pause()
-            header = app.query_one("#article-header").content
-            assert f"Date : {expected_date}" in header
-            assert "Date : unknown" not in header
+            assert f"Date : {expected_date}" in header_text(app)
+            assert "Date : unknown" not in header_text(app)
 
     asyncio.run(runner())
 
@@ -853,6 +872,7 @@ def test_ui_reader_footer_hides_pgup_and_pgdn(app_config, tmp_path, article_cont
 
             assert "page_up" not in actions
             assert "page_down" not in actions
+            assert "classify_article_categories" in actions
             assert "toggle_summary" in actions
             assert "show_or_refresh_more_info" in actions
 
@@ -1223,8 +1243,7 @@ def test_ui_falls_back_to_original_title_without_translated_title(
     async def runner() -> None:
         async with app.run_test() as pilot:
             await pilot.pause()
-            header = app.query_one("#article-header").content
-            assert "Title: Example title" in header
+            assert "Title: Example title" in header_text(app)
 
     asyncio.run(runner())
 
@@ -1241,11 +1260,11 @@ def test_ui_summary_toggle_keeps_header_and_swaps_body(app_config, tmp_path, art
     async def runner() -> None:
         async with app.run_test() as pilot:
             await pilot.pause()
-            header_before = app.query_one("#article-header").content
+            header_before = header_text(app)
             body_before = body_source(app)
             url_before = url_source(app)
             await pilot.press("s")
-            header_after = app.query_one("#article-header").content
+            header_after = header_text(app)
             body_after = body_source(app)
             url_after = url_source(app)
             assert "Title: Translated title" in header_before
@@ -1256,6 +1275,51 @@ def test_ui_summary_toggle_keeps_header_and_swaps_body(app_config, tmp_path, art
             assert body_after == "Summary text"
             assert url_before == f"URL: {article_content.url}"
             assert url_after == f"URL: {article_content.url}"
+
+    asyncio.run(runner())
+
+
+def test_ui_manual_classification_updates_header_and_storage(app_config, tmp_path, article_content) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(
+        article_content.article_id, "Translated title", "Translated text", "done"
+    )
+    llm = FakeCategorizationLLM([("SCIENCE", "TECHNOLOGIES"), ("BUSINESS",)])
+    app.llm_client = llm  # type: ignore[assignment]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert "[TECHNOLOGIES]" not in header_text(app)
+
+            await pilot.press("k")
+            for _ in range(20):
+                await pilot.pause()
+                stored = app.storage.get_article(article_content.article_id)
+                if stored is not None and stored.categories == ("TECHNOLOGIES", "SCIENCE"):
+                    break
+            else:
+                raise AssertionError("manual classification did not finish")
+
+            header_renderable = app.query_one("#article-header", Static).content
+            assert "Article # 1 of 1  [TECHNOLOGIES] [SCIENCE]" in header_text(app)
+            assert llm.calls == [(article_content.title, article_content.body)]
+            assert getattr(header_renderable, "spans", [])
+
+            await pilot.press("k")
+            for _ in range(20):
+                await pilot.pause()
+                stored = app.storage.get_article(article_content.article_id)
+                if stored is not None and stored.categories == ("BUSINESS",):
+                    break
+            else:
+                raise AssertionError("manual reclassification did not finish")
+
+            assert "[BUSINESS]" in header_text(app)
+            assert "[SCIENCE]" not in header_text(app)
 
     asyncio.run(runner())
 
@@ -2022,7 +2086,8 @@ def test_ui_help_lists_article_qa_shortcut(app_config, tmp_path) -> None:
             await pilot.pause()
             await pilot.press("h")
             await pilot.pause()
-            help_text = app.screen.query_one("#help-text", Static).content
+            help_text = plain_content(app.screen.query_one("#help-text", Static).content)
+            assert "K: classify categories" in help_text
             assert "?: ask about article" in help_text
 
     asyncio.run(runner())
@@ -2087,21 +2152,19 @@ def test_ui_loads_articles_in_insertion_order_and_shows_position(app_config, tmp
             await pilot.pause()
             assert app.current_article is not None
             assert app.current_article.article_id == article_content.article_id
-            header = app.query_one("#article-header").content
             body = body_source(app)
-            assert "Article # 1 of 2" in header
-            assert "Title: Older translated title" in header
+            assert "Article # 1 of 2" in header_text(app)
+            assert "Title: Older translated title" in header_text(app)
             assert "Older text" in body
             assert url_source(app) == f"URL: {article_content.url}"
 
             await pilot.press("right")
 
-            header = app.query_one("#article-header").content
             body = body_source(app)
             assert app.current_article is not None
             assert app.current_article.article_id == appended_article.article_id
-            assert "Article # 2 of 2" in header
-            assert "Title: Appended translated title" in header
+            assert "Article # 2 of 2" in header_text(app)
+            assert "Title: Appended translated title" in header_text(app)
             assert "Appended text" in body
             assert url_source(app) == f"URL: {appended_article.url}"
 
@@ -2441,8 +2504,7 @@ def test_ui_restores_last_read_article_on_restart(app_config, tmp_path, article_
             await pilot.pause()
             assert restarted.current_article is not None
             assert restarted.current_article.article_id == appended_article.article_id
-            header = restarted.query_one("#article-header").content
-            assert "Article # 2 of 2" in header
+            assert "Article # 2 of 2" in header_text(restarted)
 
     asyncio.run(second_run())
 
@@ -2488,8 +2550,7 @@ def test_ui_falls_back_when_last_read_article_is_missing(app_config, tmp_path, a
             assert restarted.current_article is not None
             assert restarted.current_article.article_id == article_content.article_id
             assert restarted.reader_state.article_id == article_content.article_id
-            header = restarted.query_one("#article-header").content
-            assert "Article # 1 of 1" in header
+            assert "Article # 1 of 1" in header_text(restarted)
 
     asyncio.run(runner())
 
@@ -3121,6 +3182,16 @@ def test_ui_keeps_summary_hotkey_fixed_when_localizing_labels(app_config, tmp_pa
     assert summary_bindings[0].description == "Summary"
 
 
+def test_ui_keeps_classify_hotkey_fixed_when_localizing_labels(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+
+    classify_bindings = app._bindings.get_bindings_for_key("k")
+
+    assert len(classify_bindings) == 1
+    assert classify_bindings[0].action == "classify_article_categories"
+    assert classify_bindings[0].description == "Classify"
+
+
 def test_ui_keeps_summary_hotkey_fixed_in_russian_locale(app_config, tmp_path) -> None:
     app_config.ui.locale = "ru"
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
@@ -3130,6 +3201,17 @@ def test_ui_keeps_summary_hotkey_fixed_in_russian_locale(app_config, tmp_path) -
     assert len(summary_bindings) == 1
     assert summary_bindings[0].action == "toggle_summary"
     assert summary_bindings[0].description == "Сводка"
+
+
+def test_ui_keeps_classify_hotkey_fixed_in_russian_locale(app_config, tmp_path) -> None:
+    app_config.ui.locale = "ru"
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+
+    classify_bindings = app._bindings.get_bindings_for_key("k")
+
+    assert len(classify_bindings) == 1
+    assert classify_bindings[0].action == "classify_article_categories"
+    assert classify_bindings[0].description == "Категории"
 
 
 def test_ui_ignores_invalid_saved_theme(app_config, tmp_path, article_content) -> None:
@@ -3351,7 +3433,7 @@ def test_ui_source_manager_save_defers_when_refresh_running(app_config, tmp_path
     async def runner() -> None:
         async with app.run_test() as pilot:
             await pilot.pause()
-            initial_header = app.query_one("#article-header", Static).content
+            initial_header = header_text(app)
             initial_body = body_source(app)
             await pilot.press("c")
             for _ in range(20):
@@ -3373,7 +3455,7 @@ def test_ui_source_manager_save_defers_when_refresh_running(app_config, tmp_path
             ]
             assert "next refresh will use updated provider settings" in app.status_text
             assert len(launch_calls) == 0
-            assert app.query_one("#article-header", Static).content == initial_header
+            assert header_text(app) == initial_header
             assert body_source(app) == initial_body
 
     asyncio.run(runner())
@@ -3616,11 +3698,12 @@ def test_ui_provider_home_help_shows_provider_only_bindings(app_config, tmp_path
             await pilot.pause()
             await pilot.press("h")
             await pilot.pause()
-            help_text = app.screen.query_one("#help-text", Static).content
+            help_text = plain_content(app.screen.query_one("#help-text", Static).content)
             assert "Enter/Space: open the selected provider" in help_text
             assert "C: manage sources" in help_text
             assert "D: download new articles" in help_text
             assert "Ctrl+P: command palette / choose theme" in help_text
+            assert "K: classify categories" not in help_text
             assert "Left/Right: previous/next article" not in help_text
             assert "S: toggle summary" not in help_text
             assert "M: more info" not in help_text
@@ -4323,23 +4406,22 @@ def test_ui_renders_russian_copy_and_preserves_hotkeys(app_config, tmp_path, art
     async def runner() -> None:
         async with app.run_test() as pilot:
             await pilot.pause()
-            header = app.query_one("#article-header", Static).content
-            assert "Статья № 1 из 1" in header
-            assert "Заголовок: Переведённый заголовок" in header
-            assert "Режим : полный" in header
+            assert "Статья № 1 из 1" in header_text(app)
+            assert "Заголовок: Переведённый заголовок" in header_text(app)
+            assert "Режим : полный" in header_text(app)
             assert url_source(app) == f"URL: {article_content.url}"
 
             await pilot.press("h")
             await pilot.pause()
-            help_text = app.screen.query_one("#help-text", Static).content
+            help_text = plain_content(app.screen.query_one("#help-text", Static).content)
+            assert "K: классифицировать категории" in help_text
             assert "S: переключить сводку" in help_text
             assert "M: подробнее" in help_text
             assert "D: загрузить новые статьи" in help_text
 
             await pilot.press("s")
             await pilot.pause()
-            summary_header = app.query_one("#article-header", Static).content
-            assert "Режим : сводка" in summary_header
+            assert "Режим : сводка" in header_text(app)
             assert body_source(app) == "Краткая сводка"
 
     asyncio.run(runner())

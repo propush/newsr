@@ -10,6 +10,7 @@ from time import perf_counter
 from typing import Sequence
 from urllib.parse import urlparse
 
+from ...domain.article_categories import ARTICLE_CATEGORIES, normalize_article_categories
 from ...cancellation import RefreshCancellation, cancellable_read
 from ...config.models import AppConfig
 from ..search.duckduckgo import SearchResult
@@ -86,6 +87,28 @@ class OpenAILLMClient:
             "Use short paragraphs and occasional bullet points only when helpful."
         )
         return self._chat(self.summary_model, prompt, translated_text, cancellation)
+
+    def classify_article_categories(
+        self,
+        article_title: str,
+        article_text: str,
+        cancellation: RefreshCancellation | None = None,
+    ) -> tuple[str, ...]:
+        category_list = ", ".join(ARTICLE_CATEGORIES)
+        prompt = (
+            f"Classify the news article '{article_title}' using only these labels: {category_list}. "
+            "Return a JSON array of zero or more labels. "
+            "Use only exact labels from the allowed list. "
+            "Return [] when none apply. "
+            "Do not add commentary."
+        )
+        raw = self._chat(
+            self.translation_model,
+            prompt,
+            f"{article_title}\n\n{article_text}",
+            cancellation,
+        )
+        return _parse_category_response(raw)
 
     def build_search_query(
         self,
@@ -319,3 +342,24 @@ def _extract_error_message(raw: object) -> str:
             if isinstance(message, str) and message.strip():
                 return message.strip()
     return "Unknown error"
+
+
+def _parse_category_response(raw: str) -> tuple[str, ...]:
+    stripped = raw.strip()
+    if stripped == "[]":
+        return ()
+    try:
+        parsed = json.loads(stripped)
+    except json.JSONDecodeError:
+        return normalize_article_categories(_extract_category_tokens(stripped))
+    if not isinstance(parsed, list):
+        return ()
+    return normalize_article_categories(item for item in parsed if isinstance(item, str))
+
+
+def _extract_category_tokens(raw: str) -> list[str]:
+    return [
+        token.strip()
+        for token in raw.replace("\n", ",").split(",")
+        if token.strip()
+    ]

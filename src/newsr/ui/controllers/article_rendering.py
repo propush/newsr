@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from rich.cells import cell_len
+from rich.style import Style
+from rich.text import Text
 
 from typing import TYPE_CHECKING
 
@@ -31,22 +33,27 @@ def article_header(
     total: int,
     article: ArticleRecord,
     reader_state: ReaderState,
-) -> str:
+    accent_color: str,
+) -> Text:
     date_text = format_article_date(article)
     title = article.translated_title or article.title
     mode = view_mode_label(ui, reader_state, article)
     article_position = current_index + 1
+    header = Text(ui.text("app.article.position", current=article_position, total=total))
+    if article.categories:
+        header.append("  ")
+        category_style = Style(color=accent_color, bold=True)
+        for index, category in enumerate(article.categories):
+            if index:
+                header.append(" ")
+            header.append(f"[{category}]", style=category_style)
     lines = [
-        ui.text("app.article.position", current=article_position, total=total),
-        ui.text("app.article.date", date=date_text),
+        header,
+        Text(ui.text("app.article.date", date=date_text)),
+        Text(ui.text("app.article.title", title=title)),
+        Text(ui.text("app.article.mode", mode=mode)),
     ]
-    lines.extend(
-        [
-            ui.text("app.article.title", title=title),
-            ui.text("app.article.mode", mode=mode),
-        ]
-    )
-    return "\n".join(lines)
+    return Text("\n").join(lines)
 
 
 def article_frame_title(
