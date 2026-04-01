@@ -97,18 +97,30 @@ class OpenAILLMClient:
         category_list = ", ".join(ARTICLE_CATEGORIES)
         prompt = (
             f"Classify the news article '{article_title}' using only these labels: {category_list}. "
-            "Return a JSON array of zero or more labels. "
+            "Return a JSON array with at least one label. "
             "Use only exact labels from the allowed list. "
-            "Return [] when none apply. "
             "Do not add commentary."
         )
-        raw = self._chat(
-            self.translation_model,
-            prompt,
-            f"{article_title}\n\n{article_text}",
-            cancellation,
-        )
-        return _parse_category_response(raw)
+        remaining_attempts = self.request_retries + 1
+        while remaining_attempts > 0:
+            raw = self._chat(
+                self.translation_model,
+                prompt,
+                f"{article_title}\n\n{article_text}",
+                cancellation,
+            )
+            categories = _parse_category_response(raw)
+            if categories:
+                return categories
+            remaining_attempts -= 1
+            if remaining_attempts == 0:
+                return ()
+            LOGGER.warning(
+                "classification_empty_result title=%r attempts_remaining=%s",
+                article_title,
+                remaining_attempts,
+            )
+        return ()
 
     def build_search_query(
         self,

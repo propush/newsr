@@ -4,6 +4,7 @@ import asyncio
 import webbrowser
 from datetime import UTC, datetime
 from threading import Event
+from types import MethodType
 from unittest.mock import patch
 
 from rich.cells import cell_len
@@ -16,6 +17,7 @@ from newsr.cancellation import RefreshCancellation
 import pytest
 
 from newsr.domain import AppOptions, ArticleContent, ProviderTarget, ViewMode
+from newsr.providers.llm import OpenAILLMClient
 from newsr.providers.search import SearchResult
 from newsr.ui import (
     ArticleQuestionScreen,
@@ -1320,6 +1322,38 @@ def test_ui_manual_classification_updates_header_and_storage(app_config, tmp_pat
 
             assert "[BUSINESS]" in header_text(app)
             assert "[SCIENCE]" not in header_text(app)
+
+    asyncio.run(runner())
+
+
+def test_ui_manual_classification_retries_empty_result_until_it_gets_a_label(
+    app_config, tmp_path, article_content
+) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(
+        article_content.article_id, "Translated title", "Translated text", "done"
+    )
+    llm = OpenAILLMClient(app_config)
+    raw_responses = iter(["[]", "[\"SCIENCE\"]"])
+    llm._chat = MethodType(lambda self, model, system_prompt, content, cancellation=None: next(raw_responses), llm)  # type: ignore[method-assign]
+    app.llm_client = llm  # type: ignore[assignment]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("k")
+            for _ in range(20):
+                await pilot.pause()
+                stored = app.storage.get_article(article_content.article_id)
+                if stored is not None and stored.categories == ("SCIENCE",):
+                    break
+            else:
+                raise AssertionError("manual classification retry did not finish")
+
+            assert "[SCIENCE]" in header_text(app)
 
     asyncio.run(runner())
 

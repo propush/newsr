@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from threading import Event, Thread
+from types import MethodType
 
 from newsr.cancellation import RefreshCancellation
 from newsr.domain import ArticleContent, ProviderTarget, SectionCandidate
 from newsr.pipeline import NewsPipeline
+from newsr.providers.llm import OpenAILLMClient
 
 
 class FakeProvider:
@@ -611,6 +613,33 @@ def test_pipeline_refresh_continues_when_classification_fails(app_config, storag
     assert classification_job is not None
     assert classification_job["status"] == "failed"
     assert "LLM unavailable" in classification_job["error_text"]
+
+
+def test_pipeline_refresh_retries_empty_classification_until_it_gets_a_label(
+    app_config, storage
+) -> None:
+    storage.set_selected_targets("bbc", ["world"])
+    llm = OpenAILLMClient(app_config)
+    raw_responses = iter(["[]", "[\"SCIENCE\"]", "translated world article", "translated source body", "summary translated source body"])
+    llm._chat = MethodType(lambda self, model, system_prompt, content, cancellation=None: next(raw_responses), llm)  # type: ignore[method-assign]
+    pipeline = NewsPipeline(app_config, storage, {"bbc": FakeProvider()}, llm)
+
+    result = pipeline.refresh()
+    article = storage.get_article("bbc:world-1")
+    classification_job = storage.connection.execute(
+        "SELECT status, error_text FROM jobs WHERE article_id = ? AND job_type = 'classification'",
+        ("bbc:world-1",),
+    ).fetchone()
+
+    assert result.new_articles == 1
+    assert result.failed_articles == 0
+    assert article is not None
+    assert article.categories == ("SCIENCE",)
+    assert article.translation_status == "done"
+    assert article.summary_status == "done"
+    assert classification_job is not None
+    assert classification_job["status"] == "done"
+    assert classification_job["error_text"] in ("", None)
 
 
 def test_pipeline_refresh_summary_failure_counts_as_failed(app_config, storage) -> None:
