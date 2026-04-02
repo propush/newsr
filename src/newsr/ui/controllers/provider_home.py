@@ -45,11 +45,12 @@ class ProviderHomeController:
                 provider_id=provider.provider_id,
                 display_name=provider.display_name,
                 enabled=(provider.provider_id == "bbc"),
+                provider_type="http",
             )
-            for provider in self._app.providers.values()
+            for provider in self._app.builtin_providers.values()
         ]
         self._app.storage.sync_providers(provider_records)
-        for provider in self._app.providers.values():
+        for provider in self._app.builtin_providers.values():
             if self._app.storage.list_provider_targets(provider.provider_id):
                 continue
             default_targets = provider.default_targets()
@@ -133,6 +134,19 @@ class ProviderHomeController:
         self._app.refresh_view()
 
     def open_scope(self, scope_id: str) -> None:
+        self._activate_scope(scope_id, close_provider_home=True)
+
+    def show_home_for_unavailable_scope(self) -> None:
+        self._app._persist_reader_state()
+        self.show()
+
+    def handle_deleted_provider(self, provider_id: str) -> None:
+        if self._active_scope_id == provider_id:
+            self.show_home_for_unavailable_scope()
+        if self._open:
+            self.refresh_rows()
+
+    def _activate_scope(self, scope_id: str, *, close_provider_home: bool) -> None:
         self._app._persist_reader_state()
         self._active_scope_id = scope_id
         self._selected_scope_id = scope_id
@@ -143,9 +157,9 @@ class ProviderHomeController:
             fallback_to_current_article=False,
         )
         self._app._navigation.queue_scroll_restore()
-        self.close()
+        if close_provider_home:
+            self.close()
         self._app.refresh_view()
-        self._app._navigation.maybe_auto_fetch()
 
     def open_selected_scope(self) -> None:
         try:
@@ -225,6 +239,7 @@ class ProviderHomeController:
             "page_up",
             "page_down",
             "show_source_manager",
+            "watch_topic",
             "download_articles",
             "show_help",
             "quit_reader",
@@ -276,6 +291,9 @@ class ProviderHomeController:
 
     def refresh_catalog(self, provider_id: str) -> list[ProviderTarget]:
         provider = self._app.providers[provider_id]
+        provider_record = self._app.storage.get_provider(provider_id)
+        if provider_record is not None and provider_record.provider_type == "topic":
+            return self._app.storage.list_provider_targets(provider_id)
         current_selected = {
             target.target_key for target in self._app.storage.list_selected_targets(provider_id)
         }
@@ -309,21 +327,14 @@ class ProviderHomeController:
             self._app.storage.set_provider_enabled(provider_id, enabled)
         for provider_id, target_keys in selected_targets.items():
             self._app.storage.set_selected_targets(provider_id, target_keys)
+        self._app._refresh.request_due_refresh_check()
         if (
             self._active_scope_id != ALL_PROVIDERS_SCOPE_ID
             and not enabled_by_provider.get(self._active_scope_id, False)
         ):
-            self.open_scope(ALL_PROVIDERS_SCOPE_ID)
+            self.show_home_for_unavailable_scope()
         if self._open:
             self.refresh_rows()
-        if self._app._refresh.in_progress:
-            self._app._refresh.set_status_text(
-                self._app.ui.text("app.status.sources_saved_next_refresh"),
-                busy=False,
-            )
-            self._app.refresh_view()
-            return True
-        self._app._refresh.set_status_text(self._app.ui.text("app.status.sources_saved_refreshing"), busy=False)
+        self._app._refresh.set_status_text(self._app.ui.text("app.status.sources_saved"), busy=False)
         self._app.refresh_view()
-        self._app._refresh.start()
         return True

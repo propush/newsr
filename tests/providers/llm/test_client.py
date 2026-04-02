@@ -110,7 +110,7 @@ def make_config(
     request_retries: int = 2,
 ) -> AppConfig:
     return AppConfig(
-        articles=ArticlesConfig(fetch=2, store=10),
+        articles=ArticlesConfig(fetch=2, store=10, update_schedule="0 * * * *"),
         llm=LLMConfig(
             url=url,
             model_translation="translate",

@@ -52,7 +52,8 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.sources": "Sources",
         "app.binding.export": "Export",
         "app.binding.open": "Open",
-        "app.binding.download": "Download",
+        "app.binding.watch_topic": "Watch Topic",
+        "app.binding.download": "Refresh",
         "app.binding.help": "Help",
         "app.binding.providers": "Providers",
         "app.binding.quit": "Quit",
@@ -83,6 +84,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.status.checking_llm": "checking llm responsiveness...",
         "app.status.exiting": "Exiting...",
         "app.status.sources_unchanged": "sources unchanged",
+        "app.status.sources_saved": "sources saved",
         "app.status.sources_saved_next_refresh": "sources saved; next refresh will use updated provider settings",
         "app.status.sources_saved_refreshing": "sources saved; refreshing enabled providers",
         "confirm_dialog.llm_unresponsive.header": "LLM Unavailable",
@@ -100,9 +102,10 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "L: article list\n"
             "Esc: back to providers\n"
             "C: sources\n"
+            "W: watch topic\n"
             "E: export current view\n"
             "O: open article in browser\n"
-            "D: download new articles\n"
+            "D: force refresh current provider\n"
             "Ctrl+P: command palette / choose theme\n"
             "H: help\n"
             "Q: quit"
@@ -111,13 +114,14 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Up/Down/PgUp/PgDn/B: move through providers\n"
             "Enter/Space: open the selected provider\n"
             "C: manage sources\n"
-            "D: download new articles\n"
+            "W: create watched topic\n"
+            "D: force refresh all providers\n"
             "Ctrl+P: command palette / choose theme\n"
             "H: help\n"
             "Q: quit"
         ),
         "provider_home.empty": "No enabled providers. Press C to manage sources.",
-        "provider_home.hint": "Up/Down: select   Enter/Space: open provider   C: sources   D: refresh   H: help",
+        "provider_home.hint": "Up/Down: select   Enter/Space: open provider   C: sources   W: watch topic   D: refresh   H: help",
         "provider_home.status.empty": "No provider is available.",
         "provider_home.status.selection": "{provider}: {unread} unread, {total} total",
         "provider_home.table.provider": "Provider",
@@ -127,11 +131,13 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "source.binding.pane": "Pane",
         "source.binding.toggle": "Toggle",
         "source.binding.refresh": "Refresh",
+        "source.binding.schedule": "Schedule",
+        "source.binding.delete": "Delete",
         "source.binding.apply": "Apply",
         "source.header": "Manage Sources",
         "source.loading.status": "Loading providers and targets...",
         "source.loading.body": "Loading sources...",
-        "source.hint": "Tab: switch pane   Space: toggle   R: refresh catalog   A: apply   Esc: close",
+        "source.hint": "Tab: switch pane   Space: toggle   R: refresh catalog   U: edit schedule   X: delete topic   A: apply   Esc: close",
         "source.status.still_loading": "Sources are still loading.",
         "source.status.refreshing_catalog": "Refreshing {provider} catalog...",
         "source.status.failed_load": "Failed to load sources: {error}",
@@ -140,8 +146,43 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "source.status.unable_to_load": "Unable to load sources.",
         "source.status.counts": "Loaded {providers} providers. Enabled {enabled}. Selected {selected} targets.",
         "source.table.provider": "Provider",
+        "source.table.type": "Type",
+        "source.table.schedule": "Schedule",
         "source.table.targets": "Targets",
         "source.table.target": "Target",
+        "source.provider_type.all": "all",
+        "source.provider_type.http": "http",
+        "source.provider_type.topic": "topic",
+        "source.schedule.default": "default",
+        "source.schedule.title": "Update Schedule: {provider}",
+        "source.schedule.body": (
+            "Enter a 5-field cron expression. Leave it blank to use the global default schedule: "
+            "{default_schedule}."
+        ),
+        "source.schedule.placeholder": "Leave blank for {default_schedule}",
+        "source.schedule.confirm": "Save",
+        "source.schedule.cancel": "Cancel",
+        "source.schedule.saved": "Saved update schedule for {provider}.",
+        "source.delete.title": "Delete Watched Topic",
+        "source.delete.body": "Delete the watched topic provider '{provider}'?",
+        "source.delete.confirm": "Delete",
+        "source.delete.cancel": "Cancel",
+        "source.delete.deleted": "Watched topic deleted.",
+        "watch_topic.dialog.title": "Watch Topic",
+        "watch_topic.dialog.body": (
+            "Choose the topic name and an optional cron schedule override for this watched topic. "
+            "Leave the schedule blank to use {default_schedule}."
+        ),
+        "watch_topic.dialog.topic_placeholder": "Topic name",
+        "watch_topic.dialog.schedule_placeholder": "Leave blank for {default_schedule}",
+        "watch_topic.dialog.confirm": "Create",
+        "watch_topic.dialog.cancel": "Cancel",
+        "watch_topic.error.topic_required": "Topic name is required.",
+        "watch_topic.error.invalid_schedule": "Invalid cron schedule: {error}",
+        "watch_topic.status.extracting": "extracting topic from current article...",
+        "watch_topic.status.extract_failed": "failed to extract watch topic: {error}",
+        "watch_topic.status.exists": "topic already exists: {topic}",
+        "watch_topic.status.created": "created watched topic: {topic}",
         "article_qa.binding.close": "Close",
         "article_qa.binding.next": "Next",
         "article_qa.binding.previous": "Previous",
@@ -239,7 +280,8 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.sources": "Источники",
         "app.binding.export": "Экспорт",
         "app.binding.open": "Открыть",
-        "app.binding.download": "Загрузить",
+        "app.binding.watch_topic": "Тема",
+        "app.binding.download": "Обновить",
         "app.binding.help": "Справка",
         "app.binding.providers": "Провайдеры",
         "app.binding.quit": "Выход",
@@ -270,6 +312,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.status.checking_llm": "проверка доступности llm...",
         "app.status.exiting": "Выход...",
         "app.status.sources_unchanged": "источники не изменились",
+        "app.status.sources_saved": "источники сохранены",
         "app.status.sources_saved_next_refresh": "источники сохранены; следующее обновление применит новые настройки провайдеров",
         "app.status.sources_saved_refreshing": "источники сохранены; обновляются включённые провайдеры",
         "confirm_dialog.llm_unresponsive.header": "LLM недоступна",
@@ -287,9 +330,10 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "L: список статей\n"
             "Esc: назад к провайдерам\n"
             "C: источники\n"
+            "W: следить за темой\n"
             "E: экспорт текущего вида\n"
             "O: открыть статью в браузере\n"
-            "D: загрузить новые статьи\n"
+            "D: принудительно обновить текущего провайдера\n"
             "Ctrl+P: палитра команд / выбор темы\n"
             "H: справка\n"
             "Q: выход"
@@ -298,13 +342,14 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Up/Down/PgUp/PgDn/B: перемещение по провайдерам\n"
             "Enter/Space: открыть выбранного провайдера\n"
             "C: управление источниками\n"
-            "D: загрузить новые статьи\n"
+            "W: создать отслеживаемую тему\n"
+            "D: принудительно обновить все провайдеры\n"
             "Ctrl+P: палитра команд / выбор темы\n"
             "H: справка\n"
             "Q: выход"
         ),
         "provider_home.empty": "Нет включённых провайдеров. Нажмите C для управления источниками.",
-        "provider_home.hint": "Up/Down: выбор   Enter/Space: открыть провайдер   C: источники   D: обновить   H: справка",
+        "provider_home.hint": "Up/Down: выбор   Enter/Space: открыть провайдер   C: источники   W: тема   D: обновить   H: справка",
         "provider_home.status.empty": "Нет доступных провайдеров.",
         "provider_home.status.selection": "{provider}: непрочитано {unread}, всего {total}",
         "provider_home.table.provider": "Провайдер",
@@ -314,11 +359,13 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "source.binding.pane": "Панель",
         "source.binding.toggle": "Переключить",
         "source.binding.refresh": "Обновить",
+        "source.binding.schedule": "Расписание",
+        "source.binding.delete": "Удалить",
         "source.binding.apply": "Применить",
         "source.header": "Управление источниками",
         "source.loading.status": "Загрузка провайдеров и целей...",
         "source.loading.body": "Загрузка источников...",
-        "source.hint": "Tab: сменить панель   Space: переключить   R: обновить каталог   A: применить   Esc: закрыть",
+        "source.hint": "Tab: сменить панель   Space: переключить   R: обновить каталог   U: расписание   X: удалить тему   A: применить   Esc: закрыть",
         "source.status.still_loading": "Источники ещё загружаются.",
         "source.status.refreshing_catalog": "Обновление каталога {provider}...",
         "source.status.failed_load": "Не удалось загрузить источники: {error}",
@@ -327,8 +374,43 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "source.status.unable_to_load": "Не удалось загрузить источники.",
         "source.status.counts": "Загружено провайдеров: {providers}. Включено: {enabled}. Выбрано целей: {selected}.",
         "source.table.provider": "Провайдер",
+        "source.table.type": "Тип",
+        "source.table.schedule": "Расписание",
         "source.table.targets": "Цели",
         "source.table.target": "Цель",
+        "source.provider_type.all": "all",
+        "source.provider_type.http": "http",
+        "source.provider_type.topic": "topic",
+        "source.schedule.default": "по умолчанию",
+        "source.schedule.title": "Расписание обновления: {provider}",
+        "source.schedule.body": (
+            "Введите cron-выражение из 5 полей. Оставьте поле пустым, чтобы использовать глобальное "
+            "расписание по умолчанию: {default_schedule}."
+        ),
+        "source.schedule.placeholder": "Оставьте пустым для {default_schedule}",
+        "source.schedule.confirm": "Сохранить",
+        "source.schedule.cancel": "Отмена",
+        "source.schedule.saved": "Расписание обновления сохранено для {provider}.",
+        "source.delete.title": "Удалить отслеживаемую тему",
+        "source.delete.body": "Удалить провайдера отслеживаемой темы '{provider}'?",
+        "source.delete.confirm": "Удалить",
+        "source.delete.cancel": "Отмена",
+        "source.delete.deleted": "Отслеживаемая тема удалена.",
+        "watch_topic.dialog.title": "Отслеживание темы",
+        "watch_topic.dialog.body": (
+            "Задайте имя темы и необязательное cron-расписание для этой отслеживаемой темы. "
+            "Оставьте расписание пустым, чтобы использовать {default_schedule}."
+        ),
+        "watch_topic.dialog.topic_placeholder": "Имя темы",
+        "watch_topic.dialog.schedule_placeholder": "Оставьте пустым для {default_schedule}",
+        "watch_topic.dialog.confirm": "Создать",
+        "watch_topic.dialog.cancel": "Отмена",
+        "watch_topic.error.topic_required": "Имя темы обязательно.",
+        "watch_topic.error.invalid_schedule": "Некорректное cron-расписание: {error}",
+        "watch_topic.status.extracting": "извлечение темы из текущей статьи...",
+        "watch_topic.status.extract_failed": "не удалось извлечь тему для отслеживания: {error}",
+        "watch_topic.status.exists": "тема уже существует: {topic}",
+        "watch_topic.status.created": "создана отслеживаемая тема: {topic}",
         "article_qa.binding.close": "Закрыть",
         "article_qa.binding.next": "Следующий",
         "article_qa.binding.previous": "Предыдущий",

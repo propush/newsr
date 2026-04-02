@@ -94,6 +94,8 @@ def test_pipeline_refresh_processes_new_articles(app_config, storage) -> None:
         "translated world article",
         "translated technology article",
     }
+    assert storage.has_article("bbc:world-1") is True
+    assert storage.has_article("bbc:technology-1") is True
     assert {article.translated_body for article in articles} == {"translated source body"}
     assert {article.summary for article in articles} == {"summary translated source body"}
     assert {article.categories for article in articles} == {("TECHNOLOGIES",)}
@@ -271,6 +273,7 @@ def test_pipeline_refresh_rejects_empty_or_title_only_source_text(app_config, st
     assert result.failed_articles == 1
     assert article is None
     assert llm.calls == []
+    assert storage.has_article("bbc:world-1") is True
     assert job is not None
     assert job["status"] == "failed"
     assert job["error_text"] == "article body only repeats the title"
@@ -491,6 +494,7 @@ def test_pipeline_refresh_cancellation_during_translation_resets_job_to_pending(
     assert result.new_articles == 0
     assert result.failed_articles == 0
     assert article is not None
+    assert storage.has_article("bbc:world-1") is False
     assert article.translation_status == "pending"
     assert article.translated_body is None
     assert job is not None
@@ -531,6 +535,7 @@ def test_pipeline_refresh_cancellation_during_summary_preserves_translation(
     assert result.new_articles == 0
     assert result.failed_articles == 0
     assert article is not None
+    assert storage.has_article("bbc:world-1") is False
     assert article.translation_status == "done"
     assert article.translated_body == "translated source body"
     assert article.summary_status == "pending"
@@ -585,6 +590,7 @@ def test_pipeline_refresh_translation_failure_counts_as_failed(app_config, stora
     assert result.new_articles == 0
     assert result.failed_articles == 1
     assert article is not None
+    assert storage.has_article("bbc:world-1") is False
     assert article.translation_status == "failed"
     assert fetch_job is not None
     assert fetch_job["status"] == "done"
@@ -656,6 +662,7 @@ def test_pipeline_refresh_summary_failure_counts_as_failed(app_config, storage) 
     assert result.new_articles == 0
     assert result.failed_articles == 1
     assert article is not None
+    assert storage.has_article("bbc:world-1") is False
     assert article.translation_status == "done"
     assert article.summary_status == "failed"
     assert summary_job is not None

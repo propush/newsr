@@ -41,7 +41,7 @@ class ArticleStore:
     def has_article(self, article_id: str) -> bool:
         with self._db._lock:
             row = self._db.connection.execute(
-                "SELECT 1 FROM articles WHERE article_id = ?",
+                "SELECT 1 FROM known_article_ids WHERE article_id = ?",
                 (article_id,),
             ).fetchone()
         return row is not None
@@ -155,7 +155,7 @@ class ArticleStore:
 
     def complete_summary(self, article_id: str, summary: str) -> None:
         self._set_stage_result(
-            article_id, "summary", "done", {"summary": summary},
+            article_id, "summary", "done", {"summary": summary}, mark_known=True,
         )
 
     def fail_summary(self, article_id: str, error_text: str) -> None:
@@ -177,6 +177,7 @@ class ArticleStore:
         article_updates: dict[str, str | None],
         error_text: str | None = None,
         increment_attempt: bool = False,
+        mark_known: bool = False,
     ) -> None:
         now = datetime.now(UTC).isoformat()
         status_column = f"{job_type}_status"
@@ -201,6 +202,8 @@ class ArticleStore:
                 """,
                 (article_id, job_type, status, error_text, attempt_count, now),
             )
+            if mark_known:
+                self._insert_known_article_id(article_id, now)
 
     def set_job_status(
         self,
@@ -209,6 +212,7 @@ class ArticleStore:
         status: str,
         error_text: str | None = None,
         increment_attempt: bool = False,
+        mark_known: bool = False,
     ) -> None:
         now = datetime.now(UTC).isoformat()
         with self._db.transaction():
@@ -224,6 +228,8 @@ class ArticleStore:
                 """,
                 (article_id, job_type, status, error_text, 1 if increment_attempt else 0, now),
             )
+            if mark_known:
+                self._insert_known_article_id(article_id, now)
 
     def list_articles(self) -> list[ArticleRecord]:
         with self._db._lock:
@@ -253,6 +259,16 @@ class ArticleStore:
         if row is None:
             return None
         return self._article_from_row(row)
+
+    def _insert_known_article_id(self, article_id: str, first_seen_at: str) -> None:
+        self._db.connection.execute(
+            """
+            INSERT INTO known_article_ids (article_id, first_seen_at)
+            VALUES (?, ?)
+            ON CONFLICT(article_id) DO NOTHING
+            """,
+            (article_id, first_seen_at),
+        )
 
     @staticmethod
     def _article_from_row(row: sqlite3.Row) -> ArticleRecord:

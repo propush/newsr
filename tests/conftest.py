@@ -39,7 +39,7 @@ def _isolate_llm_logger(tmp_path_factory: pytest.TempPathFactory) -> Iterator[No
 @pytest.fixture
 def app_config() -> AppConfig:
     return AppConfig(
-        articles=ArticlesConfig(fetch=2, store=10),
+        articles=ArticlesConfig(fetch=2, store=10, update_schedule="0 * * * *"),
         llm=LLMConfig(
             url="http://localhost:8081/v1",
             model_translation="translate",
@@ -61,7 +61,7 @@ def storage(tmp_path: Path) -> NewsStorage:
     db = NewsStorage(tmp_path / "newsr.sqlite3")
     db.initialize()
     db.sync_providers(
-        [ProviderRecord(provider_id="bbc", display_name="BBC News", enabled=True)]
+        [ProviderRecord(provider_id="bbc", display_name="BBC News", enabled=True, provider_type="http")]
     )
     db.replace_provider_targets(
         "bbc",

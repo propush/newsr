@@ -5,6 +5,7 @@ from typing import Any
 
 import yaml
 
+from ..scheduling import DEFAULT_UPDATE_SCHEDULE, validate_cron_expression
 from ..ui_text import parse_ui_locale
 from .models import (
     AppConfig,
@@ -32,11 +33,12 @@ def load_config(path: Path) -> AppConfig:
 def _load_articles(raw: dict) -> ArticlesConfig:
     fetch = int(raw.get("fetch", 5))
     store = int(raw.get("store", 10))
+    update_schedule = validate_cron_expression(str(raw.get("update_schedule", DEFAULT_UPDATE_SCHEDULE)))
     if fetch <= 0:
         raise ValueError("articles.fetch must be positive")
     if store <= 0:
         raise ValueError("articles.store must be positive")
-    return ArticlesConfig(fetch=fetch, store=store)
+    return ArticlesConfig(fetch=fetch, store=store, update_schedule=update_schedule)
 
 
 def _load_llm(raw: dict) -> LLMConfig:

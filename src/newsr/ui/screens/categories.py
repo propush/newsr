@@ -10,7 +10,10 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable, Static
 
 from ...domain import ProviderRecord, ProviderTarget
+from ...scheduling import validate_cron_expression
 from ...ui_text import UILocalizer
+from .confirm_dialog import ConfirmDialogScreen
+from .text_input_dialog import TextInputDialogScreen
 
 
 class SourceSelectionScreen(ModalScreen[None]):
@@ -87,9 +90,10 @@ class SourceSelectionScreen(ModalScreen[None]):
 
     BINDINGS = []
 
-    def __init__(self, ui: UILocalizer) -> None:
+    def __init__(self, ui: UILocalizer, *, default_schedule: str) -> None:
         super().__init__()
         self._ui = ui
+        self._default_schedule = default_schedule
         self._bindings = BindingsMap(self._build_bindings())
         self._providers: list[ProviderRecord] = []
         self._targets_by_provider: dict[str, list[ProviderTarget]] = {}
@@ -105,6 +109,8 @@ class SourceSelectionScreen(ModalScreen[None]):
             Binding("tab", "switch_pane", self._ui.text("source.binding.pane"), show=False),
             Binding("space", "toggle_item", self._ui.text("source.binding.toggle"), show=False),
             ("r", "refresh_catalog", self._ui.text("source.binding.refresh")),
+            ("u", "edit_schedule", self._ui.text("source.binding.schedule")),
+            ("x", "delete_provider", self._ui.text("source.binding.delete")),
             ("a", "save_selection", self._ui.text("source.binding.apply")),
         ]
 
@@ -194,6 +200,42 @@ class SourceSelectionScreen(ModalScreen[None]):
         }
         if self.app.apply_source_configuration(enabled, selected):
             self.dismiss()
+
+    def action_edit_schedule(self) -> None:
+        provider = self._current_provider()
+        if provider is None:
+            return
+        self.app.push_screen(
+            TextInputDialogScreen(
+                self._ui,
+                title=self._ui.text("source.schedule.title", provider=provider.display_name),
+                body=self._ui.text("source.schedule.body", default_schedule=self._default_schedule),
+                initial_value=provider.update_schedule or "",
+                placeholder=self._ui.text(
+                    "source.schedule.placeholder",
+                    default_schedule=self._default_schedule,
+                ),
+                confirm_label=self._ui.text("source.schedule.confirm"),
+                cancel_label=self._ui.text("source.schedule.cancel"),
+                validator=self._validate_schedule,
+            ),
+            callback=lambda result: self._apply_schedule_result(provider.provider_id, result),
+        )
+
+    def action_delete_provider(self) -> None:
+        provider = self._current_provider()
+        if provider is None or provider.provider_type != "topic":
+            return
+        self.app.push_screen(
+            ConfirmDialogScreen(
+                self._ui,
+                title=self._ui.text("source.delete.title"),
+                body=self._ui.text("source.delete.body", provider=provider.display_name),
+                confirm_label=self._ui.text("source.delete.confirm"),
+                cancel_label=self._ui.text("source.delete.cancel"),
+            ),
+            callback=lambda confirmed: self._delete_provider(provider.provider_id) if confirmed else None,
+        )
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if event.data_table.id == "provider-list":
@@ -290,7 +332,9 @@ class SourceSelectionScreen(ModalScreen[None]):
         current_provider_id = self._current_provider_id()
         table.clear(columns=True)
         table.add_column(" ", width=3, key="marker")
-        table.add_column(self._ui.text("source.table.provider"), key="provider", width=max(16, self.size.width // 3))
+        table.add_column(self._ui.text("source.table.provider"), key="provider", width=max(16, self.size.width // 4))
+        table.add_column(self._ui.text("source.table.type"), key="type", width=8)
+        table.add_column(self._ui.text("source.table.schedule"), key="schedule", width=max(12, self.size.width // 4))
         table.add_column(self._ui.text("source.table.targets"), key="targets", width=10)
         for provider in self._providers:
             enabled = self._enabled_by_provider.get(provider.provider_id, provider.enabled)
@@ -298,6 +342,8 @@ class SourceSelectionScreen(ModalScreen[None]):
             table.add_row(
                 Text("[x]" if enabled else "[ ]"),
                 provider.display_name,
+                self._provider_type_label(provider.provider_type),
+                provider.update_schedule or self._ui.text("source.schedule.default"),
                 str(selected_count),
                 key=provider.provider_id,
             )
@@ -356,6 +402,9 @@ class SourceSelectionScreen(ModalScreen[None]):
             )
         )
 
+    def _provider_type_label(self, provider_type: str) -> str:
+        return self._ui.text(f"source.provider_type.{provider_type}")
+
     def _current_provider(self) -> ProviderRecord | None:
         table = self.query_one("#provider-list", DataTable)
         return self._provider_at_row(table.cursor_row)
@@ -383,3 +432,38 @@ class SourceSelectionScreen(ModalScreen[None]):
         ):
             return None
         return targets[cursor_row].target_key
+
+    def _validate_schedule(self, raw: str) -> tuple[str | None, str | None]:
+        stripped = raw.strip()
+        if not stripped:
+            return "", None
+        try:
+            return validate_cron_expression(stripped), None
+        except ValueError as exc:
+            return None, self._ui.text("watch_topic.error.invalid_schedule", error=exc)
+
+    def _apply_schedule_result(self, provider_id: str, result: str | None) -> None:
+        if result is None:
+            return
+        provider = next((item for item in self._providers if item.provider_id == provider_id), None)
+        if provider is None:
+            return
+        normalized_result = result or None
+        provider.update_schedule = normalized_result
+        self.app.update_provider_schedule(provider_id, normalized_result)
+        self._refresh_provider_rows()
+        self._set_status(self._ui.text("source.schedule.saved", provider=provider.display_name))
+
+    def _delete_provider(self, provider_id: str) -> None:
+        self.app.delete_topic_provider(provider_id)
+        self._providers = [provider for provider in self._providers if provider.provider_id != provider_id]
+        self._targets_by_provider.pop(provider_id, None)
+        self._enabled_by_provider.pop(provider_id, None)
+        self._selected_by_provider.pop(provider_id, None)
+        self._refresh_provider_rows()
+        current_provider_id = self._current_provider_id()
+        if current_provider_id is not None:
+            self._refresh_target_rows(current_provider_id)
+        else:
+            self.query_one("#target-list", DataTable).clear(columns=True)
+        self._set_status(self._ui.text("source.delete.deleted"))

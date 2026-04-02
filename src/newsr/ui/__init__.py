@@ -11,6 +11,8 @@ from .screens import (
     ProviderHomeScreen,
     QuickNavScreen,
     SourceSelectionScreen,
+    TextInputDialogScreen,
+    WatchTopicDialogScreen,
 )
 from .themes import OLD_FIDO_THEME
 
@@ -28,4 +30,6 @@ __all__ = [
     "ProviderHomeScreen",
     "QuickNavScreen",
     "SourceSelectionScreen",
+    "TextInputDialogScreen",
+    "WatchTopicDialogScreen",
 ]

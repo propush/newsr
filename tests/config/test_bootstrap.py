@@ -47,6 +47,7 @@ def test_bootstrap_config_creates_local_config_with_locale_suggestion(tmp_path: 
     assert created is True
     assert config.ui.locale == "en"
     assert config.ui.show_all is True
+    assert config.articles.update_schedule == "0 * * * *"
     assert config.llm.url == "http://localhost:8081/v1"
     assert config.llm.model_translation == "local-translate"
     assert config.llm.model_summary == "local-translate"
@@ -231,3 +232,4 @@ def test_default_config_includes_show_all_enabled(tmp_path: Path) -> None:
     config = load_config(config_path)
 
     assert config.ui.show_all is True
+    assert config.articles.update_schedule == "0 * * * *"

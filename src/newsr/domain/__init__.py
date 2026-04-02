@@ -1,7 +1,7 @@
 from .article_categories import ARTICLE_CATEGORIES, normalize_article_categories
 from .options import AppOptions
 from .articles import ArticleContent, ArticleRecord, SectionCandidate
-from .providers import ProviderRecord, ProviderTarget
+from .providers import ProviderRecord, ProviderTarget, ProviderType
 from .reader import JobStatus, ReaderState, ViewMode
 
 __all__ = [
@@ -12,6 +12,7 @@ __all__ = [
     "JobStatus",
     "ProviderRecord",
     "ProviderTarget",
+    "ProviderType",
     "ReaderState",
     "SectionCandidate",
     "ViewMode",

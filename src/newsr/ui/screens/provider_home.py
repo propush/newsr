@@ -84,6 +84,7 @@ class ProviderHomeScreen(ModalScreen[None]):
         super().__init__()
         self._bindings.bind("c", "show_source_manager", ui.text("app.binding.sources"))
         self._bindings.bind("ctrl+p", "show_command_palette", show=False)
+        self._bindings.bind("w", "watch_topic", ui.text("app.binding.watch_topic"))
         self._bindings.bind("d", "refresh_articles", ui.text("app.binding.download"))
         self._bindings.bind("h", "show_help", ui.text("app.binding.help"))
         self._bindings.bind("space", "open_selected_provider", ui.text("app.binding.space"), show=False)
@@ -129,6 +130,9 @@ class ProviderHomeScreen(ModalScreen[None]):
 
     def action_refresh_articles(self) -> None:
         self.app.action_download_articles()
+
+    def action_watch_topic(self) -> None:
+        self.app.action_watch_topic()
 
     def action_show_help(self) -> None:
         self.app.action_show_help()

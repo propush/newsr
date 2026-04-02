@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class ArticlesConfig:
     fetch: int
     store: int
+    update_schedule: str
 
 
 @dataclass(slots=True)

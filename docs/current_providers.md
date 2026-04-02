@@ -4,6 +4,12 @@ This page is the canonical reference for NewsR's currently implemented built-in 
 
 The current built-in news providers are defined in `src/newsr/providers/registry.py`.
 
+Provider types:
+
+- built-in providers listed on this page use `provider_type = "http"`
+- `[ALL]` is a synthetic aggregate scope with `provider_type = "all"`
+- watched topics created from the UI use `provider_type = "topic"` and are stored dynamically in SQLite
+
 ## Built-in Providers
 
 ### BBC News

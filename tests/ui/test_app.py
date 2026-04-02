@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import webbrowser
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from threading import Event
 from types import MethodType
 from unittest.mock import patch
@@ -29,6 +29,8 @@ from newsr.ui import (
     NewsReaderApp,
     OpenLinkConfirmScreen,
     QuickNavScreen,
+    TextInputDialogScreen,
+    WatchTopicDialogScreen,
 )
 
 
@@ -118,6 +120,20 @@ def open_link_confirm_screen(app: NewsReaderApp) -> OpenLinkConfirmScreen | None
 def confirm_dialog_screen(app: NewsReaderApp) -> ConfirmDialogScreen | None:
     for screen in reversed(app.screen_stack):
         if isinstance(screen, ConfirmDialogScreen):
+            return screen
+    return None
+
+
+def watch_topic_dialog_screen(app: NewsReaderApp) -> WatchTopicDialogScreen | None:
+    for screen in reversed(app.screen_stack):
+        if isinstance(screen, WatchTopicDialogScreen):
+            return screen
+    return None
+
+
+def text_input_dialog_screen(app: NewsReaderApp) -> TextInputDialogScreen | None:
+    for screen in reversed(app.screen_stack):
+        if isinstance(screen, TextInputDialogScreen):
             return screen
     return None
 
@@ -509,7 +525,16 @@ class BusyStatusPipeline:
         self.release_refresh = Event()
         self.status_message = status_message
 
-    def refresh(self, on_status, on_article_ready, cancellation=None) -> None:  # type: ignore[no-untyped-def]
+    def refresh(
+        self,
+        provider_ids=None,
+        *,
+        force=False,
+        on_status=None,
+        on_article_ready=None,
+        cancellation=None,
+    ) -> None:  # type: ignore[no-untyped-def]
+        del provider_ids, force, on_article_ready
         on_status(self.status_message)
         self.started.set()
         self.release_refresh.wait(timeout=5)
@@ -576,19 +601,19 @@ def seed_provider_article(
 
 
 def disable_startup_refresh(app: NewsReaderApp) -> None:
-    app._refresh.start = lambda: None  # type: ignore[method-assign]
+    app._refresh.start = lambda *args, **kwargs: None  # type: ignore[method-assign]
 
 
 def skip_first_refresh_start(app: NewsReaderApp) -> None:
     original_start = app._refresh.start
     skipped = False
 
-    def start_once() -> None:
+    def start_once(*args, **kwargs) -> None:  # type: ignore[no-untyped-def]
         nonlocal skipped
         if not skipped:
             skipped = True
             return
-        original_start()
+        original_start(*args, **kwargs)
 
     app._refresh.start = start_once  # type: ignore[method-assign]
 
@@ -1201,7 +1226,7 @@ def test_ui_navigation_does_not_start_extra_refresh_while_startup_refresh_is_run
     asyncio.run(runner())
 
 
-def test_ui_rearms_auto_fetch_after_article_list_grows(app_config, tmp_path) -> None:
+def test_ui_does_not_auto_refresh_after_article_list_grows(app_config, tmp_path) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
     app = NewsReaderApp(app_config, storage_path)
     seed_translated_articles(app, 10)
@@ -1242,7 +1267,7 @@ def test_ui_rearms_auto_fetch_after_article_list_grows(app_config, tmp_path) -> 
             await pilot.press("right")
 
             assert app.current_index == 6
-            assert len(calls) == 2
+            assert len(calls) == 1
 
     asyncio.run(runner())
 
@@ -1255,7 +1280,16 @@ class BlockingReadyPipeline:
         self.summary_emitted = Event()
         self.release_refresh = Event()
 
-    def refresh(self, on_status, on_article_ready, cancellation=None) -> None:  # type: ignore[no-untyped-def]
+    def refresh(
+        self,
+        provider_ids=None,
+        *,
+        force=False,
+        on_status=None,
+        on_article_ready=None,
+        cancellation=None,
+    ) -> None:  # type: ignore[no-untyped-def]
+        del provider_ids, force
         self.app.storage.upsert_article_source(self.article)
         self.app.storage.update_translation(
             self.article.article_id, "Translated title", "Translated text", "done"
@@ -2864,7 +2898,16 @@ class CancellablePipeline:
         self.started = Event()
         self.cancelled = Event()
 
-    def refresh(self, on_status, on_article_ready, cancellation=None) -> None:  # type: ignore[no-untyped-def]
+    def refresh(
+        self,
+        provider_ids=None,
+        *,
+        force=False,
+        on_status=None,
+        on_article_ready=None,
+        cancellation=None,
+    ) -> None:  # type: ignore[no-untyped-def]
+        del provider_ids, force, on_status, on_article_ready
         self.started.set()
         assert cancellation is not None
         cancellation.cancelled_event.wait(timeout=5)
@@ -2877,7 +2920,16 @@ class SlowShutdownPipeline:
         self.cancelled = Event()
         self.release_refresh = Event()
 
-    def refresh(self, on_status, on_article_ready, cancellation=None) -> None:  # type: ignore[no-untyped-def]
+    def refresh(
+        self,
+        provider_ids=None,
+        *,
+        force=False,
+        on_status=None,
+        on_article_ready=None,
+        cancellation=None,
+    ) -> None:  # type: ignore[no-untyped-def]
+        del provider_ids, force, on_status, on_article_ready
         self.started.set()
         assert cancellation is not None
         cancellation.cancelled_event.wait(timeout=5)
@@ -2974,13 +3026,13 @@ def test_ui_pressing_q_exits_without_waiting_for_refresh_shutdown(app_config, tm
 
     async def runner() -> None:
         async with app.run_test() as pilot:
-            for _ in range(20):
+            for _ in range(100):
                 await pilot.pause()
                 if pipeline.started.is_set():
                     break
             assert pipeline.started.is_set()
             quit_task = asyncio.create_task(pilot.press("q"))
-            for _ in range(20):
+            for _ in range(100):
                 await pilot.pause()
                 if quit_task.done():
                     break
@@ -3636,7 +3688,7 @@ def test_ui_source_manager_refreshes_provider_catalog(app_config, tmp_path) -> N
     asyncio.run(runner())
 
 
-def test_ui_source_manager_save_persists_selection_and_starts_refresh(app_config, tmp_path) -> None:
+def test_ui_source_manager_save_persists_selection_without_starting_refresh(app_config, tmp_path) -> None:
     launch_calls: list[object] = []
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     original_start_refresh = app._refresh.start
@@ -3666,7 +3718,8 @@ def test_ui_source_manager_save_persists_selection_and_starts_refresh(app_config
             screen.action_save_selection()
             await pilot.pause()
             assert category_screen(app) is None
-            assert len(launch_calls) == 1
+            assert len(launch_calls) == 0
+            assert app.status_text == "sources saved"
             providers = app.storage.list_providers()
             assert any(provider.provider_id == "bbc" and provider.enabled is False for provider in providers)
 
@@ -3710,10 +3763,101 @@ def test_ui_source_manager_save_defers_when_refresh_running(app_config, tmp_path
                 "business",
                 "entertainment_and_arts",
             ]
-            assert "next refresh will use updated provider settings" in app.status_text
+            assert app.status_text == "sources saved"
             assert len(launch_calls) == 0
             assert header_text(app) == initial_header
             assert body_source(app) == initial_body
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_enable_provider_starts_due_refresh_after_current_refresh(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.mark_refresh_completed("bbc")
+    app.refresh_in_progress = True
+    calls: list[tuple[list[str] | None, bool]] = []
+    app._refresh.start = lambda provider_ids=None, *, force=False: calls.append((provider_ids, force))  # type: ignore[method-assign]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+            provider_list(app).move_cursor(row=provider_row_index(app, "TechCrunch"), column=0, animate=False)
+            await pilot.pause()
+            await pilot.press("space")
+            await pilot.press("a")
+            await pilot.pause()
+            assert app.storage.get_provider("techcrunch").enabled is True
+            assert calls == []
+
+            app._refresh._processed_provider_count = 1
+            app._refresh._finish()
+            await pilot.pause()
+
+            assert calls == [(["techcrunch"], False)]
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_schedule_change_starts_due_refresh_after_current_refresh(
+    app_config, tmp_path
+) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    app.storage.mark_refresh_completed("bbc")
+    app.storage.mark_refresh_completed("techcrunch")
+    app.storage.connection.execute(
+        """
+        UPDATE providers
+        SET last_refresh_completed_at = ?
+        WHERE provider_id = ?
+        """,
+        ((datetime.now(UTC) - timedelta(minutes=2)).isoformat(), "techcrunch"),
+    )
+    app.storage.connection.commit()
+    app.refresh_in_progress = True
+    calls: list[tuple[list[str] | None, bool]] = []
+    app._refresh.start = lambda provider_ids=None, *, force=False: calls.append((provider_ids, force))  # type: ignore[method-assign]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+            provider_list(app).move_cursor(row=provider_row_index(app, "TechCrunch"), column=0, animate=False)
+            await pilot.pause()
+            await pilot.press("u")
+            await pilot.pause()
+
+            screen = text_input_dialog_screen(app)
+            assert screen is not None
+            screen.query_one("#text-input-dialog-input", Input).value = "*/1 * * * *"
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert app.storage.get_provider("techcrunch").update_schedule == "*/1 * * * *"
+            assert calls == []
+
+            app._refresh._processed_provider_count = 1
+            app._refresh._finish()
+            await pilot.pause()
+
+            assert calls == [(["techcrunch"], False)]
 
     asyncio.run(runner())
 
@@ -3937,7 +4081,8 @@ def test_ui_provider_home_hides_reader_only_bindings_from_footer(app_config, tmp
             await pilot.pause()
             assert footer_bindings(app) == [
                 ("c", "Sources", "show_source_manager"),
-                ("d", "Download", "download_articles"),
+                ("w", "Watch Topic", "watch_topic"),
+                ("d", "Refresh", "download_articles"),
                 ("h", "Help", "show_help"),
                 ("q", "Quit", "quit_reader"),
             ]
@@ -3958,7 +4103,8 @@ def test_ui_provider_home_help_shows_provider_only_bindings(app_config, tmp_path
             help_text = plain_content(app.screen.query_one("#help-text", Static).content)
             assert "Enter/Space: open the selected provider" in help_text
             assert "C: manage sources" in help_text
-            assert "D: download new articles" in help_text
+            assert "W: create watched topic" in help_text
+            assert "D: force refresh all providers" in help_text
             assert "Ctrl+P: command palette / choose theme" in help_text
             assert "K: classify categories" not in help_text
             assert "Left/Right: previous/next article" not in help_text
@@ -3970,7 +4116,180 @@ def test_ui_provider_home_help_shows_provider_only_bindings(app_config, tmp_path
 
 
 @pytest.mark.provider_home
-def test_ui_entering_reader_can_trigger_auto_refresh(app_config, tmp_path, article_content) -> None:
+def test_ui_provider_home_w_opens_watch_topic_dialog(app_config, tmp_path) -> None:
+    app_config.articles.update_schedule = "*/15 * * * *"
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("w")
+            await pilot.pause()
+            screen = watch_topic_dialog_screen(app)
+            assert screen is not None
+            assert str(screen.query_one("#watch-topic-dialog-body", Static).content) == (
+                "Choose the topic name and an optional cron schedule override for this watched topic. "
+                "Leave the schedule blank to use */15 * * * *."
+            )
+            assert screen.query_one("#watch-topic-name-input", Input).value == ""
+            assert screen.query_one("#watch-topic-schedule-input", Input).value == ""
+            assert screen.query_one("#watch-topic-schedule-input", Input).placeholder == (
+                "Leave blank for */15 * * * *"
+            )
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_schedule_dialog_shows_configured_default_schedule(app_config, tmp_path) -> None:
+    app_config.articles.update_schedule = "*/15 * * * *"
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+            provider_list(app).move_cursor(row=provider_row_index(app, "BBC News"), column=0, animate=False)
+            await pilot.pause()
+            await pilot.press("u")
+            await pilot.pause()
+            screen = text_input_dialog_screen(app)
+            assert screen is not None
+            assert str(screen.query_one("#text-input-dialog-body", Static).content) == (
+                "Enter a 5-field cron expression. Leave it blank to use the global default schedule: "
+                "*/15 * * * *."
+            )
+            assert screen.query_one("#text-input-dialog-input", Input).placeholder == (
+                "Leave blank for */15 * * * *"
+            )
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_watch_topic_shows_status_for_duplicate_topic(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.create_topic_provider(
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        update_schedule=None,
+    )
+    app.rebuild_provider_registry()
+    calls: list[tuple[list[str] | None, bool]] = []
+    app._refresh.start = lambda provider_ids=None, *, force=False: calls.append((provider_ids, force))  # type: ignore[method-assign]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            provider_count = len(app.storage.list_providers())
+            calls.clear()
+            await pilot.press("w")
+            await pilot.pause()
+            screen = watch_topic_dialog_screen(app)
+            assert screen is not None
+            screen.query_one("#watch-topic-name-input", Input).value = "  openai   policy  "
+            await pilot.press("enter")
+            await pilot.pause()
+            assert watch_topic_dialog_screen(app) is None
+            assert app.status_text == "topic already exists: OpenAI policy"
+            assert len(app.storage.list_providers()) == provider_count
+            assert calls == []
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_watch_topic_added_during_refresh_starts_due_refresh_after_finish(
+    app_config, tmp_path
+) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.mark_refresh_completed("bbc")
+    app.refresh_in_progress = True
+    calls: list[tuple[list[str] | None, bool]] = []
+    app._refresh.start = lambda provider_ids=None, *, force=False: calls.append((provider_ids, force))  # type: ignore[method-assign]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("w")
+            await pilot.pause()
+            screen = watch_topic_dialog_screen(app)
+            assert screen is not None
+            screen.query_one("#watch-topic-name-input", Input).value = "OpenAI policy"
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert watch_topic_dialog_screen(app) is None
+            assert app.storage.get_provider("topic:openai-policy") is not None
+            assert calls == []
+
+            app._refresh._processed_provider_count = 1
+            app._refresh._finish()
+            await pilot.pause()
+
+            assert calls == [(["topic:openai-policy"], False)]
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_d_forces_refresh_all_enabled_real_providers(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.create_topic_provider(
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        update_schedule=None,
+    )
+    app.rebuild_provider_registry()
+    calls: list[tuple[list[str] | None, bool]] = []
+    app._refresh.start = lambda provider_ids=None, *, force=False: calls.append((provider_ids, force))  # type: ignore[method-assign]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            calls.clear()
+            await pilot.press("d")
+            await pilot.pause()
+            assert calls == [(["bbc", "topic:openai-policy"], True)]
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_reader_d_forces_refresh_for_current_provider_only(app_config, tmp_path, article_content) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
+    calls: list[tuple[list[str] | None, bool]] = []
+    app._refresh.start = lambda provider_ids=None, *, force=False: calls.append((provider_ids, force))  # type: ignore[method-assign]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            calls.clear()
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.press("d")
+            await pilot.pause()
+            assert provider_home_screen(app) is None
+            assert calls == [(["bbc"], True)]
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_entering_reader_does_not_trigger_auto_refresh(app_config, tmp_path, article_content) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     app.storage.upsert_article_source(article_content)
     app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
@@ -3994,8 +4313,8 @@ def test_ui_entering_reader_can_trigger_auto_refresh(app_config, tmp_path, artic
             await pilot.pause()
 
             assert provider_home_screen(app) is None
-            assert len(calls) == 2
-            assert app.refresh_in_progress is True
+            assert len(calls) == 1
+            assert app.refresh_in_progress is False
 
     asyncio.run(runner())
 
@@ -4088,6 +4407,203 @@ def test_ui_provider_home_space_opens_selected_provider(app_config, tmp_path) ->
             assert [article.provider_id for article in app.articles] == ["techcrunch"]
             assert app.current_article is not None
             assert app.current_article.article_id == tech_article_id
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_disabling_active_provider_from_reader_opens_provider_home(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    seed_provider_article(app, provider_id="bbc", provider_article_id="bbc-1", title="BBC 1", body="BBC body", minute=0)
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body="TC body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "TechCrunch"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert provider_home_screen(app) is None
+            assert app._provider_home.active_scope_id == "techcrunch"
+
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+
+            provider_list(app).move_cursor(
+                row=provider_row_index(app, "TechCrunch"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("space")
+            await pilot.press("a")
+            await pilot.pause()
+
+            assert category_screen(app) is None
+            assert provider_home_screen(app) is not None
+            assert app._provider_home.active_scope_id == "techcrunch"
+            assert provider_home_table(app).cursor_row == 0
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_disabling_active_provider_from_source_manager_keeps_provider_home_open(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+    seed_provider_article(app, provider_id="bbc", provider_article_id="bbc-1", title="BBC 1", body="BBC body", minute=0)
+    seed_provider_article(
+        app,
+        provider_id="techcrunch",
+        provider_article_id="tc-1",
+        title="TC 1",
+        body="TC body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "TechCrunch"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert provider_home_screen(app) is None
+            assert app._provider_home.active_scope_id == "techcrunch"
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert provider_home_screen(app) is not None
+
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+
+            provider_list(app).move_cursor(
+                row=provider_row_index(app, "TechCrunch"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("space")
+            await pilot.press("a")
+            await pilot.pause()
+
+            assert category_screen(app) is None
+            assert provider_home_screen(app) is not None
+            assert app._provider_home.active_scope_id == "techcrunch"
+            rows = provider_home_rows(app)
+            assert rows[0][0] == "[ALL]"
+            assert app._provider_home.selected_scope_id == rows[0][0] or app._provider_home.selected_scope_id == "[ALL]"
+            assert rows[1] == ["BBC News", "1", "1"]
+            assert provider_home_table(app).cursor_row == 0
+            assert app.status_text == "sources saved"
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_deleting_active_topic_from_source_manager_keeps_provider_home_open(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.create_topic_provider(
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        update_schedule=None,
+    )
+    app.rebuild_provider_registry()
+    seed_provider_article(
+        app,
+        provider_id="topic:openai-policy",
+        provider_article_id="topic-1",
+        title="Topic 1",
+        body="Topic body",
+        minute=0,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "OpenAI policy"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert provider_home_screen(app) is None
+            assert app._provider_home.active_scope_id == "topic:openai-policy"
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert provider_home_screen(app) is not None
+
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+
+            provider_list(app).move_cursor(
+                row=provider_row_index(app, "OpenAI policy"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("x")
+            await pilot.pause()
+            assert confirm_dialog_screen(app) is not None
+
+            await pilot.press("enter")
+            await pilot.pause()
+            assert confirm_dialog_screen(app) is None
+            assert app.storage.get_provider("topic:openai-policy") is None
+
+            await pilot.press("a")
+            await pilot.pause()
+
+            assert category_screen(app) is None
+            assert provider_home_screen(app) is not None
+            assert app._provider_home.active_scope_id == "topic:openai-policy"
+            rows = provider_home_rows(app)
+            assert rows[0][0] == "[ALL]"
+            assert app._provider_home.selected_scope_id == rows[0][0] or app._provider_home.selected_scope_id == "[ALL]"
+            assert "OpenAI policy" not in [row[0] for row in rows]
+            assert provider_home_table(app).cursor_row == 0
 
     asyncio.run(runner())
 
@@ -4674,7 +5190,7 @@ def test_ui_renders_russian_copy_and_preserves_hotkeys(app_config, tmp_path, art
             assert "K: классифицировать категории" in help_text
             assert "S: переключить сводку" in help_text
             assert "M: подробнее" in help_text
-            assert "D: загрузить новые статьи" in help_text
+            assert "D: принудительно обновить текущего провайдера" in help_text
 
             await pilot.press("s")
             await pilot.pause()

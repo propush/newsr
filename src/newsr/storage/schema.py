@@ -13,6 +13,10 @@ def initialize_schema(db: StorageConnection) -> None:
                 provider_id TEXT PRIMARY KEY,
                 display_name TEXT NOT NULL,
                 enabled INTEGER NOT NULL,
+                provider_type TEXT NOT NULL DEFAULT 'http',
+                update_schedule TEXT,
+                last_refresh_started_at TEXT,
+                last_refresh_completed_at TEXT,
                 settings_json TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -65,11 +69,40 @@ def initialize_schema(db: StorageConnection) -> None:
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (article_id, job_type)
             );
+            CREATE TABLE IF NOT EXISTS known_article_ids (
+                article_id TEXT PRIMARY KEY,
+                first_seen_at TEXT NOT NULL
+            );
             """
         )
+        _initialize_provider_schema(db)
         _initialize_article_schema(db)
+        _initialize_known_article_ids_schema(db)
         legacy_theme_name = _migrate_reader_state_schema(db)
         _initialize_options_schema(db, legacy_theme_name)
+
+
+def _initialize_provider_schema(db: StorageConnection) -> None:
+    db.ensure_column(
+        "providers",
+        "provider_type",
+        """TEXT NOT NULL DEFAULT 'http'""",
+    )
+    db.ensure_column(
+        "providers",
+        "update_schedule",
+        """TEXT""",
+    )
+    db.ensure_column(
+        "providers",
+        "last_refresh_started_at",
+        """TEXT""",
+    )
+    db.ensure_column(
+        "providers",
+        "last_refresh_completed_at",
+        """TEXT""",
+    )
 
 
 def _initialize_article_schema(db: StorageConnection) -> None:
@@ -77,6 +110,19 @@ def _initialize_article_schema(db: StorageConnection) -> None:
         "articles",
         "assigned_categories_json",
         """TEXT NOT NULL DEFAULT '[]'""",
+    )
+
+
+def _initialize_known_article_ids_schema(db: StorageConnection) -> None:
+    now = datetime.now(UTC).isoformat()
+    db.connection.execute(
+        """
+        INSERT INTO known_article_ids (article_id, first_seen_at)
+        SELECT article_id, ?
+        FROM articles
+        WHERE article_id NOT IN (SELECT article_id FROM known_article_ids)
+        """,
+        (now,),
     )
 
 

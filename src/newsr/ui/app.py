@@ -17,6 +17,7 @@ from ..pipeline.refresh import NewsPipeline
 from ..providers.llm.client import OpenAILLMClient
 from ..providers.registry import build_provider_registry
 from ..providers.search.duckduckgo import DuckDuckGoSearchClient
+from ..providers.topic import TopicWatchProvider
 from ..storage.facade import NewsStorage
 from ..ui_text import UILocalizer
 from .controllers.article_qa import ArticleQAController
@@ -34,6 +35,7 @@ from .controllers.more_info import MoreInfoController
 from .controllers.navigation import NavigationController
 from .controllers.provider_home import ProviderHomeController
 from .controllers.refresh import RefreshController
+from .controllers.topic_watch import TopicWatchController
 from .screens import (
     HelpScreen,
     QuickNavScreen,
@@ -155,9 +157,10 @@ class NewsReaderApp(App[None]):
         self.config_path = config_path or Path("newsr.yml")
         self.storage = NewsStorage(storage_path)
         self.storage.initialize()
-        self.providers = build_provider_registry()
+        self.builtin_providers = build_provider_registry()
         self.search_client = DuckDuckGoSearchClient()
         self.llm_client = OpenAILLMClient(config)
+        self.providers = dict(self.builtin_providers)
         self.pipeline = NewsPipeline(config, self.storage, self.providers, self.llm_client)
         self.export_service = ExportService()
 
@@ -169,8 +172,10 @@ class NewsReaderApp(App[None]):
         self._more_info = MoreInfoController(self)
         self._navigation = NavigationController(self)
         self._export = ExportController(self)
+        self._topic_watch = TopicWatchController(self)
 
         self._provider_home.bootstrap()
+        self.rebuild_provider_registry()
         self.storage.prune_expired(config.articles.store)
 
         self._shutdown_requested = False
@@ -203,6 +208,7 @@ class NewsReaderApp(App[None]):
             ("c", "show_source_manager", self.ui.text("app.binding.sources")),
             ("e", "export_current", self.ui.text("app.binding.export")),
             ("o", "open_article", self.ui.text("app.binding.open")),
+            ("w", "watch_topic", self.ui.text("app.binding.watch_topic")),
             ("d", "download_articles", self.ui.text("app.binding.download")),
             ("h", "show_help", self.ui.text("app.binding.help")),
             Binding("ctrl+p", "command_palette", show=False),
@@ -237,7 +243,8 @@ class NewsReaderApp(App[None]):
         self.load_articles()
         self.call_after_refresh(self.refresh_view)
         self.call_after_refresh(self.show_provider_home)
-        self._refresh.start()
+        self.call_after_refresh(self._refresh.run_due_refresh_if_idle)
+        self.set_interval(60, self._refresh.run_due_refresh_if_idle, pause=False)
 
     def on_resize(self) -> None:
         self._invalidate_render_cache()
@@ -397,7 +404,12 @@ class NewsReaderApp(App[None]):
         )
 
     def action_show_source_manager(self) -> None:
-        self.push_screen(SourceSelectionScreen(self.ui))
+        self.push_screen(
+            SourceSelectionScreen(
+                self.ui,
+                default_schedule=self.config.articles.update_schedule,
+            )
+        )
 
     def action_show_category_picker(self) -> None:
         self.action_show_source_manager()
@@ -417,7 +429,12 @@ class NewsReaderApp(App[None]):
         self.exit()
 
     def action_download_articles(self) -> None:
-        self._refresh.start()
+        provider_ids = self._manual_refresh_provider_ids()
+        if provider_ids:
+            self._refresh.start(provider_ids, force=True)
+
+    def action_watch_topic(self) -> None:
+        self._topic_watch.start()
 
     def action_return_to_provider_home(self) -> None:
         if self.provider_home_open:
@@ -474,6 +491,32 @@ class NewsReaderApp(App[None]):
     ) -> bool:
         return self._provider_home.apply_configuration(enabled_by_provider, selected_targets)
 
+    def update_provider_schedule(self, provider_id: str, update_schedule: str | None) -> None:
+        self.storage.update_provider_schedule(provider_id, update_schedule)
+        self._refresh.request_due_refresh_check()
+
+    def create_topic_provider(
+        self,
+        *,
+        display_name: str,
+        topic_query: str,
+        update_schedule: str | None,
+        enabled: bool = True,
+    ):
+        provider = self.storage.create_topic_provider(
+            display_name=display_name,
+            topic_query=topic_query,
+            update_schedule=update_schedule,
+            enabled=enabled,
+        )
+        self.rebuild_provider_registry()
+        return provider
+
+    def delete_topic_provider(self, provider_id: str) -> None:
+        self.storage.delete_provider(provider_id)
+        self._provider_home.handle_deleted_provider(provider_id)
+        self.rebuild_provider_registry()
+
     def open_article_by_id(self, article_id: str) -> None:
         self._navigation.open_by_id(article_id)
 
@@ -523,6 +566,21 @@ class NewsReaderApp(App[None]):
         self._persist_reader_state()
         if self._refresh._thread is None:
             self.storage.close()
+
+    def rebuild_provider_registry(self) -> None:
+        providers = dict(self.builtin_providers)
+        for provider_record in self.storage.list_providers():
+            if provider_record.provider_type != "topic":
+                continue
+            topic_query = provider_record.settings.get("topic_query", provider_record.display_name).strip()
+            providers[provider_record.provider_id] = TopicWatchProvider(
+                provider_id=provider_record.provider_id,
+                display_name=provider_record.display_name,
+                topic_query=topic_query,
+                search_client=self.search_client,
+            )
+        self.providers = providers
+        self.pipeline.providers = providers
 
     # ------------------------------------------------------------------
     # View rendering
@@ -621,3 +679,16 @@ class NewsReaderApp(App[None]):
             self.current_index = max(0, len(self.articles) - 1)
         self._navigation._state_persisted = False
         self._exit_cleanup_done = True
+
+    def _manual_refresh_provider_ids(self) -> list[str]:
+        if self.provider_home_open or self._provider_home.active_scope_id == "[ALL]":
+            return [
+                provider.provider_id
+                for provider in self.storage.list_enabled_providers()
+                if provider.provider_type != "all"
+            ]
+        provider_id = self._provider_home.active_scope_id
+        provider = self.storage.get_provider(provider_id)
+        if provider is None or provider.provider_type == "all":
+            return []
+        return [provider_id]

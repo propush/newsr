@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import sqlite3
-from datetime import UTC, datetime
-from threading import Thread
 from pathlib import Path
+import sqlite3
+from datetime import UTC, datetime, timedelta
+from threading import Thread
+
+import pytest
 
 from newsr.domain import AppOptions, ArticleContent
 from newsr.domain import ProviderRecord, ProviderTarget
@@ -202,6 +204,7 @@ def test_storage_allows_cross_thread_access(storage, article_content) -> None:
         nonlocal error
         try:
             storage.upsert_article_source(article_content)
+            storage.complete_summary(article_content.article_id, "Summary")
             assert storage.has_article(article_content.article_id)
         except BaseException as exc:  # pragma: no cover - assertion surfaces via error
             error = exc
@@ -212,6 +215,95 @@ def test_storage_allows_cross_thread_access(storage, article_content) -> None:
 
     assert error is None
     assert storage.get_article(article_content.article_id) is not None
+
+
+def test_storage_persists_article_ids_in_known_duplicates_table(storage, article_content) -> None:
+    storage.upsert_article_source(article_content)
+    storage.complete_summary(article_content.article_id, "Summary")
+    storage.prune_expired(days_to_keep=0)
+
+    assert storage.has_article(article_content.article_id) is True
+    assert storage.list_articles() == []
+
+
+def test_storage_does_not_mark_article_known_on_source_insert(storage, article_content) -> None:
+    storage.upsert_article_source(article_content)
+
+    assert storage.has_article(article_content.article_id) is False
+
+
+def test_storage_creates_topic_provider_with_default_target(storage) -> None:
+    provider = storage.create_topic_provider(
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        update_schedule="*/15 * * * *",
+    )
+
+    stored_provider = storage.get_provider(provider.provider_id)
+    targets = storage.list_provider_targets(provider.provider_id)
+
+    assert stored_provider is not None
+    assert stored_provider.provider_type == "topic"
+    assert stored_provider.update_schedule == "*/15 * * * *"
+    assert stored_provider.settings == {"topic_query": "OpenAI policy"}
+    assert targets == [
+        ProviderTarget(
+            provider_id=provider.provider_id,
+            target_key="watch",
+            target_kind="topic",
+            label="OpenAI policy",
+            payload={"query": "OpenAI policy"},
+            discovered_at=None,
+            selected=True,
+        )
+    ]
+
+
+def test_storage_lists_due_providers_using_provider_override_and_default_schedule(storage) -> None:
+    topic_provider = storage.create_topic_provider(
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        update_schedule="*/15 * * * *",
+    )
+    storage.mark_refresh_completed("bbc")
+    storage.mark_refresh_completed(topic_provider.provider_id)
+    stale_timestamp = datetime.now(UTC) - timedelta(hours=2)
+    storage.connection.execute(
+        """
+        UPDATE providers
+        SET last_refresh_completed_at = ?
+        WHERE provider_id = ?
+        """,
+        (stale_timestamp.isoformat(), "bbc"),
+    )
+    storage.connection.execute(
+        """
+        UPDATE providers
+        SET last_refresh_completed_at = ?
+        WHERE provider_id = ?
+        """,
+        ((datetime.now(UTC) - timedelta(minutes=20)).isoformat(), topic_provider.provider_id),
+    )
+    storage.connection.commit()
+
+    due_providers = storage.list_due_providers("0 * * * *")
+
+    assert {provider.provider_id for provider in due_providers} == {"bbc", topic_provider.provider_id}
+
+
+def test_storage_rejects_duplicate_topic_provider_names_case_insensitively(storage) -> None:
+    storage.create_topic_provider(
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        update_schedule=None,
+    )
+
+    with pytest.raises(ValueError, match="OpenAI policy"):
+        storage.create_topic_provider(
+            display_name="  openai   policy  ",
+            topic_query="  openai   policy  ",
+            update_schedule=None,
+        )
 
 
 def test_storage_delete_incomplete_articles_removes_partial_rows(storage, article_content) -> None:
@@ -294,5 +386,75 @@ def test_storage_migrates_existing_articles_table_to_include_assigned_categories
             for row in storage.connection.execute("PRAGMA table_info(articles)").fetchall()
         }
         assert "assigned_categories_json" in columns
+    finally:
+        storage.close()
+
+
+def test_storage_migrates_existing_articles_into_known_article_ids(tmp_path: Path) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    connection = sqlite3.connect(storage_path)
+    try:
+        connection.execute(
+            """
+            CREATE TABLE articles (
+                article_id TEXT PRIMARY KEY,
+                provider_id TEXT NOT NULL,
+                provider_article_id TEXT NOT NULL,
+                url TEXT NOT NULL,
+                category TEXT NOT NULL,
+                title TEXT NOT NULL,
+                translated_title TEXT,
+                author TEXT,
+                published_at TEXT,
+                source_body TEXT NOT NULL,
+                translated_body TEXT,
+                summary TEXT,
+                more_info TEXT,
+                translation_status TEXT NOT NULL,
+                summary_status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO articles (
+                article_id, provider_id, provider_article_id, url, category, title,
+                translated_title, author, published_at, source_body, translated_body,
+                summary, more_info, translation_status, summary_status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "bbc:legacy-1",
+                "bbc",
+                "legacy-1",
+                "https://www.bbc.com/news/legacy-1",
+                "world",
+                "Legacy title",
+                None,
+                "Reporter",
+                None,
+                "Legacy body",
+                None,
+                None,
+                None,
+                "pending",
+                "pending",
+                datetime.now(UTC).isoformat(),
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    storage = NewsStorage(storage_path)
+    try:
+        storage.initialize()
+        rows = storage.connection.execute(
+            "SELECT article_id FROM known_article_ids ORDER BY article_id"
+        ).fetchall()
+        assert [row["article_id"] for row in rows] == ["bbc:legacy-1"]
     finally:
         storage.close()

@@ -145,6 +145,18 @@ class OpenAILLMClient:
         )
         return self._chat(self.summary_model, prompt, f"{article_title}\n\n{article_text}", cancellation)
 
+    def extract_watch_topic(
+        self,
+        article_title: str,
+        article_text: str,
+        cancellation: RefreshCancellation | None = None,
+    ) -> str:
+        prompt = (
+            "Extract a short topic name for creating a persistent news watch from this article. "
+            "Return only the topic name, 2 to 6 words when possible, with no quotes or commentary."
+        )
+        return self._chat(self.summary_model, prompt, f"{article_title}\n\n{article_text}", cancellation).strip()
+
     def synthesize_more_info(
         self,
         article_title: str,

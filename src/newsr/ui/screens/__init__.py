@@ -7,6 +7,8 @@ from .more_info import MoreInfoScreen
 from .open_link_confirm import OpenLinkConfirmScreen
 from .provider_home import ProviderHomeRow, ProviderHomeScreen
 from .quick_nav import QuickNavScreen
+from .text_input_dialog import TextInputDialogScreen
+from .watch_topic_dialog import WatchTopicDialogScreen
 
 CategorySelectionScreen = SourceSelectionScreen
 
@@ -22,4 +24,6 @@ __all__ = [
     "ProviderHomeScreen",
     "QuickNavScreen",
     "SourceSelectionScreen",
+    "TextInputDialogScreen",
+    "WatchTopicDialogScreen",
 ]

@@ -7,11 +7,12 @@ NewsR currently requires Python 3.12 or newer.
 ## Features
 
 - built-in support for multiple news providers; see [Current Providers](docs/current_providers.md)
-- background refresh with cached startup content and LLM responsiveness preflight
+- cron-scheduled background refresh with LLM responsiveness preflight
 - provider home with `[ALL]` plus enabled providers, unread/total counters, and configurable sort order
+- watched topics that behave like virtual providers and can be created from provider home or the current article
 - translated full articles plus summaries
 - "more info" and article Q&A overlays backed by DuckDuckGo search and the configured LLM
-- source management for enabling providers, refreshing catalogs, and choosing targets
+- source management for enabling providers, editing schedules, refreshing catalogs, and choosing targets
 - export of the current view as Markdown or PNG
 - PNG and Markdown clipboard export support on supported platforms
 
@@ -126,7 +127,7 @@ The `exports/` directory is created on demand when you save a Markdown or PNG ex
 
 The generated `newsr.yml` contains five sections:
 
-- `articles`: how many article candidates to fetch per selected target and how many days of articles to keep in SQLite
+- `articles`: how many article candidates to fetch per selected target, how many days of articles to keep in SQLite, and the default cron refresh schedule used when a provider has no override
 - `llm`: the OpenAI-compatible base URL, optional auth settings, optional extra headers, plus a translation model for titles and article bodies and a summary model reused for summaries, "more info", search-query generation, and article Q&A
 - `translation`: the target language used for translated headlines, article text, summaries, "more info", and article Q&A answers
 - `ui`: the Textual UI locale, `[ALL]` visibility in provider home, and provider-home ordering; current built-in locales are `en` and `ru`
@@ -138,6 +139,7 @@ Example generated config for a local setup:
 articles:
   fetch: 5
   store: 10
+  update_schedule: 0 * * * *
 llm:
   url: http://localhost:8081/v1
   model_translation: local-translate
@@ -159,6 +161,7 @@ export:
 `ui.provider_sort.primary` accepts `unread` or `name`.
 `ui.provider_sort.direction` accepts `asc` or `desc`.
 `ui.show-all` accepts `true` or `false` and controls whether `[ALL]` is shown in provider home.
+`articles.update_schedule` accepts a standard 5-field cron expression and defaults to hourly refreshes.
 `export.image.quality` accepts `hd` or `fhd`.
 `llm.api_key` is optional for local unauthenticated servers. `llm.headers` can be used for extra OpenAI-compatible provider headers, and `llm.request_retries` controls how many times NewsR retries transient transport failures before surfacing an error.
 
@@ -188,23 +191,26 @@ NewsR starts in a provider home view. This is the default home screen shown afte
 - Counters only include articles whose translation has completed.
 - `Up` / `Down` / `PgUp` / `PgDn` / `B` move through the list.
 - `Enter` opens the highlighted scope.
-- `C`, `D`, `H`, `Ctrl+P`, and `Q` stay available from this view.
+- `C`, `W`, `D`, `H`, `Ctrl+P`, and `Q` stay available from this view.
 
 ## Sources
 
 Press `C` to open **Manage Sources**.
 
 - The left pane lists registered providers and whether each one is enabled.
+- Each provider row also shows its provider type and effective schedule source.
 - The right pane lists targets for the currently highlighted provider.
 - `Tab` switches panes.
 - `Space` toggles the highlighted provider or target.
 - `R` refreshes the highlighted provider's target catalog by calling its discovery flow.
+- `U` edits the highlighted provider's cron schedule override. Leave it blank to use `articles.update_schedule`.
+- `X` deletes the highlighted watched-topic provider.
 - `A` saves the current source configuration.
 - `Esc` closes the overlay without applying changes.
 
 For the current built-in provider list, bootstrap defaults, and catalog behavior, see [Current Providers](docs/current_providers.md).
 
-Saving source changes starts a refresh immediately when no refresh is already running. If a refresh is in progress, the new source configuration is saved and picked up by the next refresh cycle.
+Saving source changes updates SQLite-backed provider state immediately. The scheduler and manual refresh actions use the latest saved configuration.
 
 ## Reader Controls
 
@@ -218,9 +224,10 @@ Saving source changes starts a refresh immediately when no refresh is already ru
 - `?`: ask a follow-up question about the current article
 - `L`: open the article list
 - `C`: open source management
+- `W`: create a watched topic from the current article
 - `E`: open export actions for the current view
 - `O`: open the current article in the system browser
-- `D`: fetch new articles now
+- `D`: force-refresh the current provider, or all real providers when the current scope is `[ALL]`
 - `Ctrl+P`: open the command palette and switch themes
 - `H`: show the in-app help screen
 - `Q`: quit
@@ -255,9 +262,13 @@ Clipboard export support depends on the platform:
 
 ## Refresh Behavior
 
-- Startup loads cached articles first, then immediately starts a background refresh after a lightweight LLM responsiveness check succeeds or the retry dialog is confirmed.
+- Startup loads cached articles first and starts a minute-based scheduler loop for due providers.
 - The provider-home counters update as translated articles become ready.
-- Refresh iterates enabled providers and their selected targets from SQLite-backed source state.
+- Each enabled provider has a nullable `update_schedule`. When it is blank, NewsR uses `articles.update_schedule`.
+- The scheduler checks once per minute for due providers and only starts a refresh when no other refresh or preflight is already running.
+- `[ALL]` is a synthetic scope and is never refreshed directly.
+- Pressing `D` starts an immediate forced refresh after the same lightweight LLM responsiveness preflight used by scheduled refreshes.
+- Watched topics are fetched through a topic provider that searches the web, extracts readable article text, and sends new results through the same categorization, translation, and summary flow as built-in HTTP providers.
 - Refresh work runs in the background and updates the UI as translations and summaries finish.
 - Already cached articles are skipped before fetch and LLM work.
 - Near the end of the article list, the app arms another fetch automatically so reading forward can pull in more content.

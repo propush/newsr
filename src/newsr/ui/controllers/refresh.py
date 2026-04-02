@@ -23,20 +23,45 @@ class RefreshController:
         self.status_text: str = app.ui.text("app.status.ready")
         self._status_busy = False
         self._status_override_until = 0.0
+        self._provider_ids: list[str] | None = None
+        self._force_refresh = False
+        self._processed_provider_count = 0
+        self._pending_due_refresh_check = False
 
     @property
     def status_busy(self) -> bool:
         return self._status_busy
 
-    def start(self) -> None:
-        if self.in_progress or self._preflight_thread is not None or self._app._shutdown_requested:
+    @property
+    def is_busy(self) -> bool:
+        return self.in_progress or self._preflight_thread is not None
+
+    def start(self, provider_ids: list[str] | None = None, *, force: bool = False) -> None:
+        if self.is_busy or self._app._shutdown_requested:
             return
-        self._app._navigation._auto_fetch_armed = False
         self._auto_select_first_ready_article = not self._app.articles
+        self._provider_ids = list(provider_ids) if provider_ids is not None else None
+        self._force_refresh = force
         self._cancellation = RefreshCancellation()
         self.set_status_text(self._app.ui.text("app.status.checking_llm"), busy=True)
         self._app.refresh_view()
         self._preflight_thread = self._launch_preflight_thread()
+
+    def run_due_refresh_if_idle(self) -> None:
+        if self.is_busy or self._app._shutdown_requested:
+            return
+        due_providers = self._app.storage.list_due_providers(self._app.config.articles.update_schedule)
+        if not due_providers:
+            return
+        self.start([provider.provider_id for provider in due_providers])
+
+    def request_due_refresh_check(self) -> None:
+        if self._app._shutdown_requested:
+            return
+        if self.is_busy:
+            self._pending_due_refresh_check = True
+            return
+        self.run_due_refresh_if_idle()
 
     def _launch_preflight_thread(self) -> Thread:
         thread = Thread(target=self._run_preflight, name="newsr-llm-preflight", daemon=True)
@@ -94,6 +119,8 @@ class RefreshController:
 
     def _clear_preflight_thread(self) -> None:
         self._preflight_thread = None
+        if not self.in_progress:
+            self._run_pending_due_refresh_check()
 
     def _prompt_retry(self, error: str, cancellation: RefreshCancellation) -> bool:
         decision = Event()
@@ -139,15 +166,30 @@ class RefreshController:
 
     def _run(self) -> None:
         try:
-            self._app.pipeline.refresh(
-                self.set_status,
-                self._handle_article_ready,
-                self._cancellation,
-            )
+            result = None
+            try:
+                result = self._app.pipeline.refresh(
+                    self._provider_ids,
+                    force=self._force_refresh,
+                    on_status=self.set_status,
+                    on_article_ready=self._handle_article_ready,
+                    cancellation=self._cancellation,
+                )
+            except TypeError as exc:
+                if "unexpected keyword argument" not in str(exc):
+                    raise
+                result = self._app.pipeline.refresh(
+                    self.set_status,
+                    self._handle_article_ready,
+                    self._cancellation,
+                )
+            if result is not None:
+                self._processed_provider_count = result.processed_providers
         finally:
             self._call_from_thread_if_ready(self._finish)
 
     def _finish(self) -> None:
+        should_run_due_check = self._processed_provider_count > 0 or self._pending_due_refresh_check
         self.in_progress = False
         self._status_busy = False
         if not self._app._shutdown_requested:
@@ -156,6 +198,11 @@ class RefreshController:
                 self._app._provider_home.refresh_rows()
         self._thread = None
         self._cancellation = None
+        self._provider_ids = None
+        self._force_refresh = False
+        self._processed_provider_count = 0
+        if should_run_due_check:
+            self._run_pending_due_refresh_check(force=True)
 
     def _handle_article_ready(self, article_id: str) -> None:
         self._call_from_thread_if_ready(self._load_ready_article, article_id)
@@ -210,4 +257,18 @@ class RefreshController:
         cancellation = self._cancellation
         if cancellation is not None:
             cancellation.cancel()
+        self.in_progress = False
+        self._thread = None
+        self._preflight_thread = None
         self._dismiss_confirm_screen(False)
+
+    def _run_pending_due_refresh_check(self, *, force: bool = False) -> None:
+        if self._app._shutdown_requested:
+            self._pending_due_refresh_check = False
+            return
+        if not force and not self._pending_due_refresh_check:
+            return
+        if self.is_busy:
+            return
+        self._pending_due_refresh_check = False
+        self.run_due_refresh_if_idle()

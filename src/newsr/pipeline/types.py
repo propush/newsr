@@ -12,6 +12,7 @@ ArticleReadyCallback = Callable[[str], None]
 class RefreshResult:
     new_articles: int
     failed_articles: int
+    processed_providers: int = 0
 
 
 @dataclass(slots=True)

@@ -55,10 +55,7 @@ class NavigationController:
         fallback_to_current_article: bool = True,
     ) -> None:
         current_article = self.current_article
-        previous_count = len(self.articles)
         self.articles = self._articles_for_scope(self._app._provider_home.active_scope_id)
-        if len(self.articles) > previous_count:
-            self._auto_fetch_armed = True
         self.current_index = self._resolve_current_index(
             preferred_article_id=preferred_article_id
             or (
@@ -201,7 +198,6 @@ class NavigationController:
         self.reset_scroll()
         self._app.refresh_view()
         self.save_reader_state_now()
-        self.maybe_auto_fetch()
 
     def next(self) -> None:
         if self._app.provider_home_open or self._app._article_qa.is_active:
@@ -217,7 +213,6 @@ class NavigationController:
         self.reset_scroll()
         self._app.refresh_view()
         self.save_reader_state_now()
-        self.maybe_auto_fetch()
 
     def toggle_summary(self) -> None:
         from ...domain.reader import ViewMode
@@ -308,7 +303,6 @@ class NavigationController:
             self.reset_scroll()
             self._app.refresh_view()
             self.save_reader_state_now()
-            self.maybe_auto_fetch()
             return
 
     def reset_scroll(self) -> None:
@@ -319,13 +313,7 @@ class NavigationController:
         self._app.query_one("#article-pane", VerticalScroll).scroll_to(y=0, animate=False)
 
     def maybe_auto_fetch(self) -> None:
-        if not self.articles or not self._auto_fetch_armed:
-            return
-        trigger_index = max(0, len(self.articles) - 5)
-        if self.current_index < trigger_index:
-            return
-        self._auto_fetch_armed = False
-        self._app._refresh.start()
+        return
 
     # ------------------------------------------------------------------
     # Link confirmation
