@@ -1,19 +1,31 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from threading import Thread
 
+from rich.cells import cell_len
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingsMap
 from textual.containers import Horizontal, Vertical
+from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Static
 
 from ...domain import ProviderRecord, ProviderTarget
 from ...scheduling import validate_cron_expression
 from ...ui_text import UILocalizer
+from ..group_headers import group_header_text
+from ..provider_groups import build_provider_groups, provider_group_id_for_type, provider_group_label
 from .confirm_dialog import ConfirmDialogScreen
 from .text_input_dialog import TextInputDialogScreen
+
+
+@dataclass(slots=True)
+class SourceProviderRow:
+    label: str
+    provider: ProviderRecord | None = None
+    is_group_header: bool = False
 
 
 class SourceSelectionScreen(ModalScreen[None]):
@@ -79,6 +91,9 @@ class SourceSelectionScreen(ModalScreen[None]):
             color: $background;
         }
     }
+    #target-list {
+        padding-top: 1;
+    }
     #source-hint {
         dock: bottom;
         height: 1;
@@ -99,16 +114,19 @@ class SourceSelectionScreen(ModalScreen[None]):
         self._targets_by_provider: dict[str, list[ProviderTarget]] = {}
         self._enabled_by_provider: dict[str, bool] = {}
         self._selected_by_provider: dict[str, set[str]] = {}
+        self._provider_rows: list[SourceProviderRow] = []
+        self._selected_provider_id: str | None = None
         self._target_provider_id: str | None = None
         self._load_thread: Thread | None = None
         self._refresh_thread: Thread | None = None
+        self._last_provider_row_index = 0
 
     def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
         return [
-            ("escape", "close_overlay", self._ui.text("source.binding.close")),
+            Binding("escape", "close_overlay", self._ui.text("source.binding.close"), show=False),
             Binding("tab", "switch_pane", self._ui.text("source.binding.pane"), show=False),
             Binding("space", "toggle_item", self._ui.text("source.binding.toggle"), show=False),
-            ("r", "refresh_catalog", self._ui.text("source.binding.refresh")),
+            Binding("r", "refresh_catalog", self._ui.text("source.binding.refresh"), show=False),
             ("u", "edit_schedule", self._ui.text("source.binding.schedule")),
             ("x", "delete_provider", self._ui.text("source.binding.delete")),
             ("a", "save_selection", self._ui.text("source.binding.apply")),
@@ -138,6 +156,15 @@ class SourceSelectionScreen(ModalScreen[None]):
         self._load_thread = Thread(target=self._load_sources, name="newsr-sources", daemon=True)
         self._load_thread.start()
 
+    def on_resize(self, event: Resize) -> None:
+        if not self._providers:
+            return
+        current_provider_id = self._current_provider_id()
+        self._refresh_provider_rows(current_provider_id)
+        current_provider_id = self._current_provider_id()
+        if current_provider_id is not None:
+            self._refresh_target_rows(current_provider_id)
+
     def action_close_overlay(self) -> None:
         self.dismiss()
 
@@ -161,7 +188,7 @@ class SourceSelectionScreen(ModalScreen[None]):
             if provider is None:
                 return
             self._enabled_by_provider[provider.provider_id] = not self._enabled_by_provider[provider.provider_id]
-            self._refresh_provider_rows()
+            self._update_provider_row(provider.provider_id)
             return
         target_table = self.query_one("#target-list", DataTable)
         provider = self._current_provider()
@@ -239,9 +266,25 @@ class SourceSelectionScreen(ModalScreen[None]):
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if event.data_table.id == "provider-list":
-            provider = self._provider_at_row(event.cursor_row)
+            row = self._provider_row_at(event.cursor_row)
+            if row is not None and row.is_group_header:
+                target_row = self._adjacent_provider_row(
+                    event.cursor_row,
+                    step=-1 if event.cursor_row < self._last_provider_row_index else 1,
+                )
+                if target_row is None:
+                    target_row = self._adjacent_provider_row(
+                        event.cursor_row,
+                        step=1 if event.cursor_row < self._last_provider_row_index else -1,
+                    )
+                if target_row is not None:
+                    event.data_table.move_cursor(row=target_row, column=0, animate=False, scroll=True)
+                return
+            provider = row.provider if row is not None else None
             if provider is None:
                 return
+            self._last_provider_row_index = event.cursor_row
+            self._selected_provider_id = provider.provider_id
             self._refresh_target_rows(provider.provider_id)
         self._update_status_counts()
 
@@ -309,6 +352,9 @@ class SourceSelectionScreen(ModalScreen[None]):
         self.query_one("#source-loading", Static).display = False
         self.query_one("#source-error", Static).display = False
         self.query_one("#source-content", Horizontal).display = True
+        self.call_after_refresh(self._show_sources_after_layout)
+
+    def _show_sources_after_layout(self) -> None:
         self._refresh_provider_rows()
         current_provider_id = self._current_provider_id()
         if current_provider_id is not None:
@@ -327,27 +373,65 @@ class SourceSelectionScreen(ModalScreen[None]):
     def _set_status(self, message: str) -> None:
         self.query_one("#source-status", Static).update(message)
 
-    def _refresh_provider_rows(self) -> None:
+    def _refresh_provider_rows(self, preferred_provider_id: str | None = None) -> None:
         table = self.query_one("#provider-list", DataTable)
-        current_provider_id = self._current_provider_id()
+        current_provider_id = preferred_provider_id or self._selected_provider_id or self._current_provider_id()
+        self._provider_rows = self._build_provider_rows()
         table.clear(columns=True)
-        table.add_column(" ", width=3, key="marker")
-        table.add_column(self._ui.text("source.table.provider"), key="provider", width=max(16, self.size.width // 4))
-        table.add_column(self._ui.text("source.table.type"), key="type", width=8)
-        table.add_column(self._ui.text("source.table.schedule"), key="schedule", width=max(12, self.size.width // 4))
-        table.add_column(self._ui.text("source.table.targets"), key="targets", width=10)
-        for provider in self._providers:
+        marker_width, provider_width, type_width, schedule_width = self._provider_column_widths(table)
+        table.add_column(" ", width=marker_width, key="marker")
+        table.add_column(self._ui.text("source.table.provider"), key="provider", width=provider_width)
+        table.add_column(self._ui.text("source.table.type"), key="type", width=type_width)
+        table.add_column(self._ui.text("source.table.schedule"), key="schedule", width=schedule_width)
+        for row in self._provider_rows:
+            if row.is_group_header:
+                table.add_row("", group_header_text(row.label), "", "", key=f"group:{row.label}")
+                continue
+            provider = row.provider
+            assert provider is not None
             enabled = self._enabled_by_provider.get(provider.provider_id, provider.enabled)
-            selected_count = len(self._selected_by_provider.get(provider.provider_id, set()))
             table.add_row(
                 Text("[x]" if enabled else "[ ]"),
                 provider.display_name,
                 self._provider_type_label(provider.provider_type),
                 provider.update_schedule or self._ui.text("source.schedule.default"),
-                str(selected_count),
                 key=provider.provider_id,
             )
-        self._move_provider_cursor(current_provider_id)
+        self.call_after_refresh(lambda: self._move_provider_cursor(current_provider_id))
+
+    def _update_provider_row(self, provider_id: str) -> None:
+        if not self.is_mounted:
+            return
+        provider = next((item for item in self._providers if item.provider_id == provider_id), None)
+        row_index = self._provider_row_index(provider_id)
+        if provider is None or row_index is None:
+            self._refresh_provider_rows(provider_id)
+            return
+        table = self.query_one("#provider-list", DataTable)
+        enabled = self._enabled_by_provider.get(provider.provider_id, provider.enabled)
+        table.update_cell(provider.provider_id, "marker", Text("[x]" if enabled else "[ ]"))
+        table.update_cell(
+            provider.provider_id,
+            "schedule",
+            provider.update_schedule or self._ui.text("source.schedule.default"),
+        )
+        self._selected_provider_id = provider.provider_id
+        self._last_provider_row_index = row_index
+        table.move_cursor(row=row_index, column=0, animate=False, scroll=True)
+
+    def _provider_column_widths(self, table: DataTable) -> tuple[int, int, int, int]:
+        marker_width = 3
+        type_width = max(cell_len(self._ui.text("source.table.type")), cell_len("topic"))
+        provider_min_width = 8
+        schedule_min_width = max(cell_len(self._ui.text("source.table.schedule")), 10)
+        available_width = table.size.width or max(32, self.size.width // 2)
+        column_count = len(table.ordered_columns) or 4
+        chrome_width = (column_count * (2 * table.cell_padding)) + max(column_count - 1, 0)
+        content_width = max(20, available_width - chrome_width)
+        flexible_width = max(provider_min_width + schedule_min_width, content_width - marker_width - type_width)
+        schedule_width = min(max(schedule_min_width, flexible_width // 2), flexible_width - provider_min_width)
+        provider_width = flexible_width - schedule_width
+        return marker_width, provider_width, type_width, schedule_width
 
     def _refresh_target_rows(self, provider_id: str) -> None:
         table = self.query_one("#target-list", DataTable)
@@ -378,21 +462,17 @@ class SourceSelectionScreen(ModalScreen[None]):
 
     def _move_provider_cursor(self, provider_id: str | None) -> None:
         table = self.query_one("#provider-list", DataTable)
-        cursor_row = 0
-        if provider_id is not None:
-            for index, provider in enumerate(self._providers):
-                if provider.provider_id == provider_id:
-                    cursor_row = index
-                    break
-        if table.row_count:
+        cursor_row = self._provider_row_index(provider_id)
+        if cursor_row is not None and table.row_count:
+            self._last_provider_row_index = cursor_row
+            row = self._provider_row_at(cursor_row)
+            if row is not None and row.provider is not None:
+                self._selected_provider_id = row.provider.provider_id
             table.move_cursor(row=cursor_row, column=0, animate=False, scroll=True)
 
     def _update_status_counts(self) -> None:
         enabled_count = sum(1 for enabled in self._enabled_by_provider.values() if enabled)
-        current_provider = self._current_provider()
-        target_count = 0
-        if current_provider is not None:
-            target_count = len(self._selected_by_provider.get(current_provider.provider_id, set()))
+        target_count = sum(len(selected) for selected in self._selected_by_provider.values())
         self._set_status(
             self._ui.text(
                 "source.status.counts",
@@ -407,12 +487,13 @@ class SourceSelectionScreen(ModalScreen[None]):
 
     def _current_provider(self) -> ProviderRecord | None:
         table = self.query_one("#provider-list", DataTable)
-        return self._provider_at_row(table.cursor_row)
+        row = self._provider_row_at(table.cursor_row)
+        return row.provider if row is not None else None
 
-    def _provider_at_row(self, row_index: int) -> ProviderRecord | None:
-        if not self._providers or row_index < 0 or row_index >= len(self._providers):
+    def _provider_row_at(self, row_index: int) -> SourceProviderRow | None:
+        if not self._provider_rows or row_index < 0 or row_index >= len(self._provider_rows):
             return None
-        return self._providers[row_index]
+        return self._provider_rows[row_index]
 
     def _current_provider_id(self) -> str | None:
         provider = self._current_provider()
@@ -451,7 +532,7 @@ class SourceSelectionScreen(ModalScreen[None]):
         normalized_result = result or None
         provider.update_schedule = normalized_result
         self.app.update_provider_schedule(provider_id, normalized_result)
-        self._refresh_provider_rows()
+        self._update_provider_row(provider_id)
         self._set_status(self._ui.text("source.schedule.saved", provider=provider.display_name))
 
     def _delete_provider(self, provider_id: str) -> None:
@@ -460,6 +541,8 @@ class SourceSelectionScreen(ModalScreen[None]):
         self._targets_by_provider.pop(provider_id, None)
         self._enabled_by_provider.pop(provider_id, None)
         self._selected_by_provider.pop(provider_id, None)
+        if self._selected_provider_id == provider_id:
+            self._selected_provider_id = None
         self._refresh_provider_rows()
         current_provider_id = self._current_provider_id()
         if current_provider_id is not None:
@@ -467,3 +550,35 @@ class SourceSelectionScreen(ModalScreen[None]):
         else:
             self.query_one("#target-list", DataTable).clear(columns=True)
         self._set_status(self._ui.text("source.delete.deleted"))
+
+    def _build_provider_rows(self) -> list[SourceProviderRow]:
+        rows: list[SourceProviderRow] = []
+        for group in build_provider_groups(
+            self._providers,
+            group_for_item=lambda provider: provider_group_id_for_type(provider.provider_type),
+            sort_items=self._sort_providers_by_name,
+            group_order=("providers", "topics"),
+        ):
+            rows.append(SourceProviderRow(label=provider_group_label(self._ui, group.group_id), is_group_header=True))
+            rows.extend(SourceProviderRow(label=provider.display_name, provider=provider) for provider in group.items)
+        return rows
+
+    @staticmethod
+    def _sort_providers_by_name(providers: list[ProviderRecord]) -> list[ProviderRecord]:
+        return sorted(providers, key=lambda provider: provider.display_name.casefold())
+
+    def _provider_row_index(self, provider_id: str | None) -> int | None:
+        if provider_id is not None:
+            for index, row in enumerate(self._provider_rows):
+                provider = row.provider
+                if provider is not None and provider.provider_id == provider_id:
+                    return index
+        return self._adjacent_provider_row(0, step=1)
+
+    def _adjacent_provider_row(self, start: int, *, step: int) -> int | None:
+        index = start
+        while 0 <= index < len(self._provider_rows):
+            if self._provider_rows[index].provider is not None:
+                return index
+            index += step
+        return None

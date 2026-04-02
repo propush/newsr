@@ -8,6 +8,7 @@ from types import MethodType
 from unittest.mock import patch
 
 from rich.cells import cell_len
+from rich.text import Text
 from textual.color import Color
 from textual.widgets import DataTable
 from textual.widgets import Footer, Input, ListView, LoadingIndicator, Markdown, Static
@@ -210,6 +211,15 @@ def provider_rows(app: NewsReaderApp) -> list[list[str]]:
     return rows
 
 
+def provider_row_cells(app: NewsReaderApp, row_index: int) -> list[object]:
+    table = provider_list(app)
+    return list(table.get_row_at(row_index))
+
+
+def provider_data_rows(app: NewsReaderApp) -> list[list[str]]:
+    return [row for row in provider_rows(app) if row and row[0] in {"[x]", "[ ]"}]
+
+
 def provider_row_index(app: NewsReaderApp, display_name: str) -> int:
     for row_index, row in enumerate(provider_rows(app)):
         if len(row) > 1 and row[1] == display_name:
@@ -256,6 +266,26 @@ def provider_home_rows(app: NewsReaderApp) -> list[list[str]]:
     return rows
 
 
+def provider_home_row_cells(app: NewsReaderApp, row_index: int) -> list[object]:
+    table = provider_home_table(app)
+    return list(table.get_row_at(row_index))
+
+
+def assert_framed_provider_home_header(value: object, label: str) -> None:
+    rendered = value.plain if isinstance(value, Text) else str(value)
+    assert rendered.startswith("─")
+    assert rendered.endswith("─")
+    assert f" {label} " in rendered
+    assert rendered != label
+    if isinstance(value, Text):
+        assert value.justify == "center"
+        assert value.style == "dim italic $secondary"
+
+
+def provider_home_data_rows(app: NewsReaderApp) -> list[list[str]]:
+    return [row for row in provider_home_rows(app) if len(row) >= 3 and row[1].isdigit() and row[2].isdigit()]
+
+
 def provider_home_row_index(app: NewsReaderApp, display_name: str) -> int:
     for row_index, row in enumerate(provider_home_rows(app)):
         if row[0] == display_name:
@@ -265,6 +295,35 @@ def provider_home_row_index(app: NewsReaderApp, display_name: str) -> int:
 
 def provider_home_footer_text(app: NewsReaderApp) -> str:
     return str(app.query_one("#article-url", Static).content)
+
+
+def provider_home_selectable_row_index(app: NewsReaderApp, row_index: int, step: int) -> int | None:
+    rows = provider_home_rows(app)
+    index = row_index
+    while 0 <= index < len(rows):
+        row = rows[index]
+        if len(row) >= 3 and row[1].isdigit() and row[2].isdigit():
+            return index
+        index += step
+    boundary = range(len(rows)) if step < 0 else range(len(rows) - 1, -1, -1)
+    for index in boundary:
+        row = rows[index]
+        if len(row) >= 3 and row[1].isdigit() and row[2].isdigit():
+            return index
+    return None
+
+
+def provider_home_page_row_count(table: DataTable, row_index: int, step: int) -> int:
+    page_height = table.scrollable_content_region.height - (table.header_height if table.show_header else 0)
+    offset = 0
+    rows_to_scroll = 0
+    ordered_rows = table.ordered_rows[row_index:] if step > 0 else table.ordered_rows[: row_index + 1]
+    for ordered_row in ordered_rows:
+        offset += ordered_row.height
+        rows_to_scroll += 1
+        if offset > page_height:
+            break
+    return rows_to_scroll
 
 
 def footer_bindings(app: NewsReaderApp) -> list[tuple[str, str, str]]:
@@ -1020,6 +1079,10 @@ def test_ui_hides_space_hints_from_footer(app_config, tmp_path) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     bindings = {binding.key: binding for _key, binding in app._bindings}
 
+    assert bindings["left"].show is False
+    assert bindings["right"].show is False
+    assert bindings["up"].show is False
+    assert bindings["down"].show is False
     assert bindings["space"].show is False
     assert bindings["b"].show is False
 
@@ -3577,6 +3640,10 @@ def test_ui_applies_saved_old_fido_theme_on_startup(app_config, tmp_path, articl
 def test_ui_source_manager_loads_current_provider_and_targets(app_config, tmp_path) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
+    expected_selected = sum(
+        len(app.storage.list_selected_targets(provider.provider_id))
+        for provider in app.storage.list_providers()
+    )
 
     async def runner() -> None:
         async with app.run_test() as pilot:
@@ -3590,13 +3657,14 @@ def test_ui_source_manager_loads_current_provider_and_targets(app_config, tmp_pa
                 raise AssertionError("source manager did not finish loading")
             provider_statuses = {
                 row[1]: row[0]
-                for row in provider_rows(app)
+                for row in provider_data_rows(app)
             }
             assert provider_statuses["BBC News"] == "[x]"
             assert provider_statuses["TechCrunch"] == "[ ]"
             assert provider_statuses["The Hacker News"] == "[ ]"
             assert provider_statuses["Ars Technica"] == "[ ]"
             assert len(provider_statuses) == len(app.storage.list_providers())
+            assert [row[1] for row in provider_rows(app)[:2]] == ["Providers", "Ars Technica"]
 
             provider_list(app).move_cursor(row=provider_row_index(app, "BBC News"), column=0, animate=False)
             await pilot.pause()
@@ -3609,6 +3677,160 @@ def test_ui_source_manager_loads_current_provider_and_targets(app_config, tmp_pa
             status_text = source_status_text(app)
             assert f"Loaded {len(app.storage.list_providers())} providers." in status_text
             assert "Enabled 1." in status_text
+            assert f"Selected {expected_selected} targets globally." in status_text
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_status_counts_selected_targets_across_providers_and_topics(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    selected_before = sum(
+        len(app.storage.list_selected_targets(provider.provider_id))
+        for provider in app.storage.list_providers()
+    )
+    app.storage.create_topic_provider(
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        update_schedule=None,
+    )
+    app.rebuild_provider_registry()
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+
+            status_text = source_status_text(app)
+            assert f"Loaded {len(app.storage.list_providers())} providers." in status_text
+            assert "Enabled 2." in status_text
+            assert f"Selected {selected_before + 1} targets globally." in status_text
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_toggling_provider_keeps_cursor_position(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+
+            techcrunch_row = provider_row_index(app, "TechCrunch")
+            provider_list(app).move_cursor(row=techcrunch_row, column=0, animate=False)
+            await pilot.pause()
+
+            assert provider_list(app).cursor_row == techcrunch_row
+            await pilot.press("space")
+            await pilot.pause()
+
+            assert provider_list(app).cursor_row == techcrunch_row
+            provider_statuses = {
+                row[1]: row[0]
+                for row in provider_data_rows(app)
+            }
+            assert provider_statuses["TechCrunch"] == "[x]"
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_toggling_provider_keeps_cursor_position_after_idle_cycles(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+
+            techcrunch_row = provider_row_index(app, "TechCrunch")
+            provider_table = provider_list(app)
+            provider_table.focus()
+            await pilot.pause()
+            while provider_table.cursor_row < techcrunch_row:
+                await pilot.press("down")
+                await pilot.pause()
+
+            assert provider_table.cursor_row == techcrunch_row
+            await pilot.press("space")
+            for _ in range(5):
+                await pilot.pause()
+
+            assert provider_table.cursor_row == techcrunch_row
+            provider_statuses = {
+                row[1]: row[0]
+                for row in provider_data_rows(app)
+            }
+            assert provider_statuses["TechCrunch"] == "[x]"
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_groups_topics_and_sorts_by_name_within_groups(app_config, tmp_path) -> None:
+    app_config.ui.provider_sort.primary = "unread"
+    app_config.ui.provider_sort.direction = "desc"
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.create_topic_provider(
+        display_name="Zed AI",
+        topic_query="Zed AI",
+        update_schedule=None,
+    )
+    app.storage.create_topic_provider(
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        update_schedule=None,
+    )
+    app.rebuild_provider_registry()
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+
+            rows = provider_rows(app)
+            labels = [row[1] for row in rows]
+            topics_index = labels.index("Topics")
+            providers_header = provider_row_cells(app, 0)[1]
+            topics_header = provider_row_cells(app, topics_index)[1]
+
+            assert isinstance(providers_header, Text)
+            assert providers_header.justify == "center"
+            assert providers_header.style == "dim italic $secondary"
+            assert isinstance(topics_header, Text)
+            assert topics_header.justify == "center"
+            assert topics_header.style == "dim italic $secondary"
+            assert labels[0] == "Providers"
+            assert labels[topics_index + 1 : topics_index + 3] == ["OpenAI policy", "Zed AI"]
+            assert "Virtual" not in labels
+            assert labels[1:topics_index] == sorted(labels[1:topics_index], key=str.casefold)
+            assert all(len(row) == 4 for row in provider_rows(app))
 
     asyncio.run(runner())
 
@@ -3889,9 +4111,16 @@ def test_ui_provider_home_starts_with_all_then_enabled_providers_sorted_by_unrea
         async with app.run_test() as pilot:
             await pilot.pause()
             rows = provider_home_rows(app)
-            assert rows[0] == ["[ALL]", "3", "3"]
-            assert rows[1] == ["TechCrunch", "2", "2"]
-            assert rows[2] == ["BBC News", "1", "1"]
+            virtual_header = provider_home_row_cells(app, 0)[0]
+            providers_header = provider_home_row_cells(app, 2)[0]
+
+            assert_framed_provider_home_header(virtual_header, "Virtual")
+            assert_framed_provider_home_header(providers_header, "Providers")
+            assert_framed_provider_home_header(rows[0][0], "Virtual")
+            assert_framed_provider_home_header(rows[2][0], "Providers")
+            assert rows[1] == ["[ALL]", "3", "3"]
+            assert rows[3] == ["TechCrunch", "2", "2"]
+            assert rows[4] == ["BBC News", "1", "1"]
 
     asyncio.run(runner())
 
@@ -3927,9 +4156,11 @@ def test_ui_provider_home_counts_only_translated_articles(app_config, tmp_path) 
         async with app.run_test() as pilot:
             await pilot.pause()
             rows = provider_home_rows(app)
-            assert rows[0] == ["[ALL]", "2", "2"]
-            assert rows[1] == ["BBC News", "1", "1"]
-            assert rows[2] == ["TechCrunch", "1", "1"]
+            assert_framed_provider_home_header(rows[0][0], "Virtual")
+            assert rows[1] == ["[ALL]", "2", "2"]
+            assert_framed_provider_home_header(rows[2][0], "Providers")
+            assert rows[3] == ["BBC News", "1", "1"]
+            assert rows[4] == ["TechCrunch", "1", "1"]
 
     asyncio.run(runner())
 
@@ -3962,10 +4193,10 @@ def test_ui_provider_home_hides_all_row_when_configured(app_config, tmp_path) ->
         async with app.run_test() as pilot:
             await pilot.pause()
             rows = provider_home_rows(app)
-            assert rows == [
-                ["TechCrunch", "2", "2"],
-                ["BBC News", "1", "1"],
-            ]
+            assert len(rows) == 3
+            assert_framed_provider_home_header(rows[0][0], "Providers")
+            assert rows[1] == ["TechCrunch", "2", "2"]
+            assert rows[2] == ["BBC News", "1", "1"]
 
     asyncio.run(runner())
 
@@ -4086,6 +4317,57 @@ def test_ui_provider_home_hides_reader_only_bindings_from_footer(app_config, tmp
                 ("h", "Help", "show_help"),
                 ("q", "Quit", "quit_reader"),
             ]
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_hides_common_key_hints(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+
+            bindings = {binding.key: binding for _key, binding in screen._bindings}
+            assert bindings["escape"].show is False
+            assert bindings["tab"].show is False
+            assert bindings["r"].show is False
+            assert bindings["space"].show is False
+            assert str(screen.query_one("#source-hint", Static).content) == (
+                "Space: toggle   U: edit schedule   X: delete topic   A: apply"
+            )
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_provider_columns_fit_split_layout(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test(size=(84, 28)) as pilot:
+            await pilot.press("c")
+            for _ in range(20):
+                await pilot.pause()
+                screen = category_screen(app)
+                if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+                    break
+            else:
+                raise AssertionError("source manager did not finish loading")
+
+            table = provider_list(app)
+            rendered_width = sum(column.width for column in table.ordered_columns) + (
+                len(table.ordered_columns) * (2 * table.cell_padding)
+            )
+            assert rendered_width <= table.size.width
 
     asyncio.run(runner())
 
@@ -4373,6 +4655,7 @@ def test_ui_provider_home_provider_scope_filters_articles_and_escape_returns_hom
             await pilot.press("escape")
             await pilot.pause()
             assert provider_home_screen(app) is not None
+            assert provider_home_table(app).cursor_row == provider_home_row_index(app, "TechCrunch")
 
     asyncio.run(runner())
 
@@ -4407,6 +4690,95 @@ def test_ui_provider_home_space_opens_selected_provider(app_config, tmp_path) ->
             assert [article.provider_id for article in app.articles] == ["techcrunch"]
             assert app.current_article is not None
             assert app.current_article.article_id == tech_article_id
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_arrow_keys_move_between_provider_rows(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            table = provider_home_table(app)
+            assert table.cursor_row == provider_home_row_index(app, "[ALL]")
+
+            await pilot.press("down")
+            await pilot.pause()
+            assert table.cursor_row == provider_home_row_index(app, "BBC News")
+
+            await pilot.press("up")
+            await pilot.pause()
+            assert table.cursor_row == provider_home_row_index(app, "[ALL]")
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_top_navigation_jumps_to_first_provider_row(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            table = provider_home_table(app)
+            first_provider_row = provider_home_row_index(app, "[ALL]")
+            last_provider_row = provider_home_row_index(app, "TechCrunch")
+
+            table.move_cursor(row=last_provider_row, column=0, animate=False)
+            await pilot.pause()
+            await pilot.press("ctrl+home")
+            await pilot.pause()
+            assert table.cursor_row == first_provider_row
+
+            table.move_cursor(row=last_provider_row, column=0, animate=False)
+            await pilot.pause()
+            await pilot.press("pageup")
+            await pilot.pause()
+            assert table.cursor_row == first_provider_row
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_page_keys_use_visible_page_height(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    for provider_id in app.builtin_providers:
+        app.storage.set_provider_enabled(provider_id, True)
+
+    async def runner() -> None:
+        async with app.run_test(size=(70, 16)) as pilot:
+            await pilot.pause()
+            table = provider_home_table(app)
+            start_row = provider_home_row_index(app, "[ALL]")
+            rows_to_scroll = provider_home_page_row_count(table, start_row, 1)
+            expected_row = provider_home_selectable_row_index(app, start_row + rows_to_scroll - 1, 1)
+
+            assert expected_row is not None
+            assert expected_row - start_row > 5
+
+            await pilot.press("pagedown")
+            await pilot.pause()
+            assert table.cursor_row == expected_row
+
+            rows_to_scroll_up = provider_home_page_row_count(table, table.cursor_row, -1)
+            expected_up_row = provider_home_selectable_row_index(
+                app,
+                table.cursor_row - rows_to_scroll_up + 1,
+                -1,
+            )
+
+            assert expected_up_row is not None
+
+            await pilot.press("pageup")
+            await pilot.pause()
+            assert table.cursor_row == expected_up_row
 
     asyncio.run(runner())
 
@@ -4462,7 +4834,7 @@ def test_ui_disabling_active_provider_from_reader_opens_provider_home(app_config
             assert category_screen(app) is None
             assert provider_home_screen(app) is not None
             assert app._provider_home.active_scope_id == "techcrunch"
-            assert provider_home_table(app).cursor_row == 0
+            assert provider_home_table(app).cursor_row == 1
 
     asyncio.run(runner())
 
@@ -4523,10 +4895,11 @@ def test_ui_disabling_active_provider_from_source_manager_keeps_provider_home_op
             assert provider_home_screen(app) is not None
             assert app._provider_home.active_scope_id == "techcrunch"
             rows = provider_home_rows(app)
-            assert rows[0][0] == "[ALL]"
-            assert app._provider_home.selected_scope_id == rows[0][0] or app._provider_home.selected_scope_id == "[ALL]"
-            assert rows[1] == ["BBC News", "1", "1"]
-            assert provider_home_table(app).cursor_row == 0
+            assert_framed_provider_home_header(rows[0][0], "Virtual")
+            assert rows[1] == ["[ALL]", "1", "2"]
+            assert app._provider_home.selected_scope_id == "[ALL]"
+            assert rows[3] == ["BBC News", "1", "1"]
+            assert provider_home_table(app).cursor_row == 1
             assert app.status_text == "sources saved"
 
     asyncio.run(runner())
@@ -4600,10 +4973,11 @@ def test_ui_deleting_active_topic_from_source_manager_keeps_provider_home_open(a
             assert provider_home_screen(app) is not None
             assert app._provider_home.active_scope_id == "topic:openai-policy"
             rows = provider_home_rows(app)
-            assert rows[0][0] == "[ALL]"
-            assert app._provider_home.selected_scope_id == rows[0][0] or app._provider_home.selected_scope_id == "[ALL]"
+            assert_framed_provider_home_header(rows[0][0], "Virtual")
+            assert rows[1][0] == "[ALL]"
+            assert app._provider_home.selected_scope_id == "[ALL]"
             assert "OpenAI policy" not in [row[0] for row in rows]
-            assert provider_home_table(app).cursor_row == 0
+            assert provider_home_table(app).cursor_row == 1
 
     asyncio.run(runner())
 
@@ -4619,7 +4993,10 @@ def test_ui_hidden_all_row_does_not_break_return_to_provider_home(app_config, tm
     async def runner() -> None:
         async with app.run_test() as pilot:
             await pilot.pause()
-            assert provider_home_rows(app) == [["BBC News", "1", "1"]]
+            rows = provider_home_rows(app)
+            assert len(rows) == 2
+            assert_framed_provider_home_header(rows[0][0], "Providers")
+            assert rows[1] == ["BBC News", "1", "1"]
 
             app.open_scope("[ALL]")
             await pilot.pause()
@@ -4632,8 +5009,11 @@ def test_ui_hidden_all_row_does_not_break_return_to_provider_home(app_config, tm
             await pilot.pause()
 
             table = provider_home_table(app)
-            assert provider_home_rows(app) == [["BBC News", "1", "1"]]
-            assert table.cursor_row == 0
+            rows = provider_home_rows(app)
+            assert len(rows) == 2
+            assert_framed_provider_home_header(rows[0][0], "Providers")
+            assert rows[1] == ["BBC News", "1", "1"]
+            assert table.cursor_row == 1
             assert app._provider_home.active_scope_id == "[ALL]"
             assert app._provider_home.selected_scope_id == "bbc"
 
@@ -5191,6 +5571,8 @@ def test_ui_renders_russian_copy_and_preserves_hotkeys(app_config, tmp_path, art
             assert "S: переключить сводку" in help_text
             assert "M: подробнее" in help_text
             assert "D: принудительно обновить текущего провайдера" in help_text
+            await pilot.press("escape")
+            await pilot.pause()
 
             await pilot.press("s")
             await pilot.pause()

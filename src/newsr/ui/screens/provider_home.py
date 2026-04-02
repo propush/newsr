@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.events import Resize
@@ -9,14 +10,17 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable, Static
 
 from ...ui_text import UILocalizer
+from ..group_headers import framed_group_header_text
 
 
 @dataclass(slots=True)
 class ProviderHomeRow:
-    scope_id: str
+    scope_id: str | None
     display_name: str
     unread_count: int
     total_count: int
+    provider_type: str = "http"
+    is_group_header: bool = False
 
 
 class ProviderHomeScreen(ModalScreen[None]):
@@ -110,7 +114,10 @@ class ProviderHomeScreen(ModalScreen[None]):
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if not self._rows:
             return
-        self.app.open_scope(self._rows[event.cursor_row].scope_id)
+        row = self._rows[event.cursor_row]
+        if row.scope_id is None:
+            return
+        self.app.open_scope(row.scope_id)
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         self._update_status(event.cursor_row)
@@ -144,7 +151,10 @@ class ProviderHomeScreen(ModalScreen[None]):
         table = self.query_one("#provider-home-table", DataTable)
         if not self._rows or table.cursor_row < 0 or table.cursor_row >= len(self._rows):
             return
-        self.app.open_scope(self._rows[table.cursor_row].scope_id)
+        row = self._rows[table.cursor_row]
+        if row.scope_id is None:
+            return
+        self.app.open_scope(row.scope_id)
 
     def _configure_table(self) -> None:
         table = self.query_one("#provider-home-table", DataTable)
@@ -170,15 +180,17 @@ class ProviderHomeScreen(ModalScreen[None]):
         table.display = True
         empty.display = False
         selected_index = 0
+        provider_width = self._provider_width(table)
         for index, row in enumerate(self._rows):
             table.add_row(
-                row.display_name,
-                f"{row.unread_count:>3}",
-                f"{row.total_count:>3}",
-                key=row.scope_id,
+                self._provider_cell(row, provider_width=provider_width),
+                "" if row.is_group_header else f"{row.unread_count:>3}",
+                "" if row.is_group_header else f"{row.total_count:>3}",
+                key=row.scope_id or f"group:{row.display_name}",
             )
             if row.scope_id == previous_scope_id:
                 selected_index = index
+        selected_index = self._first_selectable_row_index(selected_index)
         table.move_cursor(row=selected_index, column=0, animate=False, scroll=True)
         table.focus()
         self._update_status(selected_index)
@@ -197,6 +209,9 @@ class ProviderHomeScreen(ModalScreen[None]):
             self.query_one("#provider-home-selection", Static).update(self._ui.text("provider_home.status.empty"))
             return
         row = self._rows[index]
+        if row.scope_id is None:
+            self.query_one("#provider-home-selection", Static).update(self._ui.text("provider_home.status.empty"))
+            return
         self._selected_scope_id = row.scope_id
         self.query_one("#provider-home-selection", Static).update(
             self._ui.text(
@@ -209,3 +224,17 @@ class ProviderHomeScreen(ModalScreen[None]):
 
     def set_app_status(self, status_text: str) -> None:
         self.query_one("#provider-home-status", Static).update(status_text)
+
+    @staticmethod
+    def _provider_cell(row: ProviderHomeRow, *, provider_width: int) -> Text | str:
+        if row.is_group_header:
+            return framed_group_header_text(row.display_name, provider_width)
+        return row.display_name
+
+    def _first_selectable_row_index(self, preferred_index: int) -> int:
+        if 0 <= preferred_index < len(self._rows) and not self._rows[preferred_index].is_group_header:
+            return preferred_index
+        for index, row in enumerate(self._rows):
+            if not row.is_group_header:
+                return index
+        return 0

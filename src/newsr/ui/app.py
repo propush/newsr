@@ -36,6 +36,7 @@ from .controllers.navigation import NavigationController
 from .controllers.provider_home import ProviderHomeController
 from .controllers.refresh import RefreshController
 from .controllers.topic_watch import TopicWatchController
+from .provider_home_table import ProviderHomeTable
 from .screens import (
     HelpScreen,
     QuickNavScreen,
@@ -192,10 +193,10 @@ class NewsReaderApp(App[None]):
 
     def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
         return [
-            ("left", "previous_article", self.ui.text("app.binding.previous")),
-            ("right", "next_article", self.ui.text("app.binding.next")),
-            ("up", "scroll_up", self.ui.text("app.binding.up")),
-            ("down", "scroll_down", self.ui.text("app.binding.down")),
+            Binding("left", "previous_article", self.ui.text("app.binding.previous"), show=False),
+            Binding("right", "next_article", self.ui.text("app.binding.next"), show=False),
+            Binding("up", "scroll_up", self.ui.text("app.binding.up"), show=False),
+            Binding("down", "scroll_down", self.ui.text("app.binding.down"), show=False),
             Binding("pageup", "page_up", self.ui.text("app.binding.pgup"), show=False),
             Binding("pagedown", "page_down", self.ui.text("app.binding.pgdn"), show=False),
             Binding("b", "page_up", self.ui.text("app.binding.back"), show=False),
@@ -221,7 +222,7 @@ class NewsReaderApp(App[None]):
         with Vertical(id="chrome"):
             yield Static(id="article-header")
             with Vertical(id="article-frame"):
-                yield DataTable(id="provider-home-table", cursor_type="row")
+                yield ProviderHomeTable(id="provider-home-table", cursor_type="row")
                 yield Static(id="provider-home-empty")
                 with VerticalScroll(id="article-pane", can_focus=False):
                     yield Markdown(id="article-body")
@@ -471,6 +472,15 @@ class NewsReaderApp(App[None]):
 
     def open_scope(self, scope_id: str) -> None:
         self._provider_home.open_scope(scope_id)
+
+    def move_provider_home_cursor(self, delta: int) -> None:
+        self._provider_home.move_cursor(delta)
+
+    def page_provider_home(self, step: int) -> None:
+        self._provider_home.page_cursor(step)
+
+    def move_provider_home_to_boundary(self, *, first: bool) -> None:
+        self._provider_home.move_to_boundary(first=first)
 
     def provider_home_rows(self) -> list:
         return self._provider_home.rows()

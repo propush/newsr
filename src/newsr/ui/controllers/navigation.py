@@ -242,13 +242,13 @@ class NavigationController:
 
     def page_up(self) -> None:
         if self._app.provider_home_open:
-            self._app._provider_home.move_cursor(-5)
+            self._app.page_provider_home(-1)
             return
         self._app.query_one("#article-pane", VerticalScroll).scroll_page_up(animate=False)
 
     def page_down(self) -> None:
         if self._app.provider_home_open:
-            self._app._provider_home.move_cursor(5)
+            self._app.page_provider_home(1)
             return
         self._app.query_one("#article-pane", VerticalScroll).scroll_page_down(animate=False)
 

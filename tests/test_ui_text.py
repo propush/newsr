@@ -23,6 +23,9 @@ def test_ui_localizer_returns_russian_translations_and_keeps_status_mapping() ->
     ui = UILocalizer("ru")
 
     assert ui.text("app.binding.summary") == "Сводка"
+    assert ui.text("provider_group.virtual") == "Виртуальные"
+    assert ui.text("provider_group.providers") == "Провайдеры"
+    assert ui.text("provider_group.topics") == "Темы"
     assert ui.text("quick_nav.selection", current=2, total=5) == "Выбрано 2 из 5"
     assert ui.status("ready") == "готово"
     assert ui.status("searching DuckDuckGo...") == "поиск в DuckDuckGo..."

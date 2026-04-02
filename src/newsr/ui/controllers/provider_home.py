@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rich.text import Text
 from textual.app import ScreenStackError
 from textual.css.query import NoMatches
 from textual.containers import Vertical
 from textual.widgets import DataTable
 
 from ...domain import ProviderRecord, ProviderTarget
+from ..group_headers import framed_group_header_text
+from ..provider_groups import build_provider_groups, provider_group_id_for_type, provider_group_label
 from ..screens import ProviderHomeRow
 
 if TYPE_CHECKING:
@@ -22,6 +25,7 @@ class ProviderHomeController:
         self._open = False
         self._active_scope_id = ALL_PROVIDERS_SCOPE_ID
         self._selected_scope_id = ALL_PROVIDERS_SCOPE_ID
+        self._last_highlighted_row = 0
 
     @property
     def is_open(self) -> bool:
@@ -62,18 +66,19 @@ class ProviderHomeController:
 
     def rows(self) -> list[ProviderHomeRow]:
         all_articles = self._app._articles_for_scope(ALL_PROVIDERS_SCOPE_ID)
-        result: list[ProviderHomeRow] = []
+        provider_rows: list[ProviderHomeRow] = []
         if self._app.config.ui.show_all:
-            result.append(
+            provider_rows.append(
                 ProviderHomeRow(
                     scope_id=ALL_PROVIDERS_SCOPE_ID,
                     display_name=ALL_PROVIDERS_SCOPE_ID,
                     unread_count=self._unread_count_for_scope(ALL_PROVIDERS_SCOPE_ID, all_articles),
                     total_count=len(all_articles),
+                    provider_type="all",
                 )
             )
         enabled_providers = self._app.storage.list_enabled_providers()
-        provider_rows = [
+        provider_rows.extend(
             ProviderHomeRow(
                 scope_id=provider.provider_id,
                 display_name=provider.display_name,
@@ -82,10 +87,26 @@ class ProviderHomeController:
                     [a for a in all_articles if a.provider_id == provider.provider_id],
                 ),
                 total_count=sum(1 for a in all_articles if a.provider_id == provider.provider_id),
+                provider_type=provider.provider_type,
             )
             for provider in enabled_providers
-        ]
-        result.extend(self._sort_rows(provider_rows))
+        )
+        result: list[ProviderHomeRow] = []
+        for group in build_provider_groups(
+            provider_rows,
+            group_for_item=lambda row: provider_group_id_for_type(row.provider_type),
+            sort_items=self._sort_rows,
+        ):
+            result.append(
+                ProviderHomeRow(
+                    scope_id=None,
+                    display_name=provider_group_label(self._app.ui, group.group_id),
+                    unread_count=0,
+                    total_count=0,
+                    is_group_header=True,
+                )
+            )
+            result.extend(group.items)
         return result
 
     def _sort_rows(self, rows: list[ProviderHomeRow]) -> list[ProviderHomeRow]:
@@ -124,9 +145,11 @@ class ProviderHomeController:
         self._notify_bindings_changed()
         self._app.refresh_view()
         try:
-            self._app.query_one("#provider-home-table", DataTable).focus()
+            table = self._app.query_one("#provider-home-table", DataTable)
         except NoMatches:
-            pass
+            return
+        table.focus()
+        self._restore_cursor_for_scope(table, self._selected_scope_id)
 
     def close(self) -> None:
         self._open = False
@@ -167,9 +190,10 @@ class ProviderHomeController:
         except NoMatches:
             return
         home_rows = self.rows()
-        if table.cursor_row < 0 or table.cursor_row >= len(home_rows):
+        row = self._row_at(home_rows, table.cursor_row)
+        if row is None:
             return
-        self.open_scope(home_rows[table.cursor_row].scope_id)
+        self.open_scope(row.scope_id)
 
     def refresh_rows(self) -> None:
         if not self._app.is_mounted:
@@ -184,18 +208,17 @@ class ProviderHomeController:
         table.add_column(self._app.ui.text("provider_home.table.provider"), key="provider", width=provider_width)
         table.add_column(self._app.ui.text("provider_home.table.unread"), key="unread", width=counter_width)
         table.add_column(self._app.ui.text("provider_home.table.total"), key="total", width=counter_width)
-        selected_row = 0
+        selected_row = self._selected_row_index(home_rows, previous_scope_id)
         for index, row in enumerate(home_rows):
             table.add_row(
-                row.display_name,
-                f"{row.unread_count:>{counter_text_width}}",
-                f"{row.total_count:>{counter_text_width}}",
-                key=row.scope_id,
+                self._provider_cell(row, provider_width=provider_width),
+                "" if row.is_group_header else f"{row.unread_count:>{counter_text_width}}",
+                "" if row.is_group_header else f"{row.total_count:>{counter_text_width}}",
+                key=row.scope_id or f"group:{row.display_name}",
             )
-            if row.scope_id == previous_scope_id:
-                selected_row = index
-        if home_rows:
+        if selected_row is not None:
             self._selected_scope_id = home_rows[selected_row].scope_id
+            self._last_highlighted_row = selected_row
             table.move_cursor(row=selected_row, column=0, animate=False, scroll=True)
         self._app._navigation._rendered_article_url = None
 
@@ -217,9 +240,10 @@ class ProviderHomeController:
         if event.data_table.id != "provider-home-table":
             return
         home_rows = self.rows()
-        if event.cursor_row < 0 or event.cursor_row >= len(home_rows):
+        row = self._row_at(home_rows, event.cursor_row)
+        if row is None:
             return
-        self.open_scope(home_rows[event.cursor_row].scope_id)
+        self.open_scope(row.scope_id)
 
     def handle_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if event.data_table.id != "provider-home-table":
@@ -227,7 +251,23 @@ class ProviderHomeController:
         home_rows = self.rows()
         if event.cursor_row < 0 or event.cursor_row >= len(home_rows):
             return
-        self._selected_scope_id = home_rows[event.cursor_row].scope_id
+        row = home_rows[event.cursor_row]
+        if row.scope_id is None:
+            direction = -1 if event.cursor_row < self._last_highlighted_row else 1
+            target_row = self._adjacent_selectable_row(
+                home_rows,
+                event.cursor_row,
+                step=direction,
+            )
+            if target_row is None:
+                target_row = self._selected_row_index(home_rows, self._selected_scope_id)
+            if target_row is None:
+                target_row = self._adjacent_selectable_row(home_rows, event.cursor_row, step=-direction)
+            if target_row is not None:
+                event.data_table.move_cursor(row=target_row, column=0, animate=False, scroll=True)
+            return
+        self._last_highlighted_row = event.cursor_row
+        self._selected_scope_id = row.scope_id
         self._app.refresh_view()
 
     def check_action(self, action: str) -> bool | None:
@@ -278,10 +318,54 @@ class ProviderHomeController:
             table = self._app.query_one("#provider-home-table", DataTable)
         except NoMatches:
             return
+        if delta == 0:
+            return
+        home_rows = self.rows()
         current = table.cursor_row
-        new_row = max(0, min(table.row_count - 1, current + delta))
-        if new_row != current:
-            table.move_cursor(row=new_row, column=0, animate=False, scroll=True)
+        step = 1 if delta > 0 else -1
+        for _ in range(abs(delta)):
+            next_row = self._adjacent_selectable_row(home_rows, current + step, step=step)
+            if next_row is None:
+                break
+            current = next_row
+        if current != table.cursor_row:
+            table.move_cursor(row=current, column=0, animate=False, scroll=True)
+
+    def page_cursor(self, step: int) -> None:
+        try:
+            table = self._app.query_one("#provider-home-table", DataTable)
+        except NoMatches:
+            return
+        if step == 0 or not table.show_cursor or table.cursor_type not in ("cell", "row"):
+            return
+        page_height = table.scrollable_content_region.height - (
+            table.header_height if table.show_header else 0
+        )
+        if page_height <= 0:
+            return
+        row_index = table.cursor_row
+        rows_to_scroll = self._page_row_count(table, row_index, step=step, page_height=page_height)
+        if rows_to_scroll <= 0:
+            return
+        target_row = row_index + rows_to_scroll - 1 if step > 0 else row_index - rows_to_scroll + 1
+        selectable_row = self._page_selectable_row(self.rows(), target_row, step=1 if step > 0 else -1)
+        if selectable_row is None or selectable_row == table.cursor_row:
+            return
+        if step > 0:
+            table.scroll_relative(y=page_height, animate=False, force=True)
+        else:
+            table.scroll_relative(y=-page_height, animate=False)
+        table.move_cursor(row=selectable_row, column=0, animate=False, scroll=False)
+
+    def move_to_boundary(self, *, first: bool) -> None:
+        try:
+            table = self._app.query_one("#provider-home-table", DataTable)
+        except NoMatches:
+            return
+        target_row = self._boundary_selectable_row(self.rows(), first=first)
+        if target_row is None or target_row == table.cursor_row:
+            return
+        table.move_cursor(row=target_row, column=0, animate=False, scroll=True)
 
     def list_providers(self) -> list[ProviderRecord]:
         return self._app.storage.list_providers()
@@ -338,3 +422,68 @@ class ProviderHomeController:
         self._app._refresh.set_status_text(self._app.ui.text("app.status.sources_saved"), busy=False)
         self._app.refresh_view()
         return True
+
+    @staticmethod
+    def _provider_cell(row: ProviderHomeRow, *, provider_width: int) -> Text | str:
+        if row.is_group_header:
+            return framed_group_header_text(row.display_name, provider_width)
+        return row.display_name
+
+    @staticmethod
+    def _row_at(rows: list[ProviderHomeRow], index: int) -> ProviderHomeRow | None:
+        if index < 0 or index >= len(rows):
+            return None
+        row = rows[index]
+        if row.scope_id is None:
+            return None
+        return row
+
+    def _selected_row_index(self, rows: list[ProviderHomeRow], scope_id: str) -> int | None:
+        for index, row in enumerate(rows):
+            if row.scope_id == scope_id:
+                return index
+        return self._adjacent_selectable_row(rows, 0, step=1)
+
+    def _restore_cursor_for_scope(self, table: DataTable, scope_id: str) -> None:
+        row_index = self._selected_row_index(self.rows(), scope_id)
+        if row_index is None:
+            return
+        self._last_highlighted_row = row_index
+        table.move_cursor(row=row_index, column=0, animate=False, scroll=True)
+
+    @staticmethod
+    def _boundary_selectable_row(rows: list[ProviderHomeRow], *, first: bool) -> int | None:
+        start = 0 if first else len(rows) - 1
+        step = 1 if first else -1
+        return ProviderHomeController._adjacent_selectable_row(rows, start, step=step)
+
+    @staticmethod
+    def _page_selectable_row(rows: list[ProviderHomeRow], target_row: int, *, step: int) -> int | None:
+        selectable_row = ProviderHomeController._adjacent_selectable_row(rows, target_row, step=step)
+        if selectable_row is not None:
+            return selectable_row
+        selectable_row = ProviderHomeController._boundary_selectable_row(rows, first=step < 0)
+        if selectable_row is not None:
+            return selectable_row
+        return ProviderHomeController._adjacent_selectable_row(rows, target_row, step=-step)
+
+    @staticmethod
+    def _page_row_count(table: DataTable, row_index: int, *, step: int, page_height: int) -> int:
+        offset = 0
+        rows_to_scroll = 0
+        ordered_rows = table.ordered_rows[row_index:] if step > 0 else table.ordered_rows[: row_index + 1]
+        for ordered_row in ordered_rows:
+            offset += ordered_row.height
+            rows_to_scroll += 1
+            if offset > page_height:
+                break
+        return rows_to_scroll
+
+    @staticmethod
+    def _adjacent_selectable_row(rows: list[ProviderHomeRow], start: int, *, step: int) -> int | None:
+        index = start
+        while 0 <= index < len(rows):
+            if rows[index].scope_id is not None:
+                return index
+            index += step
+        return None
