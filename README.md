@@ -278,6 +278,7 @@ Clipboard export support depends on the platform:
 
 - [Architecture](docs/architecture.md)
 - [Adding A Provider](docs/add_provider.md)
+- [Topic Watch](docs/topic_watch.md)
 
 ## License
 

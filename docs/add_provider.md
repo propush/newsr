@@ -15,7 +15,8 @@ That means the surrounding architecture is already multi-provider, and new provi
 - `src/newsr/domain/providers.py` defines `ProviderRecord` and `ProviderTarget`.
 - `src/newsr/storage/provider_store.py` persists providers, target catalogs, and selected targets in SQLite.
 - `src/newsr/pipeline/refresh.py` iterates enabled providers and selected targets generically.
-- `src/newsr/ui/app.py` bootstraps provider state and exposes source-management hooks to the UI.
+- `src/newsr/ui/controllers/provider_home.py` bootstraps built-in provider rows and default target selections, and owns provider-home/source-management state.
+- `src/newsr/ui/app.py` wires controllers together and keeps forwarding hooks for bindings and screen callbacks.
 - `src/newsr/ui/screens/categories.py` implements the generic source manager.
 
 Current built-ins show the intended range of provider behavior. See [Current Providers](current_providers.md) for the current built-in provider set and catalog behavior.
@@ -136,7 +137,7 @@ The registry is the only place where built-in providers should be wired together
 
 ### 7. Decide bootstrap defaults
 
-Startup bootstrapping happens in `NewsReaderApp._bootstrap_provider_state()` in `src/newsr/ui/app.py`.
+Startup bootstrapping happens in `ProviderHomeController.bootstrap()` in `src/newsr/ui/controllers/provider_home.py`.
 
 For each new provider decide:
 
@@ -181,7 +182,7 @@ For a typical provider, expect these touch points.
 ### Existing files likely to change
 
 - `src/newsr/providers/registry.py`
-- possibly `src/newsr/ui/app.py` if bootstrap defaults need adjustment
+- possibly `src/newsr/ui/controllers/provider_home.py` if bootstrap defaults need adjustment
 - possibly `docs/architecture.md` if the new provider changes the documented system shape
 
 ## Parsing Checklist

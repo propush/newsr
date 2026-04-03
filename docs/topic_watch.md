@@ -5,11 +5,12 @@ Topic watch lets NewsR track an arbitrary topic as a virtual provider.
 ## Creating A Watched Topic
 
 - In provider home, press `W` to enter a topic name manually.
-- In the reader, press `W` to ask the configured LLM for a topic name derived from the current article, then edit or confirm it.
+- In the reader, press `W` to ask the configured LLM for a topic name derived from the current article, then edit or confirm the suggested value in the same dialog.
 - The creation dialog accepts an optional 5-field cron schedule. The dialog shows the configured `articles.update_schedule` value from `newsr.yml`, and leaving the field blank uses it.
 - If the saved watched-topic query already exists, NewsR does not create another provider and shows the status `topic already exists: {topic name}`.
 
 Each watched topic is stored as its own provider row with `provider_type = "topic"` and a single `watch` target carrying the saved topic query.
+Watched-topic providers appear in provider home alongside enabled HTTP providers, and the source manager can edit their per-provider schedule or delete them.
 
 ## Refresh Model
 
