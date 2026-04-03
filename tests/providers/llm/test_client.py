@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from newsr.cancellation import RefreshCancellation
 from newsr.config import (
     AppConfig,
     ArticlesConfig,
@@ -110,7 +111,7 @@ def make_config(
     request_retries: int = 2,
 ) -> AppConfig:
     return AppConfig(
-        articles=ArticlesConfig(fetch=2, store=10, update_schedule="0 * * * *"),
+        articles=ArticlesConfig(fetch=2, store=10, timeout=180, update_schedule="0 * * * *"),
         llm=LLMConfig(
             url=url,
             model_translation="translate",
@@ -291,3 +292,20 @@ def test_llm_client_returns_empty_classification_after_retry_budget_is_exhausted
 
     assert result == ()
     assert len(FakeHTTPConnection.requests) == 2
+
+
+def test_llm_client_uses_remaining_cancellation_budget_for_connection_timeout() -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "translated"}}]}),
+    ]
+    client = OpenAILLMClient(make_config())
+    cancellation = RefreshCancellation().child_with_timeout(5)
+
+    try:
+        result = client.translate_title("Headline", cancellation)
+    finally:
+        cancellation.finish()
+
+    assert result == "translated"
+    assert len(FakeHTTPConnection.instances) == 1
+    assert 0 < FakeHTTPConnection.instances[0].timeout <= 5

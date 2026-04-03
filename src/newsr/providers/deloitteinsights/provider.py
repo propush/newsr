@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from urllib.request import Request, urlopen
 
-from ...cancellation import RefreshCancellation, cancellable_read
+from ...cancellation import RefreshCancellation, cancellable_read, resolve_request_timeout
 from ...domain import ArticleContent, ProviderTarget, SectionCandidate
 from .catalog import BASE_TARGET_OPTIONS, TargetOption
 from .parsing import parse_article_html, parse_search_response
@@ -86,7 +86,7 @@ class DeloitteInsightsProvider:
         request = Request(url, headers={"User-Agent": "newsr/0.1"})
         if cancellation is not None:
             cancellation.raise_if_cancelled()
-        with urlopen(request, timeout=30) as response:
+        with urlopen(request, timeout=resolve_request_timeout(cancellation, 30)) as response:
             return cancellable_read(response, cancellation).decode("utf-8")
 
     @staticmethod
@@ -105,7 +105,7 @@ class DeloitteInsightsProvider:
         )
         if cancellation is not None:
             cancellation.raise_if_cancelled()
-        with urlopen(request, timeout=30) as response:
+        with urlopen(request, timeout=resolve_request_timeout(cancellation, 30)) as response:
             return cancellable_read(response, cancellation).decode("utf-8")
 
 

@@ -4,7 +4,7 @@ import logging
 import re
 from threading import Lock
 
-from ..cancellation import RefreshCancellation, RefreshCancelled
+from ..cancellation import RefreshCancellation, RefreshCancelled, RefreshTimedOut
 from ..config.models import AppConfig
 from ..domain import ProviderTarget, SectionCandidate
 from ..providers.base import NewsProvider
@@ -14,6 +14,12 @@ from .types import ArticleReadyCallback, RefreshProgress, RefreshResult, StatusC
 
 
 _LOG = logging.getLogger("newsr.llm")
+
+
+class ArticleProcessingTimeout(RuntimeError):
+    def __init__(self, stage: str) -> None:
+        super().__init__(stage)
+        self.stage = stage
 
 
 class NewsPipeline:
@@ -141,11 +147,16 @@ class NewsPipeline:
         progress = RefreshProgress(completed_articles=0, total_articles=len(pending_candidates))
         for candidate in pending_candidates:
             self._raise_if_cancelled(cancellation)
+            article_cancellation = (
+                cancellation.child_with_timeout(self.config.articles.timeout)
+                if cancellation is not None
+                else RefreshCancellation().child_with_timeout(self.config.articles.timeout)
+            )
             try:
                 self._emit(on_status, f"extracting {candidate.article_id}")
-                content = provider.fetch_article(candidate, cancellation)
+                content = provider.fetch_article(candidate, article_cancellation)
                 content.body = self._validated_source_text(content.title, content.body)
-                self._raise_if_cancelled(cancellation)
+                self._raise_if_cancelled(article_cancellation)
                 self.storage.upsert_article_source(content)
                 self.storage.set_job_status(candidate.article_id, "fetch", "done")
                 if self._process_article_llm(
@@ -155,11 +166,30 @@ class NewsPipeline:
                     on_status,
                     on_article_ready,
                     progress,
-                    cancellation,
+                    article_cancellation,
                 ):
                     new_articles += 1
                 else:
                     failed_articles += 1
+            except ArticleProcessingTimeout as exc:
+                failed_articles += 1
+                error_text = f"article processing exceeded {self.config.articles.timeout} seconds"
+                _LOG.warning(
+                    "article_timed_out article_id=%s stage=%s timeout_s=%s",
+                    candidate.article_id,
+                    exc.stage,
+                    self.config.articles.timeout,
+                )
+                self.storage.discard_article_permanently(candidate.article_id, exc.stage, error_text)
+            except RefreshTimedOut:
+                failed_articles += 1
+                error_text = f"article processing exceeded {self.config.articles.timeout} seconds"
+                _LOG.warning(
+                    "article_timed_out article_id=%s stage=fetch timeout_s=%s",
+                    candidate.article_id,
+                    self.config.articles.timeout,
+                )
+                self.storage.discard_article_permanently(candidate.article_id, "fetch", error_text)
             except RefreshCancelled:
                 self._emit(on_status, "refresh cancelled")
                 raise
@@ -177,6 +207,16 @@ class NewsPipeline:
                     mark_known=True,
                 )
             except Exception as exc:
+                if article_cancellation.timed_out:
+                    failed_articles += 1
+                    error_text = f"article processing exceeded {self.config.articles.timeout} seconds"
+                    _LOG.warning(
+                        "article_timed_out article_id=%s stage=fetch timeout_s=%s",
+                        candidate.article_id,
+                        self.config.articles.timeout,
+                    )
+                    self.storage.discard_article_permanently(candidate.article_id, "fetch", error_text)
+                    continue
                 failed_articles += 1
                 _LOG.warning(
                     "fetch_failed article_id=%s error=%s", candidate.article_id, exc,
@@ -188,6 +228,8 @@ class NewsPipeline:
                     error_text=str(exc),
                     increment_attempt=True,
                 )
+            finally:
+                article_cancellation.finish()
         return new_articles, failed_articles
 
     def _fetch_target_candidates(
@@ -255,10 +297,14 @@ class NewsPipeline:
             self._raise_if_cancelled(cancellation)
             self.storage.replace_categories(article_id, categories)
             self.storage.set_job_status(article_id, "classification", "done")
+        except RefreshTimedOut as exc:
+            raise ArticleProcessingTimeout("classification") from exc
         except RefreshCancelled:
             self.storage.set_job_status(article_id, "classification", "pending")
             raise
         except Exception as exc:
+            if cancellation is not None and cancellation.timed_out:
+                raise ArticleProcessingTimeout("classification") from exc
             _LOG.warning("classification_failed article_id=%s error=%s", article_id, exc)
             self.storage.set_job_status(
                 article_id,
@@ -298,10 +344,14 @@ class NewsPipeline:
             self._raise_if_cancelled(cancellation)
             self.storage.complete_translation(article_id, translated_title, translated_text)
             self._emit_article_ready(on_article_ready, article_id)
+        except RefreshTimedOut as exc:
+            raise ArticleProcessingTimeout("translation") from exc
         except RefreshCancelled:
             self.storage.reset_translation(article_id)
             raise
         except Exception as exc:
+            if cancellation is not None and cancellation.timed_out:
+                raise ArticleProcessingTimeout("translation") from exc
             _LOG.warning("translation_failed article_id=%s error=%s", article_id, exc)
             self.storage.fail_translation(article_id, str(exc))
             return False
@@ -336,10 +386,14 @@ class NewsPipeline:
             self._emit_article_ready(on_article_ready, article_id)
             progress.completed_articles += 1
             return True
+        except RefreshTimedOut as exc:
+            raise ArticleProcessingTimeout("summary") from exc
         except RefreshCancelled:
             self.storage.reset_summary(article_id)
             raise
         except Exception as exc:
+            if cancellation is not None and cancellation.timed_out:
+                raise ArticleProcessingTimeout("summary") from exc
             _LOG.warning("summary_failed article_id=%s error=%s", article_id, exc)
             self.storage.fail_summary(article_id, str(exc))
             return False

@@ -11,7 +11,7 @@ from typing import Sequence
 from urllib.parse import urlparse
 
 from ...domain.article_categories import ARTICLE_CATEGORIES, normalize_article_categories
-from ...cancellation import RefreshCancellation, cancellable_read
+from ...cancellation import RefreshCancellation, cancellable_read, resolve_request_timeout
 from ...config.models import AppConfig
 from ..search.duckduckgo import SearchResult
 
@@ -44,6 +44,7 @@ class OpenAILLMClient:
         self._request_ids = count(1)
         self._slot_lock = Lock()
         self._conn: http.client.HTTPConnection | http.client.HTTPSConnection | None = None
+        self._conn_timeout: float | None = None
         parsed = urlparse(self.base_url)
         self._scheme = (parsed.scheme or "http").lower()
         self._host = parsed.hostname or "localhost"
@@ -244,12 +245,17 @@ class OpenAILLMClient:
         )
         return self._chat(self.summary_model, prompt, content, cancellation)
 
-    def _ensure_connection(self) -> http.client.HTTPConnection | http.client.HTTPSConnection:
-        if self._conn is None:
+    def _ensure_connection(
+        self,
+        timeout: float,
+    ) -> http.client.HTTPConnection | http.client.HTTPSConnection:
+        if self._conn is None or self._conn_timeout != timeout:
+            self._reset_connection()
             connection_class = (
                 http.client.HTTPSConnection if self._scheme == "https" else http.client.HTTPConnection
             )
-            self._conn = connection_class(self._host, self._port, timeout=300)
+            self._conn = connection_class(self._host, self._port, timeout=timeout)
+            self._conn_timeout = timeout
         return self._conn
 
     def _reset_connection(self) -> None:
@@ -259,6 +265,7 @@ class OpenAILLMClient:
             except Exception:
                 pass
             self._conn = None
+            self._conn_timeout = None
 
     def _chat(
         self,
@@ -334,7 +341,7 @@ class OpenAILLMClient:
         while remaining_attempts > 0:
             if cancellation is not None:
                 cancellation.raise_if_cancelled()
-            conn = self._ensure_connection()
+            conn = self._ensure_connection(resolve_request_timeout(cancellation, 300))
             try:
                 conn.request(
                     "POST",

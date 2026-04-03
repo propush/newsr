@@ -39,7 +39,7 @@ def _isolate_llm_logger(tmp_path_factory: pytest.TempPathFactory) -> Iterator[No
 @pytest.fixture
 def app_config() -> AppConfig:
     return AppConfig(
-        articles=ArticlesConfig(fetch=2, store=10, update_schedule="0 * * * *"),
+        articles=ArticlesConfig(fetch=2, store=10, timeout=180, update_schedule="0 * * * *"),
         llm=LLMConfig(
             url="http://localhost:8081/v1",
             model_translation="translate",

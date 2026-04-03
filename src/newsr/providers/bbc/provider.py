@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from urllib.request import Request, urlopen
 
-from ...cancellation import RefreshCancellation, cancellable_read
+from ...cancellation import RefreshCancellation, cancellable_read, resolve_request_timeout
 from ...domain import ArticleContent, ProviderTarget, SectionCandidate
 from .categories import BASE_CATEGORY_OPTIONS, CategoryOption, merge_category_catalogs
 from .parsing import parse_article_html, parse_category_catalog_html, parse_section_html
@@ -84,7 +84,7 @@ class BBCNewsProvider:
         req = Request(url, headers={"User-Agent": "newsr/0.1"})
         if cancellation is not None:
             cancellation.raise_if_cancelled()
-        with urlopen(req, timeout=30) as response:
+        with urlopen(req, timeout=resolve_request_timeout(cancellation, 30)) as response:
             return cancellable_read(response, cancellation).decode("utf-8")
 
 

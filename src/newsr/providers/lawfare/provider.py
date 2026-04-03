@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from urllib.request import Request, urlopen
 
-from ...cancellation import RefreshCancellation, cancellable_read
+from ...cancellation import RefreshCancellation, cancellable_read, resolve_request_timeout
 from ...domain import ArticleContent, ProviderTarget, SectionCandidate
 from .catalog import BASE_TARGET_OPTIONS, TargetOption
 from .parsing import parse_article_html, parse_section_html
@@ -93,7 +93,7 @@ class LawfareProvider:
         )
         if cancellation is not None:
             cancellation.raise_if_cancelled()
-        with urlopen(request, timeout=30) as response:
+        with urlopen(request, timeout=resolve_request_timeout(cancellation, 30)) as response:
             return cancellable_read(response, cancellation).decode("utf-8")
 
 

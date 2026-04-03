@@ -38,6 +38,31 @@ class ArticleStore:
                 " AND status != 'failed'"
             )
 
+    def discard_article_permanently(self, article_id: str, job_type: str, error_text: str) -> None:
+        now = datetime.now(UTC).isoformat()
+        with self._db.transaction():
+            self._db.connection.execute(
+                "DELETE FROM articles WHERE article_id = ?",
+                (article_id,),
+            )
+            self._db.connection.execute(
+                "DELETE FROM jobs WHERE article_id = ? AND status != 'failed'",
+                (article_id,),
+            )
+            self._db.connection.execute(
+                """
+                INSERT INTO jobs (article_id, job_type, status, error_text, attempt_count, updated_at)
+                VALUES (?, ?, 'failed', ?, 1, ?)
+                ON CONFLICT(article_id, job_type) DO UPDATE SET
+                    status = excluded.status,
+                    error_text = excluded.error_text,
+                    attempt_count = jobs.attempt_count + excluded.attempt_count,
+                    updated_at = excluded.updated_at
+                """,
+                (article_id, job_type, error_text, now),
+            )
+            self._insert_known_article_id(article_id, now)
+
     def has_article(self, article_id: str) -> bool:
         with self._db._lock:
             row = self._db.connection.execute(

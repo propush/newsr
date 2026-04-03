@@ -47,6 +47,7 @@ def test_bootstrap_config_creates_local_config_with_locale_suggestion(tmp_path: 
     assert created is True
     assert config.ui.locale == "en"
     assert config.ui.show_all is True
+    assert config.articles.timeout == 180
     assert config.articles.update_schedule == "0 * * * *"
     assert config.llm.url == "http://localhost:8081/v1"
     assert config.llm.model_translation == "local-translate"
@@ -78,6 +79,7 @@ def test_bootstrap_config_accepts_russian_ui_locale_display_name(tmp_path: Path)
 
     assert config.ui.locale == "ru"
     assert config.ui.show_all is True
+    assert config.articles.timeout == 180
     assert "Available UI languages: English, Русский" in output.getvalue()
 
 
@@ -114,6 +116,7 @@ def test_bootstrap_config_creates_cloud_config_and_retries_bad_headers(tmp_path:
     assert config.llm.api_key == "sk-test"
     assert config.ui.locale == "en"
     assert config.ui.show_all is True
+    assert config.articles.timeout == 180
     assert config.llm.headers == {
         "OpenAI-Organization": "org-test",
         "X-Custom": "value",
@@ -178,6 +181,7 @@ export:
     assert selected_locale == "en"
     assert config.ui.locale == "en"
     assert config.ui.show_all is True
+    assert config.articles.timeout == 180
     assert prompt.prompts == ["UI language [English]: "]
     assert "Saved UI language: English" in output.getvalue()
 
@@ -221,6 +225,7 @@ export:
     assert selected_locale == "ru"
     assert config.ui.locale == "ru"
     assert config.ui.show_all is True
+    assert config.articles.timeout == 180
     assert prompt.prompts == ["UI language [Русский]: "]
     assert "Suggested UI language from locale: Русский" in output.getvalue()
     assert "Saved UI language: Русский" in output.getvalue()
@@ -232,4 +237,5 @@ def test_default_config_includes_show_all_enabled(tmp_path: Path) -> None:
     config = load_config(config_path)
 
     assert config.ui.show_all is True
+    assert config.articles.timeout == 180
     assert config.articles.update_schedule == "0 * * * *"

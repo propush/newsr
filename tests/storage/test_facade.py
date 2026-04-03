@@ -347,6 +347,31 @@ def test_storage_delete_incomplete_articles_preserves_failed_orphan_jobs(storage
     assert jobs[0]["status"] == "failed"
 
 
+def test_storage_discard_article_permanently_removes_partial_rows_and_marks_known(
+    storage,
+    article_content,
+) -> None:
+    storage.upsert_article_source(article_content)
+    storage.set_job_status(article_content.article_id, "translation", "running")
+
+    storage.discard_article_permanently(
+        article_content.article_id,
+        "translation",
+        "article processing exceeded 180 seconds",
+    )
+
+    assert storage.get_article(article_content.article_id) is None
+    assert storage.has_article(article_content.article_id) is True
+    jobs = storage.connection.execute(
+        "SELECT job_type, status, error_text FROM jobs WHERE article_id = ? ORDER BY job_type",
+        (article_content.article_id,),
+    ).fetchall()
+    assert len(jobs) == 1
+    assert jobs[0]["job_type"] == "translation"
+    assert jobs[0]["status"] == "failed"
+    assert "exceeded 180 seconds" in jobs[0]["error_text"]
+
+
 def test_storage_migrates_existing_articles_table_to_include_assigned_categories(tmp_path: Path) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
     connection = sqlite3.connect(storage_path)

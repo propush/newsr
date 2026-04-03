@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from newsr.cancellation import RefreshCancellation
 from newsr.domain import SectionCandidate
 from newsr.providers.bbc import (
     BASE_CATEGORY_OPTIONS,
@@ -120,3 +123,47 @@ def test_is_article_url_rejects_section_and_live_pages() -> None:
     assert is_article_url("https://www.bbc.com/news/world") is False
     assert is_article_url("https://www.bbc.com/news/live/cn047x0j52lt") is False
     assert is_article_url("https://www.bbc.com/news/topics/cx2pk70323et") is False
+
+
+def test_provider_read_url_uses_remaining_cancellation_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_timeout: list[float] = []
+
+    class FakeResponse:
+        def __init__(self) -> None:
+            self._body = b"fixture"
+
+        def read(self, _size: int = -1) -> bytes:
+            if _size < 0:
+                data = self._body
+                self._body = b""
+                return data
+            if not self._body:
+                return b""
+            data = self._body[:_size]
+            self._body = self._body[_size:]
+            return data
+
+        def close(self) -> None:
+            return None
+
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+    def fake_urlopen(request, timeout):  # type: ignore[no-untyped-def]
+        captured_timeout.append(timeout)
+        return FakeResponse()
+
+    monkeypatch.setattr("newsr.providers.bbc.provider.urlopen", fake_urlopen)
+    cancellation = RefreshCancellation().child_with_timeout(5)
+
+    try:
+        html = BBCNewsProvider._read_url("https://www.bbc.com/news/world", cancellation)
+    finally:
+        cancellation.finish()
+
+    assert html == "fixture"
+    assert len(captured_timeout) == 1
+    assert 0 < captured_timeout[0] <= 5

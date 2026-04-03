@@ -22,6 +22,7 @@ from ..ui_text import (
 
 DEFAULT_ARTICLES_FETCH = 5
 DEFAULT_ARTICLES_STORE = 10
+DEFAULT_ARTICLES_TIMEOUT = 180
 DEFAULT_REQUEST_RETRIES = 2
 DEFAULT_EXPORT_IMAGE_QUALITY = "fhd"
 
@@ -70,6 +71,7 @@ class BootstrapAnswers:
     headers: dict[str, str] | None = None
     articles_fetch: int = DEFAULT_ARTICLES_FETCH
     articles_store: int = DEFAULT_ARTICLES_STORE
+    articles_timeout: int = DEFAULT_ARTICLES_TIMEOUT
     articles_update_schedule: str = DEFAULT_UPDATE_SCHEDULE
     request_retries: int = DEFAULT_REQUEST_RETRIES
     export_image_quality: str = DEFAULT_EXPORT_IMAGE_QUALITY
@@ -206,6 +208,7 @@ def render_config(answers: BootstrapAnswers) -> str:
         "articles": {
             "fetch": answers.articles_fetch,
             "store": answers.articles_store,
+            "timeout": answers.articles_timeout,
             "update_schedule": answers.articles_update_schedule,
         },
         "llm": llm_config,
