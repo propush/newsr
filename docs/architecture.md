@@ -2,10 +2,12 @@
 
 NewsR is a single-process local terminal application. It runs from the repository root, keeps its state in SQLite under `cache/`, and uses a provider-backed refresh pipeline to keep the Textual UI responsive while content is fetched and processed.
 
+For the concrete built-in provider list, bootstrap defaults, and catalog behavior, see [Current Providers](current_providers.md). For the current `newsr.yml` schema and defaults, see [Configuration](configuration.md).
+
 ## Package Layout
 
 - `newsr.app`: process bootstrap and CLI entrypoint used by `newsr` and `python -m newsr`
-- `newsr.config`: config dataclasses plus loading and validation for `newsr.yml`, including UI locale, `[ALL]` provider-home visibility, and provider-home sort settings
+- `newsr.config`: config dataclasses plus loading, validation, first-run bootstrap, and `ui.locale` backfill for `newsr.yml`
 - `newsr.domain`: shared article, article-category vocabulary, provider, and reader-state models used across UI, storage, and pipeline code
 - `newsr.ui_text`: built-in UI locale definitions plus localized labels, prompts, hints, and status text used by both bootstrap and the Textual app
 - `newsr.providers.base`: `NewsProvider` protocol used by the refresh pipeline
@@ -25,6 +27,21 @@ All network-facing providers use `cancellable_read` from `newsr.cancellation` fo
 
 Provider catalogs are not uniform. See [Current Providers](current_providers.md) for the current built-in provider list, bootstrap defaults, and catalog behavior.
 
+## Current Features
+
+- Provider home groups `[ALL]`, built-in providers, and watched topics, and can sort visible scopes by unread count or name through `ui.provider_sort`.
+- The reader supports full and summary views, per-scope saved article position, saved scroll offset, and a quick-navigation list that only includes translated articles.
+- Refresh work is scheduled per provider with a global default cron expression and optional per-provider overrides from the source manager.
+- Every refresh session performs an LLM responsiveness check before starting article processing.
+- Articles are classified into the fixed app category vocabulary: `ADVERTISEMENT`, `SPORT`, `TECHNOLOGIES`, `AI`, `LIFE`, `MEETUP`, `BUSINESS`, `POLITICS`, `WAR`, `SCIENCE`, `HEALTH`, `SECURITY`, and `CULTURE`.
+- The reader can rerun category classification for the current article from stored source text.
+- `More Info` builds a cached article-specific context panel from DuckDuckGo results plus LLM synthesis.
+- Article Q&A keeps a temporary per-modal transcript, combines stored article text with live DuckDuckGo results, and does not persist chat history after the modal closes.
+- Watched topics are dynamic providers backed by DuckDuckGo search and generic readable-content extraction; see [Topic Watch](topic_watch.md).
+- Export supports saving or copying Markdown and PNG output for the current article view.
+- Opening an article URL uses an in-app confirmation screen before handing the link to the browser.
+- UI language currently supports `en` and `ru`, and the selected Textual theme is persisted in SQLite options.
+
 ## Runtime Flow
 
 1. `newsr.app.main` first patches missing `ui.locale` into existing `newsr.yml` files when needed, then runs interactive first-run bootstrap only when `newsr.yml` does not exist yet.
@@ -38,11 +55,11 @@ Provider catalogs are not uniform. See [Current Providers](current_providers.md)
 9. Pressing `W` in provider home opens the watched-topic creation dialog. Pressing `W` in the reader asks the configured LLM to extract a topic name from the current article, then opens the same editable dialog. New watched topics are created as topic providers in SQLite and can immediately force-refresh their own scope when the refresh controller is idle.
 10. The source manager can refresh an HTTP provider catalog through `discover_targets()`, persist replacement target lists while preserving still-valid selections, edit per-provider cron overrides, and delete watched-topic providers.
 11. Reader state such as the current article, view mode, and scroll offset is persisted per scope, while the selected theme is stored separately in the single-row options table.
-12. "More info", article Q&A, open-link confirmation, browser handoff, and export actions run outside the refresh pipeline but reuse the same stored article content, provider registry, and configured LLM endpoint.
+12. "More info", article Q&A, open-link confirmation, browser handoff, and export actions run outside the refresh pipeline but reuse the same stored article content, provider registry, DuckDuckGo search client, and configured LLM endpoint. "More info" results are cached per article in SQLite, while article-Q&A transcripts remain modal-local and are discarded when the screen closes.
 
 ## Local State
 
-- `newsr.yml`: user config for refresh limits including `articles.timeout`, default provider update schedule, LLM endpoint/model settings plus `llm.request_retries`, translation language, UI locale (`en` or `ru`), `[ALL]` provider-home visibility (`ui.show-all = true|false`), provider-home sorting (`ui.provider_sort.primary = unread|name`, `ui.provider_sort.direction = asc|desc`), and export image quality (`hd` or `fhd`)
-- `cache/newsr.sqlite3`: provider registry state, provider types, provider schedule overrides, discovered targets, selected targets, article source text, permanent known article ids, assigned article categories, translated text, summaries, job state, scoped reader state, and global options
+- `newsr.yml`: user config for global refresh, LLM, translation, UI, and export settings; see [Configuration](configuration.md)
+- `cache/newsr.sqlite3`: provider registry state, provider types, watched-topic settings, provider schedule overrides, discovered targets, selected targets, article source text, translated text, summaries, cached `more_info`, permanent known article ids, assigned article categories, job state, scoped reader state, and global options
 - `cache/newsr-llm.log`: request log for LLM calls
 - `exports/`: saved Markdown and PNG exports, created on demand

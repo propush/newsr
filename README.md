@@ -125,58 +125,7 @@ The `exports/` directory is created on demand when you save a Markdown or PNG ex
 
 ## Configuration
 
-The generated `newsr.yml` contains five sections:
-
-- `articles`: how many article candidates to fetch per selected target, how many days of articles to keep in SQLite, and the default cron refresh schedule used when a provider has no override
-- `llm`: the OpenAI-compatible base URL, optional auth settings, optional extra headers, plus a translation model for titles and article bodies and a summary model reused for summaries, "more info", search-query generation, and article Q&A
-- `translation`: the target language used for translated headlines, article text, summaries, "more info", and article Q&A answers
-- `ui`: the Textual UI locale, `[ALL]` visibility in provider home, and provider-home ordering; current built-in locales are `en` and `ru`
-- `export`: image export settings
-
-Example generated config for a local setup:
-
-```yaml
-articles:
-  fetch: 5
-  store: 10
-  update_schedule: 0 * * * *
-llm:
-  url: http://localhost:8081/v1
-  model_translation: local-translate
-  model_summary: local-translate
-  request_retries: 2
-translation:
-  target_language: English
-ui:
-  locale: en
-  show-all: true
-  provider_sort:
-    primary: unread
-    direction: desc
-export:
-  image:
-    quality: fhd
-```
-
-`ui.provider_sort.primary` accepts `unread` or `name`.
-`ui.provider_sort.direction` accepts `asc` or `desc`.
-`ui.show-all` accepts `true` or `false` and controls whether `[ALL]` is shown in provider home.
-`articles.update_schedule` accepts a standard 5-field cron expression and defaults to hourly refreshes.
-`export.image.quality` accepts `hd` or `fhd`.
-`llm.api_key` is optional for local unauthenticated servers. `llm.headers` can be used for extra OpenAI-compatible provider headers, and `llm.request_retries` controls how many times NewsR retries transient transport failures before surfacing an error.
-
-Example cloud-specific additions:
-
-```yaml
-llm:
-  url: https://api.openai.com/v1
-  model_translation: gpt-4.1-mini
-  model_summary: gpt-4.1-mini
-  request_retries: 2
-  api_key: sk-...
-  headers:
-    OpenAI-Organization: org-...
-```
+See [Configuration](docs/configuration.md) for the current `newsr.yml` schema, defaults, validation rules, scheduling behavior, and runtime files.
 
 If you launch NewsR without an interactive terminal and `newsr.yml` is missing, startup fails with a message telling you to create the config file manually.
 
@@ -279,6 +228,7 @@ Clipboard export support depends on the platform:
 - [Architecture](docs/architecture.md)
 - [Adding A Provider](docs/add_provider.md)
 - [Topic Watch](docs/topic_watch.md)
+- [Configuration Reference](docs/configuration.md)
 
 ## License
 

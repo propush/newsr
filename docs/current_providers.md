@@ -4,6 +4,13 @@ This page is the canonical reference for NewsR's currently implemented built-in 
 
 The current built-in news providers are defined in `src/newsr/providers/registry.py`.
 
+Bootstrap behavior:
+
+- first startup syncs every built-in provider into SQLite
+- only `bbc` is enabled by default
+- every built-in provider gets its initial target catalog from `default_targets()`
+- the source manager can later enable or disable providers, change selected targets, refresh HTTP-provider catalogs, and add per-provider schedule overrides
+
 Provider types:
 
 - built-in providers listed on this page use `provider_type = "http"`
