@@ -3664,7 +3664,7 @@ def test_ui_source_manager_loads_current_provider_and_targets(app_config, tmp_pa
             assert provider_statuses["The Hacker News"] == "[ ]"
             assert provider_statuses["Ars Technica"] == "[ ]"
             assert len(provider_statuses) == len(app.storage.list_providers())
-            assert [row[1] for row in provider_rows(app)[:2]] == ["Providers", "Ars Technica"]
+            assert [row[1] for row in provider_rows(app)[:2]] == ["Providers", "9to5Mac"]
 
             provider_list(app).move_cursor(row=provider_row_index(app, "BBC News"), column=0, animate=False)
             await pilot.pause()

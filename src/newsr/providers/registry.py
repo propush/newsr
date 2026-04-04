@@ -13,6 +13,7 @@ from .infoq.provider import InfoQProvider
 from .lawfare.provider import LawfareProvider
 from .marketingdive.provider import MarketingDiveProvider
 from .medcitynews.provider import MedCityNewsProvider
+from .ninetofivemac.provider import NineToFiveMacProvider
 from .sciencedaily.provider import ScienceDailyProvider
 from .techcrunch.provider import TechCrunchProvider
 from .thehackernews.provider import TheHackerNewsProvider
@@ -22,6 +23,7 @@ from .tomshardware.provider import TomsHardwareProvider
 def build_provider_registry() -> dict[str, NewsProvider]:
     providers = [
         BBCNewsProvider(),
+        NineToFiveMacProvider(),
         TechCrunchProvider(),
         TheHackerNewsProvider(),
         ArsTechnicaProvider(),

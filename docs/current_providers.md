@@ -19,6 +19,13 @@ Provider types:
 - default selected targets: `World`, `Technology`, `Business`, `Entertainment And Arts`
 - catalog behavior: live discovery that merges discovered categories with the built-in base catalog
 
+### 9to5Mac
+
+- provider id: `9to5mac`
+- bootstrap state: disabled by default
+- default selected targets: `Latest`, `iPhone`, `Mac`, `iPad`, `Apple Watch`
+- catalog behavior: static built-in Apple/category catalog using the site root for `Latest` plus guide-backed targets for `iPhone`, `Mac`, `iPad`, `Apple Watch`, `Vision Pro`, `Apple TV`, `AirPods`, `HomeKit`, `Reviews`, `How Tos`, `App Store`, `Apple Music`, `CarPlay`, `Siri`, `Apple Silicon`, `Apple Arcade`, and `AAPL`, with candidate extraction limited to native written 9to5Mac article links
+
 ### TechCrunch
 
 - provider id: `techcrunch`
