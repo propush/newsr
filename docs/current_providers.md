@@ -33,6 +33,13 @@ Provider types:
 - default selected targets: `Latest`, `iPhone`, `Mac`, `iPad`, `Apple Watch`
 - catalog behavior: static built-in Apple/category catalog using the site root for `Latest` plus guide-backed targets for `iPhone`, `Mac`, `iPad`, `Apple Watch`, `Vision Pro`, `Apple TV`, `AirPods`, `HomeKit`, `Reviews`, `How Tos`, `App Store`, `Apple Music`, `CarPlay`, `Siri`, `Apple Silicon`, `Apple Arcade`, and `AAPL`, with candidate extraction limited to native written 9to5Mac article links
 
+### 9to5Google
+
+- provider id: `ninetofivegoogle`
+- bootstrap state: disabled by default
+- default selected targets: `Latest`, `Pixel`, `Android`, `Chrome`, `TV`, `Workspace`
+- catalog behavior: static built-in guide-backed catalog using the site root for `Latest` plus guide-backed targets for `Pixel`, `Android`, `Chrome`, `TV`, `Workspace`, `Assistant`, `Smart Home`, `Cars`, `Reviews`, `How Tos`, and `Deals`
+
 ### TechCrunch
 
 - provider id: `techcrunch`

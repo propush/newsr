@@ -8,3 +8,5 @@ newsr.yml*
 .DS_Store
 exports/
 .claude
+.coverage
+docs/plans
