@@ -61,5 +61,5 @@ Provider catalogs are not uniform. See [Current Providers](current_providers.md)
 
 - `newsr.yml`: user config for global refresh, LLM, translation, UI, and export settings; see [Configuration](configuration.md)
 - `cache/newsr.sqlite3`: provider registry state, provider types, watched-topic settings, provider schedule overrides, discovered targets, selected targets, article source text, translated text, summaries, cached `more_info`, permanent known article ids, assigned article categories, job state, scoped reader state, and global options
-- `cache/newsr-llm.log`: request log for LLM calls
+- `cache/newsr-llm.log`: request log for LLM calls plus non-provider network request metadata such as DuckDuckGo search URLs, methods, statuses, and errors
 - `exports/`: saved Markdown and PNG exports, created on demand

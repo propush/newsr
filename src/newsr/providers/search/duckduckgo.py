@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
+from time import perf_counter
+from urllib.error import HTTPError
 from urllib.parse import parse_qs, quote, quote_plus, unquote, urljoin, urlparse, urlunsplit
 from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
 
 from ...cancellation import RefreshCancellation, cancellable_read
+from ...runtime_logging import configure_cache_logger
 
 DUCKDUCKGO_HTML_ROOT = "https://html.duckduckgo.com/html/"
 DUCKDUCKGO_ROOT = "https://duckduckgo.com"
+LOGGER = logging.getLogger("newsr.llm")
+LOGGER.setLevel(logging.INFO)
+LOGGER.propagate = False
 
 
 @dataclass(slots=True)
@@ -21,13 +28,23 @@ class SearchResult:
 
 class DuckDuckGoSearchClient:
     def search(
-        self, query: str, limit: int = 5, cancellation: RefreshCancellation | None = None
+        self,
+        query: str,
+        limit: int = 5,
+        cancellation: RefreshCancellation | None = None,
+        *,
+        log_request: bool = True,
     ) -> list[SearchResult]:
-        html = self._read_url(query, cancellation)
+        html = self._read_url(query, cancellation, log_request=log_request)
         return parse_search_results(html)[:limit]
 
     @staticmethod
-    def _read_url(query: str, cancellation: RefreshCancellation | None = None) -> str:
+    def _read_url(
+        query: str,
+        cancellation: RefreshCancellation | None = None,
+        *,
+        log_request: bool = True,
+    ) -> str:
         req = Request(
             f"{DUCKDUCKGO_HTML_ROOT}?q={quote_plus(query)}",
             headers={
@@ -38,10 +55,46 @@ class DuckDuckGoSearchClient:
                 )
             },
         )
+        configure_cache_logger(LOGGER, filename="newsr-llm.log")
         if cancellation is not None:
             cancellation.raise_if_cancelled()
-        with urlopen(req, timeout=30) as response:
-            return cancellable_read(response, cancellation).decode("utf-8")
+        if not log_request:
+            with urlopen(req, timeout=30) as response:
+                return cancellable_read(response, cancellation).decode("utf-8")
+        method = req.get_method()
+        url = req.full_url
+        started_at = perf_counter()
+        try:
+            with urlopen(req, timeout=30) as response:
+                payload = cancellable_read(response, cancellation).decode("utf-8")
+                LOGGER.info(
+                    "network_request_done method=%s url=%s status=%s duration_s=%.3f",
+                    method,
+                    url,
+                    getattr(response, "status", "unknown"),
+                    perf_counter() - started_at,
+                )
+                return payload
+        except HTTPError as exc:
+            LOGGER.warning(
+                "network_request_failed method=%s url=%s status=%s duration_s=%.3f error=%s",
+                method,
+                url,
+                exc.code,
+                perf_counter() - started_at,
+                exc,
+            )
+            raise
+        except Exception as exc:
+            LOGGER.exception(
+                "network_request_failed method=%s url=%s duration_s=%.3f error_type=%s error=%s",
+                method,
+                url,
+                perf_counter() - started_at,
+                type(exc).__name__,
+                exc,
+            )
+            raise
 
 
 def parse_search_results(html: str) -> list[SearchResult]:

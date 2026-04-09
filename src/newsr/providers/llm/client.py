@@ -4,12 +4,12 @@ import http.client
 import json
 import logging
 from itertools import count
-from pathlib import Path
 from threading import Lock
 from time import perf_counter
 from typing import Sequence
 from urllib.parse import urlparse
 
+from ...runtime_logging import configure_cache_logger
 from ...domain.article_categories import ARTICLE_CATEGORIES, normalize_article_categories
 from ...cancellation import RefreshCancellation, cancellable_read, resolve_request_timeout
 from ...config.models import AppConfig
@@ -22,13 +22,7 @@ LOGGER.propagate = False
 
 
 def _configure_logger() -> None:
-    if LOGGER.handlers:
-        return
-    log_path = Path.cwd() / "cache" / "newsr-llm.log"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    handler = logging.FileHandler(log_path, encoding="utf-8")
-    handler.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
-    LOGGER.addHandler(handler)
+    configure_cache_logger(LOGGER, filename="newsr-llm.log")
 
 
 class OpenAILLMClient:

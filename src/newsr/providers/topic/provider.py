@@ -41,7 +41,12 @@ class TopicWatchProvider:
         query = target.payload.get("query", self._topic_query).strip()
         seen_urls: set[str] = set()
         candidates: list[SectionCandidate] = []
-        for result in self._search_client.search(query, limit=limit * 2, cancellation=cancellation):
+        for result in self._search_client.search(
+            query,
+            limit=limit * 2,
+            cancellation=cancellation,
+            log_request=False,
+        ):
             normalized_url = normalize_result_url(result.url)
             if not normalized_url or normalized_url in seen_urls:
                 continue

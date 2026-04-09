@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import http.client
 import json
+import logging
 
 import pytest
 
@@ -309,3 +310,22 @@ def test_llm_client_uses_remaining_cancellation_budget_for_connection_timeout() 
     assert result == "translated"
     assert len(FakeHTTPConnection.instances) == 1
     assert 0 < FakeHTTPConnection.instances[0].timeout <= 5
+
+
+def test_llm_client_logs_request_lifecycle(caplog) -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "translated"}}]}),
+    ]
+    client = OpenAILLMClient(make_config())
+    logger = logging.getLogger("newsr.llm")
+    original_propagate = logger.propagate
+    logger.propagate = True
+    try:
+        with caplog.at_level(logging.INFO, logger="newsr.llm"):
+            result = client.translate_title("Headline")
+    finally:
+        logger.propagate = original_propagate
+
+    assert result == "translated"
+    assert any("request_start" in record.message for record in caplog.records)
+    assert any("request_done" in record.message for record in caplog.records)
