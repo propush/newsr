@@ -188,6 +188,34 @@ def test_parse_article_html_returns_canonical_url() -> None:
     assert article.url == "https://9to5google.com/2026/04/03/google-pixel-10-pro-features/"
 
 
+def test_parse_article_html_cleans_site_suffix_from_meta_title() -> None:
+    html = """
+    <html>
+    <head>
+        <meta property="og:title" content="Test Article - 9to5Google">
+    </head>
+    <body>
+        <div id="content">
+            <div class="container med post-content">
+                <p>Article body.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    candidate = SectionCandidate(
+        article_id="2024/01/01/test-article",
+        provider_id="ninetofivegoogle",
+        provider_article_id="2024/01/01/test-article",
+        url="https://9to5google.com/2024/01/01/test-article/",
+        category="Test",
+    )
+
+    article = parse_article_html(html, candidate)
+
+    assert article.title == "Test Article"
+
+
 def test_parse_article_html_handles_missing_title() -> None:
     html = """
     <html>

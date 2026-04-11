@@ -56,6 +56,86 @@ def test_parse_article_html_extracts_body_metadata() -> None:
     assert "Worth checking out on Amazon" not in article.body
 
 
+def test_parse_article_html_handles_malformed_date() -> None:
+    html = """
+    <html>
+    <head>
+        <meta property="og:title" content="Test Article">
+        <meta property="article:published_time" content="not-a-date">
+    </head>
+    <body>
+        <div id="content">
+            <h1>Test Article</h1>
+            <div class="container med post-content">
+                <p>Article body.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    candidate = SectionCandidate(
+        article_id="2024/01/01/test-article",
+        provider_id="9to5mac",
+        provider_article_id="2024/01/01/test-article",
+        url="https://9to5mac.com/2024/01/01/test-article/",
+        category="Test",
+    )
+
+    article = parse_article_html(html, candidate)
+
+    assert article.published_at is None
+
+
+def test_parse_article_html_cleans_site_suffix_from_meta_title() -> None:
+    html = """
+    <html>
+    <head>
+        <meta property="og:title" content="Test Article - 9to5Mac">
+    </head>
+    <body>
+        <div id="content">
+            <div class="container med post-content">
+                <p>Article body.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    candidate = SectionCandidate(
+        article_id="2024/01/01/test-article",
+        provider_id="9to5mac",
+        provider_article_id="2024/01/01/test-article",
+        url="https://9to5mac.com/2024/01/01/test-article/",
+        category="Test",
+    )
+
+    article = parse_article_html(html, candidate)
+
+    assert article.title == "Test Article"
+
+
+def test_parse_section_html_keeps_google_only_podcast_patterns_site_specific() -> None:
+    html = """
+    <html>
+    <body>
+        <main>
+            <div id="posts">
+                <a class="article__title-link" href="https://9to5mac.com/2026/04/01/pixelated-5-launch-event/">
+                    Pixelated 5: Launch Event Recap
+                </a>
+            </div>
+        </main>
+    </body>
+    </html>
+    """
+
+    candidates = parse_section_html(html, "Test")
+
+    assert [candidate.article_id for candidate in candidates] == [
+        "2026/04/01/pixelated-5-launch-event"
+    ]
+
+
 def test_discover_targets_returns_static_catalog() -> None:
     provider = NineToFiveMacProvider()
 
