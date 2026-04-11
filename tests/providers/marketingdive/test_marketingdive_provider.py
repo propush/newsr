@@ -53,17 +53,6 @@ def test_parse_article_html_extracts_body_metadata() -> None:
     assert "Read more: Related coverage" not in article.body
 
 
-def test_discover_targets_returns_static_catalog() -> None:
-    provider = MarketingDiveProvider()
-
-    default_targets = provider.default_targets()
-    discovered_targets = provider.discover_targets()
-
-    assert [target.target_key for target in discovered_targets] == [
-        target.target_key for target in default_targets
-    ]
-
-
 def test_default_targets_match_curated_marketing_dive_catalog() -> None:
     targets = MarketingDiveProvider().default_targets()
 

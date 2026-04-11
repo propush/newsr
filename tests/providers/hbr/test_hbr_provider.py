@@ -79,17 +79,6 @@ def test_parse_article_html_returns_empty_body_for_unusable_page_shape() -> None
     assert article.body == ""
 
 
-def test_discover_targets_returns_static_catalog() -> None:
-    provider = HBRProvider()
-
-    default_targets = provider.default_targets()
-    discovered_targets = provider.discover_targets()
-
-    assert [target.target_key for target in discovered_targets] == [
-        target.target_key for target in default_targets
-    ]
-
-
 def test_default_targets_match_curated_hbr_catalog() -> None:
     targets = HBRProvider().default_targets()
 

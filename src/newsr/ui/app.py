@@ -326,14 +326,6 @@ class NewsReaderApp(App[None]):
     def _invalidate_render_cache(self) -> None:
         self._navigation.invalidate_render_cache()
 
-    @property
-    def _auto_fetch_armed(self) -> bool:
-        return self._navigation._auto_fetch_armed
-
-    @_auto_fetch_armed.setter
-    def _auto_fetch_armed(self, value: bool) -> None:
-        self._navigation._auto_fetch_armed = value
-
     # ------------------------------------------------------------------
     # Action methods (thin forwarding to controllers)
     # ------------------------------------------------------------------
@@ -367,9 +359,6 @@ class NewsReaderApp(App[None]):
             self._provider_home.open_selected_scope()
             return
         self._navigation.space_down()
-
-    def action_space_up(self) -> None:
-        self._navigation.space_up()
 
     def action_open_article(self) -> None:
         self._navigation.open_article()

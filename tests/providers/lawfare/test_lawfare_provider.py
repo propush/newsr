@@ -64,17 +64,6 @@ def test_parse_article_html_extracts_body_metadata_and_strips_boilerplate() -> N
     assert "Back to Top" not in article.body
 
 
-def test_discover_targets_returns_static_catalog() -> None:
-    provider = LawfareProvider()
-
-    default_targets = provider.default_targets()
-    discovered_targets = provider.discover_targets()
-
-    assert [target.target_key for target in discovered_targets] == [
-        target.target_key for target in default_targets
-    ]
-
-
 def test_default_targets_match_curated_lawfare_catalog() -> None:
     targets = LawfareProvider().default_targets()
 

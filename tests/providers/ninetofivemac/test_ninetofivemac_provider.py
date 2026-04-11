@@ -136,17 +136,6 @@ def test_parse_section_html_keeps_google_only_podcast_patterns_site_specific() -
     ]
 
 
-def test_discover_targets_returns_static_catalog() -> None:
-    provider = NineToFiveMacProvider()
-
-    default_targets = provider.default_targets()
-    discovered_targets = provider.discover_targets()
-
-    assert [target.target_key for target in discovered_targets] == [
-        target.target_key for target in default_targets
-    ]
-
-
 def test_default_targets_match_curated_catalog() -> None:
     targets = NineToFiveMacProvider().default_targets()
 

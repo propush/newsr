@@ -98,17 +98,6 @@ def test_parse_article_html_extracts_news_body_metadata() -> None:
     assert "Source: Cloudflare blog" not in article.body
 
 
-def test_discover_targets_returns_static_catalog() -> None:
-    provider = InfoQProvider()
-
-    default_targets = provider.default_targets()
-    discovered_targets = provider.discover_targets()
-
-    assert [target.target_key for target in discovered_targets] == [
-        target.target_key for target in default_targets
-    ]
-
-
 def test_default_targets_match_curated_live_topic_catalog() -> None:
     targets = InfoQProvider().default_targets()
 

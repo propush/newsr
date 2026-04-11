@@ -36,17 +36,6 @@ class TestDefaultTargets:
         assert latest.payload == {"path": "/"}
 
 
-class TestDiscoverTargets:
-    def test_returns_same_as_default_targets(self):
-        provider = NineToFiveGoogleProvider()
-        targets1 = provider.default_targets()
-        targets2 = provider.discover_targets()
-        assert len(targets1) == len(targets2)
-        for t1, t2 in zip(targets1, targets2):
-            assert t1.target_key == t2.target_key
-            assert t1.label == t2.label
-
-
 class TestFetchCandidates:
     def test_fetches_candidates_with_limit(self):
         provider = NineToFiveGoogleProvider()

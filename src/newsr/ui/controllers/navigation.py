@@ -21,7 +21,6 @@ class NavigationController:
         self._app = app
         self.articles: list[ArticleRecord] = []
         self.current_index: int = 0
-        self._auto_fetch_armed: bool = True
         self._pending_scroll_restore: bool = False
         self._scroll_restore_attempts_remaining: int = 0
         self._scroll_restore_scheduled: bool = False
@@ -261,9 +260,6 @@ class NavigationController:
             return
         pane.scroll_page_down(animate=False)
 
-    def space_up(self) -> None:
-        pass
-
     def open_article(self) -> None:
         if self._app.provider_home_open:
             return
@@ -311,9 +307,6 @@ class NavigationController:
         self._scroll_restore_scheduled = False
         self._app.reader_state.scroll_offset = 0
         self._app.query_one("#article-pane", VerticalScroll).scroll_to(y=0, animate=False)
-
-    def maybe_auto_fetch(self) -> None:
-        return
 
     # ------------------------------------------------------------------
     # Link confirmation

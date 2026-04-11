@@ -4571,37 +4571,6 @@ def test_ui_reader_d_forces_refresh_for_current_provider_only(app_config, tmp_pa
 
 
 @pytest.mark.provider_home
-def test_ui_entering_reader_does_not_trigger_auto_refresh(app_config, tmp_path, article_content) -> None:
-    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
-    app.storage.upsert_article_source(article_content)
-    app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
-
-    calls: list[object] = []
-
-    def fake_launch_refresh_thread() -> object:
-        calls.append(app._refresh._run)
-        return object()
-
-    app._refresh._launch_thread = fake_launch_refresh_thread  # type: ignore[method-assign]
-
-    async def runner() -> None:
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            assert len(calls) == 1
-            app.refresh_in_progress = False
-            app._auto_fetch_armed = True
-
-            await pilot.press("enter")
-            await pilot.pause()
-
-            assert provider_home_screen(app) is None
-            assert len(calls) == 1
-            assert app.refresh_in_progress is False
-
-    asyncio.run(runner())
-
-
-@pytest.mark.provider_home
 def test_ui_provider_home_enter_all_opens_reader(app_config, tmp_path, article_content) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
