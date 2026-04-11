@@ -19,6 +19,10 @@ LOGGER.setLevel(logging.INFO)
 LOGGER.propagate = False
 
 
+class SearchUnavailableError(RuntimeError):
+    """Raised when the upstream search provider returns no usable results page."""
+
+
 @dataclass(slots=True)
 class SearchResult:
     title: str
@@ -58,14 +62,16 @@ class DuckDuckGoSearchClient:
         started_at = perf_counter()
         try:
             with open_request(req, cancellation, timeout=30) as response:
+                status = getattr(response, "status", "unknown")
                 payload = read_text_response(response, cancellation)
                 LOGGER.info(
                     "network_request_done method=%s url=%s status=%s duration_s=%.3f",
                     method,
                     url,
-                    getattr(response, "status", "unknown"),
+                    status,
                     perf_counter() - started_at,
                 )
+                _raise_if_search_page_unavailable(status, payload)
                 return payload
         except HTTPError as exc:
             LOGGER.warning(
@@ -128,3 +134,25 @@ def normalize_result_url(url: str) -> str:
     query = quote(parsed.query, safe="=&%/:?@!$'()*+,;~-._")
     fragment = quote(parsed.fragment, safe="%/:?@!$&'()*+,;=-._~")
     return urlunsplit((parsed.scheme, netloc, path, query, fragment))
+
+
+def _raise_if_search_page_unavailable(status: object, payload: str) -> None:
+    if not _is_challenge_page(payload):
+        return
+    status_text = str(status)
+    raise SearchUnavailableError(
+        "DuckDuckGo search is unavailable because DuckDuckGo returned an anti-bot challenge"
+        f" page (HTTP {status_text})."
+    )
+
+
+def _is_challenge_page(payload: str) -> bool:
+    lowered = payload.lower()
+    markers = (
+        "bots use duckduckgo too",
+        "anomaly-modal",
+        "challenge-form",
+        "anomaly.js?",
+        "error-lite@duckduckgo.com",
+    )
+    return any(marker in lowered for marker in markers)

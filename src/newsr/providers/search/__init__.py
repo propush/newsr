@@ -1,6 +1,7 @@
 from .duckduckgo import (
     DUCKDUCKGO_HTML_ROOT,
     DuckDuckGoSearchClient,
+    SearchUnavailableError,
     SearchResult,
     normalize_result_url,
     parse_search_results,
@@ -9,6 +10,7 @@ from .duckduckgo import (
 __all__ = [
     "DUCKDUCKGO_HTML_ROOT",
     "DuckDuckGoSearchClient",
+    "SearchUnavailableError",
     "SearchResult",
     "normalize_result_url",
     "parse_search_results",

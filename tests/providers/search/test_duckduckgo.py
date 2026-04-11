@@ -6,6 +6,7 @@ from urllib.error import HTTPError
 import pytest
 
 from newsr.providers.search import DuckDuckGoSearchClient, parse_search_results
+from newsr.providers.search.duckduckgo import SearchUnavailableError
 
 
 class FakeHTTPResponse:
@@ -188,6 +189,57 @@ def test_search_logs_request_metadata_without_logging_response_body(monkeypatch,
     assert "Example Story" not in log_text
     assert "Useful background context." not in log_text
     assert "<html>" not in log_text
+
+
+def test_search_raises_when_duckduckgo_returns_challenge_page(monkeypatch, caplog) -> None:
+    html = """
+    <html>
+      <body>
+        <form id="challenge-form">
+          <div class="anomaly-modal__title">Unfortunately, bots use DuckDuckGo too.</div>
+        </form>
+      </body>
+    </html>
+    """
+
+    monkeypatch.setattr(
+        "newsr.providers.search.duckduckgo.open_request",
+        lambda req, cancellation=None, timeout=30: FakeHTTPResponse(html, status=202),
+    )
+    logger = logging.getLogger("newsr.llm")
+    original_propagate = logger.propagate
+    logger.propagate = True
+    try:
+        with caplog.at_level(logging.INFO, logger="newsr.llm"):
+            with pytest.raises(SearchUnavailableError, match="anti-bot challenge"):
+                DuckDuckGoSearchClient().search("example query")
+    finally:
+        logger.propagate = original_propagate
+
+    assert any(
+        "network_request_done" in record.message
+        and "url=https://html.duckduckgo.com/html/?q=example+query" in record.message
+        and "status=202" in record.message
+        for record in caplog.records
+    )
+
+
+def test_search_raises_when_duckduckgo_returns_challenge_body_with_200(monkeypatch) -> None:
+    html = """
+    <html>
+      <body>
+        <div class="anomaly-modal__description">Please complete the following challenge.</div>
+      </body>
+    </html>
+    """
+
+    monkeypatch.setattr(
+        "newsr.providers.search.duckduckgo.open_request",
+        lambda req, cancellation=None, timeout=30: FakeHTTPResponse(html, status=200),
+    )
+
+    with pytest.raises(SearchUnavailableError, match="HTTP 200"):
+        DuckDuckGoSearchClient().search("example query")
 
 
 def test_search_logs_http_errors_without_logging_error_body(monkeypatch, caplog) -> None:
