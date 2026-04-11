@@ -135,8 +135,8 @@ def test_topic_provider_search_requests_do_not_emit_non_provider_network_logs(
     </html>
     """
     monkeypatch.setattr(
-        "newsr.providers.search.duckduckgo.urlopen",
-        lambda req, timeout=30: FakeHTTPResponse(html, status=200),
+        "newsr.providers.search.duckduckgo.open_request",
+        lambda req, cancellation=None, timeout=30: FakeHTTPResponse(html, status=200),
     )
     provider = TopicWatchProvider(
         provider_id="topic:openai-policy",

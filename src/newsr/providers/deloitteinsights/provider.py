@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-from urllib.request import Request, urlopen
 
-from ...cancellation import RefreshCancellation, cancellable_read, resolve_request_timeout
+from ...cancellation import RefreshCancellation
 from ...domain import ArticleContent, ProviderTarget, SectionCandidate
+from ..transport import newsr_headers, read_text_url
 from .catalog import BASE_TARGET_OPTIONS, TargetOption
 from .parsing import parse_article_html, parse_search_response
 from .urls import DELOITTE_SEARCH_ENDPOINT, normalize_target_path
@@ -83,30 +83,24 @@ class DeloitteInsightsProvider:
 
     @staticmethod
     def _read_url(url: str, cancellation: RefreshCancellation | None = None) -> str:
-        request = Request(url, headers={"User-Agent": "newsr/0.1"})
-        if cancellation is not None:
-            cancellation.raise_if_cancelled()
-        with urlopen(request, timeout=resolve_request_timeout(cancellation, 30)) as response:
-            return cancellable_read(response, cancellation).decode("utf-8")
+        return read_text_url(url, cancellation)
 
     @staticmethod
     def _read_search_results(
         search_tag: str, limit: int, cancellation: RefreshCancellation | None = None
     ) -> str:
-        request = Request(
+        return read_text_url(
             DELOITTE_SEARCH_ENDPOINT,
+            cancellation,
             data=json.dumps(_search_payload(search_tag, limit)).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "newsr/0.1",
-                "d-target": "elastic",
-            },
+            headers=newsr_headers(
+                {
+                    "Content-Type": "application/json",
+                    "d-target": "elastic",
+                }
+            ),
             method="POST",
         )
-        if cancellation is not None:
-            cancellation.raise_if_cancelled()
-        with urlopen(request, timeout=resolve_request_timeout(cancellation, 30)) as response:
-            return cancellable_read(response, cancellation).decode("utf-8")
 
 
 def _search_payload(search_tag: str, limit: int) -> dict[str, object]:

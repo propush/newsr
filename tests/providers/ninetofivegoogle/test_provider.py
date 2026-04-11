@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from urllib.error import HTTPError
-from urllib.request import Request
 
-from newsr.cancellation import RefreshCancellation, RefreshCancelled, RefreshTimedOut
+from newsr.cancellation import RefreshCancellation, RefreshCancelled
 from newsr.domain import ProviderTarget, SectionCandidate
 from newsr.providers.ninetofivegoogle.provider import (
     NineToFiveGoogleProvider,
@@ -154,29 +153,21 @@ class TestReadUrl:
         provider = NineToFiveGoogleProvider()
         html = "<html><body>Test</body></html>"
 
-        with patch('newsr.providers.ninetofivegoogle.provider.urlopen') as mock_urlopen:
-            mock_response = MagicMock()
-            mock_response.status = 200
-            mock_response.__enter__ = lambda self: mock_response
-            mock_response.__exit__ = lambda self, *args: None
-            mock_response.read = lambda: html.encode('utf-8')
-            mock_urlopen.return_value = mock_response
-
+        with patch("newsr.providers.ninetofivegoogle.provider.read_text_url", return_value=html):
             result = provider._read_url("https://9to5google.com/test/")
-            assert result == html
+
+        assert result == html
 
     def test_http_error_raises(self):
         provider = NineToFiveGoogleProvider()
 
-        with patch('newsr.providers.ninetofivegoogle.provider.urlopen') as mock_urlopen:
-            from urllib.error import HTTPError
-
-            mock_urlopen.side_effect = HTTPError(
+        with patch("newsr.providers.ninetofivegoogle.provider.read_text_url") as mock_read_text_url:
+            mock_read_text_url.side_effect = HTTPError(
                 url="https://9to5google.com/not-found/",
                 hdrs={},
                 code=404,
                 msg="Not Found",
-                fp=None
+                fp=None,
             )
 
             with pytest.raises(RuntimeError) as exc_info:
@@ -188,15 +179,13 @@ class TestReadUrl:
     def test_http_500_error_raises(self):
         provider = NineToFiveGoogleProvider()
 
-        with patch('newsr.providers.ninetofivegoogle.provider.urlopen') as mock_urlopen:
-            from urllib.error import HTTPError
-
-            mock_urlopen.side_effect = HTTPError(
+        with patch("newsr.providers.ninetofivegoogle.provider.read_text_url") as mock_read_text_url:
+            mock_read_text_url.side_effect = HTTPError(
                 url="https://9to5google.com/error/",
                 hdrs={},
                 code=500,
                 msg="Internal Server Error",
-                fp=None
+                fp=None,
             )
 
             with pytest.raises(RuntimeError):

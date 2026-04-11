@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from urllib.request import Request, urlopen
-
-from ...cancellation import RefreshCancellation, cancellable_read, resolve_request_timeout
+from ...cancellation import RefreshCancellation
 from ...domain import ArticleContent, ProviderTarget, SectionCandidate
+from ..transport import read_text_url
 from .categories import BASE_CATEGORY_OPTIONS, CategoryOption, merge_category_catalogs
 from .parsing import parse_article_html, parse_category_catalog_html, parse_section_html
 from .urls import BBC_ROOT
@@ -81,11 +80,7 @@ class BBCNewsProvider:
 
     @staticmethod
     def _read_url(url: str, cancellation: RefreshCancellation | None = None) -> str:
-        req = Request(url, headers={"User-Agent": "newsr/0.1"})
-        if cancellation is not None:
-            cancellation.raise_if_cancelled()
-        with urlopen(req, timeout=resolve_request_timeout(cancellation, 30)) as response:
-            return cancellable_read(response, cancellation).decode("utf-8")
+        return read_text_url(url, cancellation)
 
 
 DEFAULT_TARGET_SLUGS = {

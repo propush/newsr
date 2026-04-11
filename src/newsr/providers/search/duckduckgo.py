@@ -5,12 +5,12 @@ import logging
 from time import perf_counter
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, quote, quote_plus, unquote, urljoin, urlparse, urlunsplit
-from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
 
-from ...cancellation import RefreshCancellation, cancellable_read
+from ...cancellation import RefreshCancellation
 from ...runtime_logging import configure_cache_logger
+from ..transport import browser_headers, build_request, open_request, read_text_response
 
 DUCKDUCKGO_HTML_ROOT = "https://html.duckduckgo.com/html/"
 DUCKDUCKGO_ROOT = "https://duckduckgo.com"
@@ -45,28 +45,20 @@ class DuckDuckGoSearchClient:
         *,
         log_request: bool = True,
     ) -> str:
-        req = Request(
+        req = build_request(
             f"{DUCKDUCKGO_HTML_ROOT}?q={quote_plus(query)}",
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/136.0 Safari/537.36 newsr/0.1"
-                )
-            },
+            headers=browser_headers(),
         )
         configure_cache_logger(LOGGER, filename="newsr-llm.log")
-        if cancellation is not None:
-            cancellation.raise_if_cancelled()
         if not log_request:
-            with urlopen(req, timeout=30) as response:
-                return cancellable_read(response, cancellation).decode("utf-8")
+            with open_request(req, cancellation, timeout=30) as response:
+                return read_text_response(response, cancellation)
         method = req.get_method()
         url = req.full_url
         started_at = perf_counter()
         try:
-            with urlopen(req, timeout=30) as response:
-                payload = cancellable_read(response, cancellation).decode("utf-8")
+            with open_request(req, cancellation, timeout=30) as response:
+                payload = read_text_response(response, cancellation)
                 LOGGER.info(
                     "network_request_done method=%s url=%s status=%s duration_s=%.3f",
                     method,

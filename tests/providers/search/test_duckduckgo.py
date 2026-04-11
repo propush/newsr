@@ -164,8 +164,8 @@ def test_search_logs_request_metadata_without_logging_response_body(monkeypatch,
     """
 
     monkeypatch.setattr(
-        "newsr.providers.search.duckduckgo.urlopen",
-        lambda req, timeout=30: FakeHTTPResponse(html, status=200),
+        "newsr.providers.search.duckduckgo.open_request",
+        lambda req, cancellation=None, timeout=30: FakeHTTPResponse(html, status=200),
     )
     logger = logging.getLogger("newsr.llm")
     original_propagate = logger.propagate
@@ -191,10 +191,10 @@ def test_search_logs_request_metadata_without_logging_response_body(monkeypatch,
 
 
 def test_search_logs_http_errors_without_logging_error_body(monkeypatch, caplog) -> None:
-    def fail(req, timeout=30):
+    def fail(req, cancellation=None, timeout=30):
         raise HTTPError(req.full_url, 503, "service unavailable", hdrs=None, fp=None)
 
-    monkeypatch.setattr("newsr.providers.search.duckduckgo.urlopen", fail)
+    monkeypatch.setattr("newsr.providers.search.duckduckgo.open_request", fail)
     logger = logging.getLogger("newsr.llm")
     original_propagate = logger.propagate
     logger.propagate = True

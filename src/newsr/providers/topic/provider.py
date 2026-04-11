@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
 
-from ...cancellation import RefreshCancellation, cancellable_read, resolve_request_timeout
+from ...cancellation import RefreshCancellation
 from ...domain import ArticleContent, ProviderTarget, SectionCandidate
 from ..search.duckduckgo import DuckDuckGoSearchClient, normalize_result_url
+from ..transport import browser_headers, read_text_url
 
 
 class TopicWatchProvider:
@@ -116,20 +116,12 @@ def _article_id_for_url(url: str) -> str:
 
 
 def _read_url(url: str, cancellation: RefreshCancellation | None = None) -> str:
-    request = Request(
+    return read_text_url(
         url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/136.0 Safari/537.36 newsr/0.1"
-            )
-        },
+        cancellation,
+        headers=browser_headers(),
+        errors="replace",
     )
-    if cancellation is not None:
-        cancellation.raise_if_cancelled()
-    with urlopen(request, timeout=resolve_request_timeout(cancellation, 30)) as response:
-        return cancellable_read(response, cancellation).decode("utf-8", errors="replace")
 
 
 def _parse_article_html(html: str, *, fallback_url: str) -> ParsedTopicArticle:

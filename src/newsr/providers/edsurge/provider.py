@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from urllib.request import Request, urlopen
-
-from ...cancellation import RefreshCancellation, cancellable_read, resolve_request_timeout
+from ...cancellation import RefreshCancellation
+from ..transport import read_text_url
 from ...domain import ArticleContent, ProviderTarget, SectionCandidate
 from .catalog import BASE_TARGET_OPTIONS, TargetOption
 from .parsing import parse_article_html, parse_section_html
@@ -79,11 +78,7 @@ class EdSurgeProvider:
 
     @staticmethod
     def _read_url(url: str, cancellation: RefreshCancellation | None = None) -> str:
-        request = Request(url, headers={"User-Agent": "newsr/0.1"})
-        if cancellation is not None:
-            cancellation.raise_if_cancelled()
-        with urlopen(request, timeout=resolve_request_timeout(cancellation, 30)) as response:
-            return cancellable_read(response, cancellation).decode("utf-8")
+        return read_text_url(url, cancellation)
 
 
 DEFAULT_TARGET_SLUGS = {

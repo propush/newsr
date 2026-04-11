@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from urllib.request import Request, urlopen
-
-from ...cancellation import RefreshCancellation, cancellable_read, resolve_request_timeout
+from ...cancellation import RefreshCancellation
 from ...domain import ArticleContent, ProviderTarget, SectionCandidate
+from ..transport import read_text_url
 from .catalog import BASE_TARGET_OPTIONS, TargetOption
 from .parsing import parse_article_html, parse_section_html
 from .urls import LAWFARE_ROOT, normalize_target_path
@@ -79,8 +78,9 @@ class LawfareProvider:
 
     @staticmethod
     def _read_url(url: str, cancellation: RefreshCancellation | None = None) -> str:
-        request = Request(
+        return read_text_url(
             url,
+            cancellation,
             headers={
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Accept-Language": "en-US,en;q=0.9",
@@ -91,10 +91,6 @@ class LawfareProvider:
                 ),
             },
         )
-        if cancellation is not None:
-            cancellation.raise_if_cancelled()
-        with urlopen(request, timeout=resolve_request_timeout(cancellation, 30)) as response:
-            return cancellable_read(response, cancellation).decode("utf-8")
 
 
 DEFAULT_TARGET_SLUGS = {

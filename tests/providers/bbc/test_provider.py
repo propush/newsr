@@ -156,7 +156,7 @@ def test_provider_read_url_uses_remaining_cancellation_budget(monkeypatch: pytes
         captured_timeout.append(timeout)
         return FakeResponse()
 
-    monkeypatch.setattr("newsr.providers.bbc.provider.urlopen", fake_urlopen)
+    monkeypatch.setattr("newsr.providers.transport.urlopen", fake_urlopen)
     cancellation = RefreshCancellation().child_with_timeout(5)
 
     try:
