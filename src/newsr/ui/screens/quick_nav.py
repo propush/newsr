@@ -94,6 +94,7 @@ class QuickNavScreen(ModalScreen[None]):
 
     def action_close_overlay(self) -> None:
         self.dismiss()
+        self.app.restore_reader_focus()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if not self._visible_articles:
@@ -101,6 +102,7 @@ class QuickNavScreen(ModalScreen[None]):
         article = self._visible_articles[event.cursor_row]
         self.app.open_article_by_id(article.article_id)
         self.dismiss()
+        self.app.restore_reader_focus()
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         self._update_selection_status(event.cursor_row)

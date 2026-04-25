@@ -69,3 +69,4 @@ class ExportController:
             screen.dismiss()
         except ScreenStackError:
             pass
+        self._app.restore_reader_focus()

@@ -2480,6 +2480,44 @@ def test_ui_closing_help_with_escape_keeps_article_view(app_config, tmp_path, ar
     asyncio.run(runner())
 
 
+def test_ui_reader_navigation_still_works_after_help_screen(app_config, tmp_path, article_content) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    second_article = ArticleContent(
+        article_id="test-2",
+        url="https://www.bbc.com/news/test-2",
+        category="technology",
+        title="Second title",
+        author="Reporter",
+        published_at=datetime(2026, 3, 20, 12, 5, tzinfo=UTC),
+        body="Second source text",
+    )
+    tall_body = "\n\n".join(f"Paragraph {index}" for index in range(200))
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Translated title", tall_body, "done")
+    app.storage.upsert_article_source(second_article)
+    app.storage.update_translation(second_article.article_id, "Second translated title", "Second text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("h", "escape")
+            await pilot.pause()
+
+            pane = article_pane(app)
+            await pilot.press("pagedown")
+            await pilot.pause()
+            assert pane.scroll_target_y > 0
+
+            await pilot.press("right")
+            await pilot.pause()
+            assert app.current_article is not None
+            assert app.current_article.article_id == second_article.article_id
+
+    asyncio.run(runner())
+
+
 def test_ui_loads_articles_in_insertion_order_and_shows_position(app_config, tmp_path, article_content) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
     app = NewsReaderApp(app_config, storage_path)
@@ -2622,6 +2660,44 @@ def test_ui_quick_nav_enter_opens_selected_article_and_escape_closes_without_cha
             await pilot.pause()
 
             assert quick_nav_screen(app) is None
+            assert app.current_article is not None
+            assert app.current_article.article_id == newer_article.article_id
+
+    asyncio.run(runner())
+
+
+def test_ui_reader_navigation_still_works_after_quick_nav(app_config, tmp_path, article_content) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    newer_article = ArticleContent(
+        article_id="test-2",
+        url="https://www.bbc.com/news/test-2",
+        category="technology",
+        title="Newer title",
+        author="Reporter",
+        published_at=datetime(2026, 3, 25, 12, 5, tzinfo=UTC),
+        body="Newer source text",
+    )
+    tall_body = "\n\n".join(f"Paragraph {index}" for index in range(200))
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Older translated title", tall_body, "done")
+    app.storage.upsert_article_source(newer_article)
+    app.storage.update_translation(newer_article.article_id, "Newer translated title", "Newer text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("l", "escape")
+            await pilot.pause()
+
+            pane = article_pane(app)
+            await pilot.press("pagedown")
+            await pilot.pause()
+            assert pane.scroll_target_y > 0
+
+            await pilot.press("right")
+            await pilot.pause()
             assert app.current_article is not None
             assert app.current_article.article_id == newer_article.article_id
 
@@ -4659,6 +4735,51 @@ def test_ui_provider_home_space_opens_selected_provider(app_config, tmp_path) ->
             assert [article.provider_id for article in app.articles] == ["techcrunch"]
             assert app.current_article is not None
             assert app.current_article.article_id == tech_article_id
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_reader_navigation_still_works_after_opening_provider_scope(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    first_article_id = seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="bbc-1",
+        title="BBC 1",
+        body="\n\n".join(f"Paragraph {index}" for index in range(200)),
+        minute=0,
+    )
+    second_article_id = seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="bbc-2",
+        title="BBC 2",
+        body="BBC body 2",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            provider_home_table(app).move_cursor(
+                row=provider_home_row_index(app, "BBC News"),
+                column=0,
+                animate=False,
+            )
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert provider_home_screen(app) is None
+            assert app.current_article is not None
+            assert app.current_article.article_id == first_article_id
+
+            await pilot.press("right")
+            await pilot.pause()
+            assert app.current_article is not None
+            assert app.current_article.article_id == second_article_id
 
     asyncio.run(runner())
 

@@ -340,4 +340,4 @@ class NavigationController:
             screen.dismiss()
         except ScreenStackError:
             pass
-        self._app.call_after_refresh(self._app.set_focus, None)
+        self._app.restore_reader_focus()

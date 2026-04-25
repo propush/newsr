@@ -242,6 +242,7 @@ class ArticleQAController:
             screen.dismiss()
         except ScreenStackError:
             pass
+        self._app.restore_reader_focus()
 
     def _schedule_progress(
         self,

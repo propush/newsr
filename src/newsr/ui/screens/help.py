@@ -19,9 +19,10 @@ class HelpScreen(ModalScreen[None]):
         yield Static(self._body, id="help-text")
 
     def on_key(self, event: Key) -> None:
-        if event.key == "escape":
-            event.stop()
+        event.stop()
         self.dismiss()
+        self.app.restore_reader_focus()
 
     def action_close_overlay(self) -> None:
         self.dismiss()
+        self.app.restore_reader_focus()

@@ -157,6 +157,7 @@ class MoreInfoController:
             screen.dismiss()
         except ScreenStackError:
             pass
+        self._app.restore_reader_focus()
 
     def _loading_text(self, article: ArticleRecord, stage: str) -> str:
         title = article.translated_title or article.title

@@ -459,6 +459,12 @@ class NewsReaderApp(App[None]):
     def close_provider_home(self) -> None:
         self._provider_home.close()
 
+    def restore_reader_focus(self) -> None:
+        if self.provider_home_open:
+            return
+        self._provider_home._notify_bindings_changed()
+        self.call_after_refresh(self.set_focus, None)
+
     def open_scope(self, scope_id: str) -> None:
         self._provider_home.open_scope(scope_id)
 

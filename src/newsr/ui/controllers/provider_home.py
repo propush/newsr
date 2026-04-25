@@ -155,6 +155,7 @@ class ProviderHomeController:
         self._open = False
         self._notify_bindings_changed()
         self._app.refresh_view()
+        self._app.restore_reader_focus()
 
     def open_scope(self, scope_id: str) -> None:
         self._activate_scope(scope_id, close_provider_home=True)
