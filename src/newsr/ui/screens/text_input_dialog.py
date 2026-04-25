@@ -108,7 +108,7 @@ class TextInputDialogScreen(ModalScreen[str | None]):
         if event.button.id == "text-input-dialog-confirm":
             self._submit()
             return
-        self.dismiss(None)
+        self._dismiss(None)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "text-input-dialog-input":
@@ -117,12 +117,12 @@ class TextInputDialogScreen(ModalScreen[str | None]):
     def action_activate_focused(self) -> None:
         focused_id = self._focused_control_id()
         if focused_id == "text-input-dialog-cancel":
-            self.dismiss(None)
+            self._dismiss(None)
             return
         self._submit()
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        self._dismiss(None)
 
     def action_focus_next_control(self) -> None:
         self._move_focus(1)
@@ -137,7 +137,11 @@ class TextInputDialogScreen(ModalScreen[str | None]):
             self.query_one("#text-input-dialog-error", Static).update(error)
             self.query_one("#text-input-dialog-input", Input).focus()
             return
-        self.dismiss(normalized)
+        self._dismiss(normalized)
+
+    def _dismiss(self, result: str | None) -> None:
+        self.dismiss(result)
+        self.app.restore_navigation_focus()
 
     def _focused_control_id(self) -> str:
         focused = self.app.focused

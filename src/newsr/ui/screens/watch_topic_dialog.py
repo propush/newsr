@@ -130,7 +130,7 @@ class WatchTopicDialogScreen(ModalScreen[WatchTopicResult | None]):
         if event.button.id == "watch-topic-dialog-confirm":
             self._submit()
             return
-        self.dismiss(None)
+        self._dismiss(None)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id in {"watch-topic-name-input", "watch-topic-schedule-input"}:
@@ -139,12 +139,12 @@ class WatchTopicDialogScreen(ModalScreen[WatchTopicResult | None]):
     def action_activate_focused(self) -> None:
         focused_id = self._focused_control_id()
         if focused_id == "watch-topic-dialog-cancel":
-            self.dismiss(None)
+            self._dismiss(None)
             return
         self._submit()
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        self._dismiss(None)
 
     def action_focus_next_control(self) -> None:
         self._move_focus(1)
@@ -166,7 +166,11 @@ class WatchTopicDialogScreen(ModalScreen[WatchTopicResult | None]):
             self.query_one("#watch-topic-dialog-error", Static).update(error)
             self.query_one("#watch-topic-schedule-input", Input).focus()
             return
-        self.dismiss((topic_name, normalized_schedule))
+        self._dismiss((topic_name, normalized_schedule))
+
+    def _dismiss(self, result: WatchTopicResult | None) -> None:
+        self.dismiss(result)
+        self.app.restore_navigation_focus()
 
     def _focused_control_id(self) -> str:
         focused = self.app.focused

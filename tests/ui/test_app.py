@@ -248,6 +248,15 @@ def source_status_text(app: NewsReaderApp) -> str:
     return str(screen.query_one("#source-status", Static).content)
 
 
+async def wait_for_source_manager(app: NewsReaderApp, pilot) -> CategorySelectionScreen:  # type: ignore[no-untyped-def]
+    for _ in range(20):
+        await pilot.pause()
+        screen = category_screen(app)
+        if screen is not None and provider_list(app).row_count and target_list(app).row_count:
+            return screen
+    raise AssertionError("source manager did not finish loading")
+
+
 def provider_home_screen(app: NewsReaderApp):
     return app if app.provider_home_open else None
 
@@ -2704,6 +2713,84 @@ def test_ui_reader_navigation_still_works_after_quick_nav(app_config, tmp_path, 
     asyncio.run(runner())
 
 
+def test_ui_reader_navigation_still_works_after_command_palette(app_config, tmp_path, article_content) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    newer_article = ArticleContent(
+        article_id="test-2",
+        url="https://www.bbc.com/news/test-2",
+        category="technology",
+        title="Newer title",
+        author="Reporter",
+        published_at=datetime(2026, 3, 25, 12, 5, tzinfo=UTC),
+        body="Newer source text",
+    )
+    tall_body = "\n\n".join(f"Paragraph {index}" for index in range(200))
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Older translated title", tall_body, "done")
+    app.storage.upsert_article_source(newer_article)
+    app.storage.update_translation(newer_article.article_id, "Newer translated title", "Newer text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("ctrl+p", "escape")
+            await pilot.pause()
+
+            pane = article_pane(app)
+            await pilot.press("pagedown")
+            await pilot.pause()
+            assert pane.scroll_target_y > 0
+
+            await pilot.press("right")
+            await pilot.pause()
+            assert app.current_article is not None
+            assert app.current_article.article_id == newer_article.article_id
+
+    asyncio.run(runner())
+
+
+def test_ui_reader_navigation_still_works_after_source_manager(app_config, tmp_path, article_content) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    newer_article = ArticleContent(
+        article_id="test-2",
+        url="https://www.bbc.com/news/test-2",
+        category="technology",
+        title="Newer title",
+        author="Reporter",
+        published_at=datetime(2026, 3, 25, 12, 5, tzinfo=UTC),
+        body="Newer source text",
+    )
+    tall_body = "\n\n".join(f"Paragraph {index}" for index in range(200))
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Older translated title", tall_body, "done")
+    app.storage.upsert_article_source(newer_article)
+    app.storage.update_translation(newer_article.article_id, "Newer translated title", "Newer text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("c")
+            await wait_for_source_manager(app, pilot)
+            await pilot.press("escape")
+            await pilot.pause()
+
+            pane = article_pane(app)
+            await pilot.press("pagedown")
+            await pilot.pause()
+            assert pane.scroll_target_y > 0
+
+            await pilot.press("right")
+            await pilot.pause()
+            assert app.current_article is not None
+            assert app.current_article.article_id == newer_article.article_id
+
+    asyncio.run(runner())
+
+
 def test_ui_quick_nav_updates_selected_counter_when_cursor_moves(
     app_config, tmp_path, article_content
 ) -> None:
@@ -3288,6 +3375,47 @@ def test_ui_dismissing_open_link_confirmation_returns_to_article_view(
             assert body_source(app) == "Translated text"
             assert url_source(app) == f"URL: {article_content.url}"
             assert opened_urls == []
+
+    asyncio.run(runner())
+
+
+def test_ui_reader_navigation_still_works_after_open_link_confirmation(
+    app_config, tmp_path, article_content, monkeypatch
+) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    newer_article = ArticleContent(
+        article_id="test-2",
+        url="https://www.bbc.com/news/test-2",
+        category="technology",
+        title="Newer title",
+        author="Reporter",
+        published_at=datetime(2026, 3, 25, 12, 5, tzinfo=UTC),
+        body="Newer source text",
+    )
+    tall_body = "\n\n".join(f"Paragraph {index}" for index in range(200))
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Older translated title", tall_body, "done")
+    app.storage.upsert_article_source(newer_article)
+    app.storage.update_translation(newer_article.article_id, "Newer translated title", "Newer text", "done")
+    monkeypatch.setattr(webbrowser, "open", lambda url, new=0: True)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("o", "escape")
+            await pilot.pause()
+
+            pane = article_pane(app)
+            await pilot.press("pagedown")
+            await pilot.pause()
+            assert pane.scroll_target_y > 0
+
+            await pilot.press("right")
+            await pilot.pause()
+            assert app.current_article is not None
+            assert app.current_article.article_id == newer_article.article_id
 
     asyncio.run(runner())
 
@@ -4379,6 +4507,28 @@ def test_ui_provider_home_forwards_ctrl_p_to_command_palette(app_config, tmp_pat
 
 
 @pytest.mark.provider_home
+def test_ui_provider_home_navigation_still_works_after_command_palette(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            table = provider_home_table(app)
+            assert table.cursor_row == provider_home_row_index(app, "[ALL]")
+
+            await pilot.press("ctrl+p", "escape")
+            await pilot.pause()
+            await pilot.press("down")
+            await pilot.pause()
+
+            assert table.cursor_row == provider_home_row_index(app, "BBC News")
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
 def test_ui_provider_home_hides_reader_only_bindings_from_footer(app_config, tmp_path) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
@@ -4499,6 +4649,77 @@ def test_ui_provider_home_w_opens_watch_topic_dialog(app_config, tmp_path) -> No
     asyncio.run(runner())
 
 
+@pytest.mark.provider_home
+def test_ui_provider_home_navigation_still_works_after_watch_topic_dialog(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.set_provider_enabled("techcrunch", True)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            table = provider_home_table(app)
+            assert table.cursor_row == provider_home_row_index(app, "[ALL]")
+
+            await pilot.press("w", "escape")
+            await pilot.pause()
+            await pilot.press("down")
+            await pilot.pause()
+
+            assert watch_topic_dialog_screen(app) is None
+            assert table.cursor_row == provider_home_row_index(app, "BBC News")
+
+    asyncio.run(runner())
+
+
+def test_ui_reader_navigation_still_works_after_watch_topic_dialog(
+    app_config, tmp_path, article_content, monkeypatch
+) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    newer_article = ArticleContent(
+        article_id="test-2",
+        url="https://www.bbc.com/news/test-2",
+        category="technology",
+        title="Newer title",
+        author="Reporter",
+        published_at=datetime(2026, 3, 25, 12, 5, tzinfo=UTC),
+        body="Newer source text",
+    )
+    tall_body = "\n\n".join(f"Paragraph {index}" for index in range(200))
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Older translated title", tall_body, "done")
+    app.storage.upsert_article_source(newer_article)
+    app.storage.update_translation(newer_article.article_id, "Newer translated title", "Newer text", "done")
+    monkeypatch.setattr(OpenAILLMClient, "extract_watch_topic", lambda self, title, text: "Test topic")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("w")
+            for _ in range(20):
+                await pilot.pause()
+                if watch_topic_dialog_screen(app) is not None:
+                    break
+            else:
+                raise AssertionError("watch topic dialog did not open")
+            await pilot.press("escape")
+            await pilot.pause()
+
+            pane = article_pane(app)
+            await pilot.press("pagedown")
+            await pilot.pause()
+            assert pane.scroll_target_y > 0
+
+            await pilot.press("right")
+            await pilot.pause()
+            assert app.current_article is not None
+            assert app.current_article.article_id == newer_article.article_id
+
+    asyncio.run(runner())
+
+
 def test_ui_source_manager_schedule_dialog_shows_configured_default_schedule(app_config, tmp_path) -> None:
     app_config.articles.update_schedule = "*/15 * * * *"
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
@@ -4527,6 +4748,60 @@ def test_ui_source_manager_schedule_dialog_shows_configured_default_schedule(app
             assert screen.query_one("#text-input-dialog-input", Input).placeholder == (
                 "Leave blank for */15 * * * *"
             )
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_navigation_still_works_after_schedule_dialog_cancel(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.press("c")
+            await wait_for_source_manager(app, pilot)
+            table = provider_list(app)
+            bbc_row = provider_row_index(app, "BBC News")
+            table.move_cursor(row=bbc_row, column=0, animate=False)
+            await pilot.pause()
+
+            await pilot.press("u", "escape")
+            await pilot.pause()
+            await pilot.press("down")
+            await pilot.pause()
+
+            assert text_input_dialog_screen(app) is None
+            assert table.has_focus
+            assert table.cursor_row != bbc_row
+
+    asyncio.run(runner())
+
+
+def test_ui_source_manager_navigation_still_works_after_delete_dialog_cancel(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.create_topic_provider(
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        update_schedule=None,
+    )
+    app.rebuild_provider_registry()
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.press("c")
+            await wait_for_source_manager(app, pilot)
+            table = provider_list(app)
+            topic_row = provider_row_index(app, "OpenAI policy")
+            table.move_cursor(row=topic_row, column=0, animate=False)
+            await pilot.pause()
+
+            await pilot.press("x", "escape")
+            await pilot.pause()
+
+            assert confirm_dialog_screen(app) is None
+            assert table.has_focus
+            assert table.cursor_row == topic_row
 
     asyncio.run(runner())
 

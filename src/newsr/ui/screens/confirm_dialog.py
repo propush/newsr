@@ -101,24 +101,28 @@ class ConfirmDialogScreen(ModalScreen[bool]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
         if event.button.id == "confirm-dialog-confirm":
-            self.dismiss(True)
+            self._dismiss(True)
             return
-        self.dismiss(False)
+        self._dismiss(False)
 
     def action_activate_focused(self) -> None:
         if self._focused_button_id() == "confirm-dialog-cancel":
-            self.dismiss(False)
+            self._dismiss(False)
             return
-        self.dismiss(True)
+        self._dismiss(True)
 
     def action_confirm(self) -> None:
-        self.dismiss(True)
+        self._dismiss(True)
 
     def action_cancel(self) -> None:
-        self.dismiss(False)
+        self._dismiss(False)
 
     def action_focus_next_control(self) -> None:
         self._move_focus(1)
 
     def action_focus_previous_control(self) -> None:
         self._move_focus(-1)
+
+    def _dismiss(self, result: bool) -> None:
+        self.dismiss(result)
+        self.app.restore_navigation_focus()

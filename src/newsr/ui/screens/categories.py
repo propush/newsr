@@ -8,6 +8,7 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingsMap
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Static
@@ -120,6 +121,7 @@ class SourceSelectionScreen(ModalScreen[None]):
         self._load_thread: Thread | None = None
         self._refresh_thread: Thread | None = None
         self._last_provider_row_index = 0
+        self._last_focused_table_id = "provider-list"
 
     def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
         return [
@@ -167,6 +169,7 @@ class SourceSelectionScreen(ModalScreen[None]):
 
     def action_close_overlay(self) -> None:
         self.dismiss()
+        self.app.restore_navigation_focus()
 
     def action_switch_pane(self) -> None:
         if not self._providers:
@@ -175,8 +178,10 @@ class SourceSelectionScreen(ModalScreen[None]):
         target_table = self.query_one("#target-list", DataTable)
         if provider_table.has_focus:
             target_table.focus()
+            self._last_focused_table_id = "target-list"
         else:
             provider_table.focus()
+            self._last_focused_table_id = "provider-list"
 
     def action_toggle_item(self) -> None:
         if not self._providers:
@@ -227,6 +232,7 @@ class SourceSelectionScreen(ModalScreen[None]):
         }
         if self.app.apply_source_configuration(enabled, selected):
             self.dismiss()
+            self.app.restore_navigation_focus()
 
     def action_edit_schedule(self) -> None:
         provider = self._current_provider()
@@ -360,7 +366,16 @@ class SourceSelectionScreen(ModalScreen[None]):
         if current_provider_id is not None:
             self._refresh_target_rows(current_provider_id)
         self.query_one("#provider-list", DataTable).focus()
+        self._last_focused_table_id = "provider-list"
         self._update_status_counts()
+
+    def restore_navigation_focus(self) -> None:
+        table_id = self._last_focused_table_id
+        try:
+            table = self.query_one(f"#{table_id}", DataTable)
+        except NoMatches:
+            table = self.query_one("#provider-list", DataTable)
+        table.focus()
 
     def _show_error(self, message: str) -> None:
         self.query_one("#source-loading", Static).display = False

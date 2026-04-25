@@ -163,6 +163,7 @@ class RefreshController:
             screen.dismiss(result)
         except Exception:
             self._confirm_screen = None
+        self._app.restore_navigation_focus()
 
     def _run(self) -> None:
         try:

@@ -5,6 +5,7 @@ from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.app import ScreenStackError
 from textual.binding import Binding, BindingsMap
+from textual.command import CommandPalette
 from textual.css.query import NoMatches
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import DataTable, Footer, Header, LoadingIndicator, Markdown, Static
@@ -459,11 +460,26 @@ class NewsReaderApp(App[None]):
     def close_provider_home(self) -> None:
         self._provider_home.close()
 
+    def restore_navigation_focus(self) -> None:
+        self.call_after_refresh(self._restore_navigation_focus_now)
+
     def restore_reader_focus(self) -> None:
-        if self.provider_home_open:
+        self.restore_navigation_focus()
+
+    def _restore_navigation_focus_now(self) -> None:
+        if len(self.screen_stack) > 1:
+            restore = getattr(self.screen, "restore_navigation_focus", None)
+            if callable(restore):
+                restore()
             return
         self._provider_home._notify_bindings_changed()
-        self.call_after_refresh(self.set_focus, None)
+        if self.provider_home_open:
+            try:
+                self.query_one("#provider-home-table", DataTable).focus()
+            except NoMatches:
+                pass
+            return
+        self.set_focus(None)
 
     def open_scope(self, scope_id: str) -> None:
         self._provider_home.open_scope(scope_id)
@@ -558,6 +574,9 @@ class NewsReaderApp(App[None]):
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         self._provider_home.handle_row_highlighted(event)
+
+    def on_command_palette_closed(self, event: CommandPalette.Closed) -> None:
+        self.restore_navigation_focus()
 
     def _watch_theme(self, theme_name: str) -> None:
         super()._watch_theme(theme_name)
