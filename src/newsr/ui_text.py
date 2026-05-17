@@ -45,7 +45,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.back": "Back",
         "app.binding.classify": "Classify",
         "app.binding.space": "Space",
-        "app.binding.summary": "Summary",
+        "app.binding.mode": "Mode",
         "app.binding.more_info": "More Info",
         "app.binding.ask": "Ask",
         "app.binding.list": "List",
@@ -65,6 +65,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.article.mode": "Mode : {mode}",
         "app.article.mode.full": "full",
         "app.article.mode.summary": "summary",
+        "app.article.mode.original": "original",
         "app.article.url": "URL: {url}",
         "app.status.ready": "ready",
         "app.status.refresh_already_running": "refresh already running",
@@ -96,7 +97,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Up/Down/PgUp/PgDn/B: scroll\n"
             "K: classify categories\n"
             "Space: page down or next article\n"
-            "S: toggle summary\n"
+            "S: cycle reader mode\n"
             "M: more info\n"
             "?: ask about article\n"
             "L: article list\n"
@@ -275,7 +276,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.back": "Назад",
         "app.binding.classify": "Категории",
         "app.binding.space": "Space",
-        "app.binding.summary": "Сводка",
+        "app.binding.mode": "Режим",
         "app.binding.more_info": "Подробнее",
         "app.binding.ask": "Спросить",
         "app.binding.list": "Список",
@@ -295,6 +296,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.article.mode": "Режим : {mode}",
         "app.article.mode.full": "полный",
         "app.article.mode.summary": "сводка",
+        "app.article.mode.original": "оригинал",
         "app.article.url": "URL: {url}",
         "app.status.ready": "готово",
         "app.status.refresh_already_running": "обновление уже запущено",
@@ -326,7 +328,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Up/Down/PgUp/PgDn/B: прокрутка\n"
             "K: классифицировать категории\n"
             "Space: страница вниз или следующая статья\n"
-            "S: переключить сводку\n"
+            "S: переключить режим чтения\n"
             "M: подробнее\n"
             "?: спросить о статье\n"
             "L: список статей\n"

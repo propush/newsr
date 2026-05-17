@@ -14,6 +14,7 @@ class JobStatus(StrEnum):
 class ViewMode(StrEnum):
     FULL = "full"
     SUMMARY = "summary"
+    ORIGINAL = "original"
 
 
 @dataclass(slots=True)

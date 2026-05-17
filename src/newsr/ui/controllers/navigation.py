@@ -122,6 +122,14 @@ class NavigationController:
         self._state_persisted = False
         self.persist_reader_state()
 
+    def save_reader_state_now_without_scroll_capture(self) -> None:
+        article = self.current_article
+        self._app.reader_state.article_id = article.article_id if article else None
+        self._app.storage.save_reader_state(
+            self._app._provider_home.active_scope_id, self._app.reader_state,
+        )
+        self._state_persisted = True
+
     def capture_reader_state(self) -> ReaderState:
         article = self.current_article
         self._app.reader_state.article_id = article.article_id if article else None
@@ -213,19 +221,31 @@ class NavigationController:
         self._app.refresh_view()
         self.save_reader_state_now()
 
-    def toggle_summary(self) -> None:
+    def cycle_view_mode(self) -> None:
         from ...domain.reader import ViewMode
 
         if self._app.provider_home_open:
             return
         article = self.current_article
-        if article is None or not article.summary:
+        if article is None:
             return
-        self._app.reader_state.view_mode = (
-            ViewMode.SUMMARY if self._app.reader_state.view_mode == ViewMode.FULL else ViewMode.FULL
-        )
+        next_mode = self._next_view_mode(self._app.reader_state.view_mode, has_summary=bool(article.summary))
+        if next_mode == self._app.reader_state.view_mode:
+            return
+        self._app.reader_state.view_mode = next_mode
+        self.reset_scroll()
         self._app.refresh_view()
-        self.save_reader_state_now()
+        self.save_reader_state_now_without_scroll_capture()
+
+    @staticmethod
+    def _next_view_mode(current: ViewMode, *, has_summary: bool) -> ViewMode:
+        from ...domain.reader import ViewMode
+
+        if current == ViewMode.FULL:
+            return ViewMode.SUMMARY if has_summary else ViewMode.ORIGINAL
+        if current == ViewMode.SUMMARY:
+            return ViewMode.ORIGINAL
+        return ViewMode.FULL
 
     def scroll_up(self) -> None:
         if self._app.provider_home_open:

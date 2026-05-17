@@ -22,7 +22,7 @@ def test_ui_locale_helpers_accept_russian_names_and_locale_codes() -> None:
 def test_ui_localizer_returns_russian_translations_and_keeps_status_mapping() -> None:
     ui = UILocalizer("ru")
 
-    assert ui.text("app.binding.summary") == "Сводка"
+    assert ui.text("app.binding.mode") == "Режим"
     assert ui.text("provider_group.virtual") == "Виртуальные"
     assert ui.text("provider_group.providers") == "Провайдеры"
     assert ui.text("provider_group.topics") == "Темы"

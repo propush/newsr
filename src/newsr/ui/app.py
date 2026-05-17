@@ -203,7 +203,7 @@ class NewsReaderApp(App[None]):
             Binding("b", "page_up", self.ui.text("app.binding.back"), show=False),
             ("k", "classify_article_categories", self.ui.text("app.binding.classify")),
             Binding("space", "space_down", self.ui.text("app.binding.space"), show=False),
-            ("s", "toggle_summary", self.ui.text("app.binding.summary")),
+            ("s", "cycle_view_mode", self.ui.text("app.binding.mode")),
             ("m", "show_or_refresh_more_info", self.ui.text("app.binding.more_info")),
             Binding("?", "show_article_qa", self.ui.text("app.binding.ask")),
             ("l", "show_quick_nav", self.ui.text("app.binding.list")),
@@ -337,8 +337,8 @@ class NewsReaderApp(App[None]):
     def action_next_article(self) -> None:
         self._navigation.next()
 
-    def action_toggle_summary(self) -> None:
-        self._navigation.toggle_summary()
+    def action_cycle_view_mode(self) -> None:
+        self._navigation.cycle_view_mode()
 
     def action_classify_article_categories(self) -> None:
         self._article_categories.categorize_current()

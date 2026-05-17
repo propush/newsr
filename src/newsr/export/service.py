@@ -94,9 +94,16 @@ class ExportService:
         )
 
     def _build_document(self, *, article: ArticleRecord, view_mode: ViewMode, theme: Theme) -> ExportDocument:
-        mode_label = "summary" if view_mode == ViewMode.SUMMARY and article.summary else "full"
-        body = article.summary if mode_label == "summary" and article.summary else article.translated_body or article.source_body
-        title = article.translated_title or article.title
+        mode_label = self._mode_label(article, view_mode)
+        if mode_label == ViewMode.ORIGINAL.value:
+            body = article.source_body
+            title = article.title
+        elif mode_label == ViewMode.SUMMARY.value and article.summary:
+            body = article.summary
+            title = article.translated_title or article.title
+        else:
+            body = article.translated_body or article.source_body
+            title = article.translated_title or article.title
         date = article.published_at or article.created_at
         date_text = date.astimezone().strftime("%Y-%m-%d %H:%M %Z")
         slug = self._slugify(article.article_id)
@@ -112,6 +119,14 @@ class ExportService:
             filename_stem=f"{date.astimezone().strftime('%Y-%m-%d')}_{slug}_{mode_label}",
             theme=self._resolve_theme(theme),
         )
+
+    @staticmethod
+    def _mode_label(article: ArticleRecord, view_mode: ViewMode) -> str:
+        if view_mode == ViewMode.ORIGINAL:
+            return ViewMode.ORIGINAL.value
+        if view_mode == ViewMode.SUMMARY and article.summary:
+            return ViewMode.SUMMARY.value
+        return ViewMode.FULL.value
 
     @staticmethod
     def _slugify(value: str) -> str:

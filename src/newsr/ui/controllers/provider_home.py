@@ -290,7 +290,7 @@ class ProviderHomeController:
             "previous_article",
             "next_article",
             "classify_article_categories",
-            "toggle_summary",
+            "cycle_view_mode",
             "show_or_refresh_more_info",
             "show_article_qa",
             "show_quick_nav",

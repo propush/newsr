@@ -18,12 +18,22 @@ if TYPE_CHECKING:
 def article_text(reader_state: ReaderState, article: ArticleRecord) -> str:
     if reader_state.view_mode == ViewMode.SUMMARY and article.summary:
         return article.summary
+    if reader_state.view_mode == ViewMode.ORIGINAL:
+        return article.source_body
     return article.translated_body or article.source_body
+
+
+def article_title(reader_state: ReaderState, article: ArticleRecord) -> str:
+    if reader_state.view_mode == ViewMode.ORIGINAL:
+        return article.title
+    return article.translated_title or article.title
 
 
 def view_mode_label(ui: UILocalizer, reader_state: ReaderState, article: ArticleRecord) -> str:
     if reader_state.view_mode == ViewMode.SUMMARY and article.summary:
         return ui.text("app.article.mode.summary")
+    if reader_state.view_mode == ViewMode.ORIGINAL:
+        return ui.text("app.article.mode.original")
     return ui.text("app.article.mode.full")
 
 
@@ -36,7 +46,7 @@ def article_header(
     accent_color: str,
 ) -> Text:
     date_text = format_article_date(article)
-    title = article.translated_title or article.title
+    title = article_title(reader_state, article)
     mode = view_mode_label(ui, reader_state, article)
     article_position = current_index + 1
     header = Text(ui.text("app.article.position", current=article_position, total=total))

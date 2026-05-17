@@ -17,7 +17,7 @@ class ExportController:
         self._screen: ExportScreen | None = None
 
     def export_current(self) -> None:
-        from .article_rendering import view_mode_label
+        from .article_rendering import article_title, view_mode_label
 
         if self._app.provider_home_open:
             return
@@ -34,7 +34,7 @@ class ExportController:
             return
         self._screen = ExportScreen(
             self._app.ui,
-            article.translated_title or article.title,
+            article_title(self._app.reader_state, article),
             view_mode_label(self._app.ui, self._app.reader_state, article),
         )
         self._app.push_screen(self._screen)

@@ -974,16 +974,23 @@ def test_ui_uses_download_date_when_published_date_is_missing(app_config, tmp_pa
     asyncio.run(runner())
 
 
-def test_ui_ignores_summary_toggle_without_summary(app_config, tmp_path, article_content) -> None:
+def test_ui_cycles_between_full_and_original_without_summary(app_config, tmp_path, article_content) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
     app = NewsReaderApp(app_config, storage_path)
     app.storage.upsert_article_source(article_content)
-    app.storage.update_translation(article_content.article_id, None, "Translated text", "done")
+    app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
 
     async def runner() -> None:
         async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("s")
+            assert app.reader_state.view_mode == ViewMode.ORIGINAL
+            assert "Title: Example title" in header_text(app)
+            assert body_source(app) == "Paragraph one.\n\nParagraph two."
             await pilot.press("s")
             assert app.reader_state.view_mode == ViewMode.FULL
+            assert "Title: Translated title" in header_text(app)
+            assert body_source(app) == "Translated text"
 
     asyncio.run(runner())
 
@@ -1044,7 +1051,7 @@ def test_ui_reader_footer_hides_pgup_and_pgdn(app_config, tmp_path, article_cont
             assert "page_up" not in actions
             assert "page_down" not in actions
             assert "classify_article_categories" in actions
-            assert "toggle_summary" in actions
+            assert "cycle_view_mode" in actions
             assert "show_or_refresh_more_info" in actions
 
     asyncio.run(runner())
@@ -1579,7 +1586,7 @@ def test_ui_falls_back_to_original_title_without_translated_title(
     asyncio.run(runner())
 
 
-def test_ui_summary_toggle_keeps_header_and_swaps_body(app_config, tmp_path, article_content) -> None:
+def test_ui_mode_cycle_shows_full_summary_original_and_full(app_config, tmp_path, article_content) -> None:
     storage_path = tmp_path / "newsr.sqlite3"
     app = NewsReaderApp(app_config, storage_path)
     app.storage.upsert_article_source(article_content)
@@ -1606,6 +1613,50 @@ def test_ui_summary_toggle_keeps_header_and_swaps_body(app_config, tmp_path, art
             assert body_after == "Summary text"
             assert url_before == f"URL: {article_content.url}"
             assert url_after == f"URL: {article_content.url}"
+            await pilot.press("s")
+            assert app.reader_state.view_mode == ViewMode.ORIGINAL
+            assert "Title: Example title" in header_text(app)
+            assert "Mode : original" in header_text(app)
+            assert body_source(app) == "Paragraph one.\n\nParagraph two."
+            assert url_source(app) == f"URL: {article_content.url}"
+            await pilot.press("s")
+            assert app.reader_state.view_mode == ViewMode.FULL
+            assert "Title: Translated title" in header_text(app)
+            assert "Mode : full" in header_text(app)
+            assert body_source(app) == "Translated text"
+
+    asyncio.run(runner())
+
+
+def test_ui_mode_change_resets_scroll_and_persists_zero_offset(app_config, tmp_path, article_content) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(
+        article_content.article_id,
+        "Translated title",
+        "\n\n".join(f"Translated paragraph {index}" for index in range(140)),
+        "done",
+    )
+    app.storage.update_summary(article_content.article_id, "Summary text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            pane = article_pane(app)
+            assert pane.max_scroll_y >= 20
+            pane.scroll_to(y=20, animate=False)
+            await pilot.pause()
+            assert int(pane.scroll_y) == 20
+
+            await pilot.press("s")
+            await pilot.pause()
+
+            assert app.reader_state.view_mode == ViewMode.SUMMARY
+            assert int(article_pane(app).scroll_y) == 0
+            assert app.reader_state.scroll_offset == 0
+            assert app.storage.load_reader_state("[ALL]").scroll_offset == 0
+            assert app.storage.load_reader_state("[ALL]").view_mode == ViewMode.SUMMARY
 
     asyncio.run(runner())
 
@@ -3507,6 +3558,26 @@ def test_ui_pressing_e_opens_export_screen(app_config, tmp_path, article_content
     asyncio.run(runner())
 
 
+def test_ui_pressing_e_opens_export_screen_for_original_mode(app_config, tmp_path, article_content) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Translated title", "Translated text", "done")
+    app.storage.update_summary(article_content.article_id, "Summary text", "done")
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.press("s", "s", "e")
+            await pilot.pause()
+            screen = export_screen(app)
+            assert screen is not None
+            export_body = screen.query_one("#export-body", Static).content
+            assert "Title: Example title" in export_body
+            assert "Mode: original" in export_body
+
+    asyncio.run(runner())
+
+
 def test_ui_export_screen_runs_action_and_closes_on_success(app_config, tmp_path, article_content) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
@@ -3748,14 +3819,14 @@ def test_ui_registers_old_fido_theme(app_config, tmp_path) -> None:
     assert theme.background == "#000000"
 
 
-def test_ui_keeps_summary_hotkey_fixed_when_localizing_labels(app_config, tmp_path) -> None:
+def test_ui_keeps_mode_hotkey_fixed_when_localizing_labels(app_config, tmp_path) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
 
-    summary_bindings = app._bindings.get_bindings_for_key("s")
+    mode_bindings = app._bindings.get_bindings_for_key("s")
 
-    assert len(summary_bindings) == 1
-    assert summary_bindings[0].action == "toggle_summary"
-    assert summary_bindings[0].description == "Summary"
+    assert len(mode_bindings) == 1
+    assert mode_bindings[0].action == "cycle_view_mode"
+    assert mode_bindings[0].description == "Mode"
 
 
 def test_ui_keeps_classify_hotkey_fixed_when_localizing_labels(app_config, tmp_path) -> None:
@@ -3768,15 +3839,15 @@ def test_ui_keeps_classify_hotkey_fixed_when_localizing_labels(app_config, tmp_p
     assert classify_bindings[0].description == "Classify"
 
 
-def test_ui_keeps_summary_hotkey_fixed_in_russian_locale(app_config, tmp_path) -> None:
+def test_ui_keeps_mode_hotkey_fixed_in_russian_locale(app_config, tmp_path) -> None:
     app_config.ui.locale = "ru"
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
 
-    summary_bindings = app._bindings.get_bindings_for_key("s")
+    mode_bindings = app._bindings.get_bindings_for_key("s")
 
-    assert len(summary_bindings) == 1
-    assert summary_bindings[0].action == "toggle_summary"
-    assert summary_bindings[0].description == "Сводка"
+    assert len(mode_bindings) == 1
+    assert mode_bindings[0].action == "cycle_view_mode"
+    assert mode_bindings[0].description == "Режим"
 
 
 def test_ui_keeps_classify_hotkey_fixed_in_russian_locale(app_config, tmp_path) -> None:
@@ -4616,7 +4687,7 @@ def test_ui_provider_home_help_shows_provider_only_bindings(app_config, tmp_path
             assert "Ctrl+P: command palette / choose theme" in help_text
             assert "K: classify categories" not in help_text
             assert "Left/Right: previous/next article" not in help_text
-            assert "S: toggle summary" not in help_text
+            assert "S: cycle reader mode" not in help_text
             assert "M: more info" not in help_text
             assert "L: article list" not in help_text
 
@@ -5933,7 +6004,7 @@ def test_ui_renders_russian_copy_and_preserves_hotkeys(app_config, tmp_path, art
             await pilot.pause()
             help_text = plain_content(app.screen.query_one("#help-text", Static).content)
             assert "K: классифицировать категории" in help_text
-            assert "S: переключить сводку" in help_text
+            assert "S: переключить режим чтения" in help_text
             assert "M: подробнее" in help_text
             assert "D: принудительно обновить текущего провайдера" in help_text
             await pilot.press("escape")

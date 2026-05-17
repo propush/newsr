@@ -85,6 +85,29 @@ def test_export_service_uses_summary_body_for_summary_mode(tmp_path: Path, app_c
     assert result.output_path.read_text(encoding="utf-8").endswith("Short summary")
 
 
+def test_export_service_uses_original_title_and_body_for_original_mode(
+    tmp_path: Path, app_config: AppConfig
+) -> None:
+    article = make_article(body="Full article", summary="Short summary")
+    service = ExportService(exports_root=tmp_path / "exports", clipboard=FakeClipboard())
+
+    result = service.export(
+        ExportAction.SAVE_MARKDOWN,
+        article=article,
+        view_mode=ViewMode.ORIGINAL,
+        theme=OLD_FIDO_THEME,
+        config=app_config,
+    )
+
+    assert result.success is True
+    assert result.output_path is not None
+    assert result.output_path.name.endswith("_original.md")
+    content = result.output_path.read_text(encoding="utf-8")
+    assert content.startswith("# Source title\n\n")
+    assert "Mode: original" in content
+    assert content.endswith("Source body")
+
+
 def test_export_service_saves_hd_png_with_phone_width(tmp_path: Path, app_config: AppConfig) -> None:
     article = make_article(body="\n\n".join(f"Paragraph {index}" for index in range(120)))
     service = ExportService(exports_root=tmp_path / "exports", clipboard=FakeClipboard())

@@ -10,7 +10,7 @@ NewsR currently requires Python 3.12 or newer.
 - cron-scheduled background refresh with LLM responsiveness preflight
 - provider home with `[ALL]` plus enabled providers, unread/total counters, and configurable sort order
 - watched topics that behave like virtual providers and can be created from provider home or the current article
-- translated full articles plus summaries
+- translated full articles, summaries, and original source text views
 - "more info" and article Q&A overlays backed by DuckDuckGo search and the configured LLM
 - source management for enabling providers, editing schedules, refreshing catalogs, and choosing targets
 - export of the current view as Markdown or PNG
@@ -33,6 +33,8 @@ Full article view:
 Summary view:
 
 ![Summary view](docs/images/article_summary.png)
+
+Original mode shows the stored source title and body.
 
 Theme switch example:
 
@@ -168,7 +170,7 @@ Saving source changes updates SQLite-backed provider state immediately. The sche
 - `PgUp` / `PgDn` / `B`: page scroll
 - `Space`: page down, then move to the next article when already at the end
 - `Esc`: return to the provider home
-- `S`: toggle between full article and summary when a summary exists
+- `S`: cycle reader mode: translated full article, translated summary when available, and original source text
 - `M`: open or refresh the "more info" panel for the current article
 - `?`: ask a follow-up question about the current article
 - `L`: open the article list
@@ -200,8 +202,8 @@ Press `E` to export the current view. NewsR can:
 - save Markdown to `exports/`
 - copy Markdown to the system clipboard
 
-Exports use the current article view, so summary mode exports the summary and full mode exports the full article body currently shown, preferring translated text when available. PNG exports also use the current Textual theme colors.
-Saved export filenames include the local date, a slug derived from `article_id`, and the active mode (`full` or `summary`).
+Exports use the current article view. Full mode exports the translated title and body, summary mode exports the translated title and summary, and original mode exports the stored source title and body. PNG exports also use the current Textual theme colors.
+Saved export filenames include the local date, a slug derived from `article_id`, and the active mode (`full`, `summary`, or `original`).
 
 Clipboard export support depends on the platform:
 

@@ -143,7 +143,7 @@ def test_storage_persists_reader_state(storage) -> None:
     )
     provider_state = ReaderState(
         article_id="bbc:test-2",
-        view_mode=ViewMode.FULL,
+        view_mode=ViewMode.ORIGINAL,
         scroll_offset=3,
     )
 
