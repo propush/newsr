@@ -11,6 +11,7 @@ NewsR currently requires Python 3.12 or newer.
 - provider home with `[ALL]` plus enabled providers, unread/total counters, and configurable sort order
 - watched topics that behave like virtual providers and can be created from provider home or the current article
 - translated full articles, summaries, and original source text views
+- brief reviews that synthesize recent or unread articles into a scrollable Markdown report
 - "more info" and article Q&A overlays backed by DuckDuckGo search and the configured LLM
 - source management for enabling providers, editing schedules, refreshing catalogs, and choosing targets
 - export of the current view as Markdown or PNG
@@ -39,6 +40,16 @@ Original mode shows the stored source title and body.
 Theme switch example:
 
 ![Theme change](docs/images/theme_changed.png)
+
+### Brief Review
+
+Brief review setup:
+
+![Brief review setup](docs/images/brief_setup.png)
+
+Generated brief review:
+
+![Generated brief review](docs/images/brief_reading.png)
 
 ### Navigation And Source Management
 
@@ -140,9 +151,16 @@ NewsR starts in a provider home view. This is the default home screen shown afte
 - `[ALL]` opens the shared reader across all enabled providers.
 - Enabled providers appear under `[ALL]` with unread and total counters.
 - Counters only include articles whose translation has completed.
-- `Up` / `Down` / `PgUp` / `PgDn` / `B` move through the list.
+- `Up` / `Down` / `PgUp` / `PgDn` move through the list.
 - `Enter` opens the highlighted scope.
+- `B` opens brief review generation.
 - `C`, `W`, `D`, `H`, `Ctrl+P`, and `Q` stay available from this view.
+
+## Brief Review
+
+Press `B` from the provider home to create a brief review. The setup screen lets you choose `Last 24 hr`, `Last week`, or `All unread`, include watched-topic articles, and decide whether generated articles should be marked read. Use `Tab` or arrow keys to move between controls, `Enter` or `Space` to toggle or press the focused control, `G` to generate, and `Esc` to close.
+
+After generation, NewsR opens the brief in a scrollable Markdown reader. The report is synthesized by the configured summary model from the selected cached articles and includes provider statistics. Use `Up` / `Down` to scroll, `PgUp` / `PgDn` / `B` / `Space` to page, and `Esc` to return to the provider home.
 
 ## Sources
 

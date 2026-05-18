@@ -24,6 +24,7 @@ DEFAULT_ARTICLES_FETCH = 5
 DEFAULT_ARTICLES_STORE = 10
 DEFAULT_ARTICLES_TIMEOUT = 180
 DEFAULT_REQUEST_RETRIES = 2
+DEFAULT_BRIEF_CONTEXT = 100000
 DEFAULT_EXPORT_IMAGE_QUALITY = "fhd"
 
 DEFAULT_LOCAL_URL = "http://localhost:8081/v1"
@@ -74,6 +75,7 @@ class BootstrapAnswers:
     articles_timeout: int = DEFAULT_ARTICLES_TIMEOUT
     articles_update_schedule: str = DEFAULT_UPDATE_SCHEDULE
     request_retries: int = DEFAULT_REQUEST_RETRIES
+    brief_context: int = DEFAULT_BRIEF_CONTEXT
     export_image_quality: str = DEFAULT_EXPORT_IMAGE_QUALITY
 
 
@@ -198,6 +200,7 @@ def render_config(answers: BootstrapAnswers) -> str:
         "model_translation": answers.llm_model,
         "model_summary": answers.llm_model,
         "request_retries": answers.request_retries,
+        "brief_context": answers.brief_context,
     }
     if answers.api_key:
         llm_config["api_key"] = answers.api_key

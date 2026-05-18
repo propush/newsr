@@ -54,6 +54,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.open": "Open",
         "app.binding.watch_topic": "Watch Topic",
         "app.binding.download": "Refresh",
+        "app.binding.brief": "Brief Review",
         "app.binding.help": "Help",
         "app.binding.providers": "Providers",
         "app.binding.quit": "Quit",
@@ -112,8 +113,9 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Q: quit"
         ),
         "help.body.provider_home": (
-            "Up/Down/PgUp/PgDn/B: move through providers\n"
+            "Up/Down/PgUp/PgDn: move through providers\n"
             "Enter/Space: open the selected provider\n"
+            "B: brief review\n"
             "C: manage sources\n"
             "W: create watched topic\n"
             "D: force refresh all providers\n"
@@ -122,7 +124,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Q: quit"
         ),
         "provider_home.empty": "No enabled providers. Press C to manage sources.",
-        "provider_home.hint": "Up/Down: select   Enter/Space: open provider   C: sources   W: watch topic   D: refresh   H: help",
+        "provider_home.hint": "Up/Down: select   Enter/Space: open provider   B: brief   C: sources   W: watch topic   D: refresh",
         "provider_home.status.empty": "No provider is available.",
         "provider_home.status.selection": "{provider}: {unread} unread, {total} total",
         "provider_home.table.provider": "Provider",
@@ -224,6 +226,28 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "more_info.body.unavailable": "# More info unavailable\n\nThe additional lookup failed.\n\nError: `{error}`",
         "more_info.body.no_results": "No additional public context was found for this article yet.",
         "more_info.body.loading": "# More Info\n\nGathering extra context for:\n\n**{title}**\n\nCurrent step: {stage}",
+        "brief.binding.close": "Close",
+        "brief.binding.generate": "Generate",
+        "brief.header": "Brief Review",
+        "brief.period.label": "Period",
+        "brief.period.last_24h": "Last 24 hr",
+        "brief.period.last_week": "Last week",
+        "brief.period.all_unread": "All unread",
+        "brief.option.include_topics": "Include watched topics",
+        "brief.option.mark_read": "Mark selected sources read",
+        "brief.button.generate": "Generate",
+        "brief.button.cancel": "Cancel",
+        "brief.hint": "Tab/Arrows: move   Enter/Space: toggle or press   G: generate   Esc: cancel/close",
+        "brief.body.ready": "# Brief\n\nChoose a period and press Generate.",
+        "brief.body.starting": "# Brief\n\nStarting brief generation...",
+        "brief.body.generating": "# Brief\n\nGenerating report...\n\nCurrent step: {status}",
+        "brief.body.cancelled": "# Brief\n\nGeneration was cancelled.",
+        "brief.body.failed": "# Brief unavailable\n\nThe brief could not be generated.\n\nError: `{error}`",
+        "brief_reader.binding.close": "Close",
+        "brief_reader.binding.pgup": "PgUp",
+        "brief_reader.binding.pgdn": "PgDn",
+        "brief_reader.header": "Brief Review",
+        "brief_reader.hint": "Esc: close   Up/Down: scroll   Space/B: page",
         "quick_nav.binding.close": "Close",
         "quick_nav.header": "Quick Navigation",
         "quick_nav.empty": "No translated articles available.",
@@ -285,6 +309,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.open": "Открыть",
         "app.binding.watch_topic": "Тема",
         "app.binding.download": "Обновить",
+        "app.binding.brief": "Краткий обзор",
         "app.binding.help": "Справка",
         "app.binding.providers": "Провайдеры",
         "app.binding.quit": "Выход",
@@ -343,8 +368,9 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Q: выход"
         ),
         "help.body.provider_home": (
-            "Up/Down/PgUp/PgDn/B: перемещение по провайдерам\n"
+            "Up/Down/PgUp/PgDn: перемещение по провайдерам\n"
             "Enter/Space: открыть выбранного провайдера\n"
+            "B: краткий обзор\n"
             "C: управление источниками\n"
             "W: создать отслеживаемую тему\n"
             "D: принудительно обновить все провайдеры\n"
@@ -353,7 +379,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Q: выход"
         ),
         "provider_home.empty": "Нет включённых провайдеров. Нажмите C для управления источниками.",
-        "provider_home.hint": "Up/Down: выбор   Enter/Space: открыть провайдер   C: источники   W: тема   D: обновить   H: справка",
+        "provider_home.hint": "Up/Down: выбор   Enter/Space: открыть провайдер   B: обзор   C: источники   W: тема   D: обновить",
         "provider_home.status.empty": "Нет доступных провайдеров.",
         "provider_home.status.selection": "{provider}: непрочитано {unread}, всего {total}",
         "provider_home.table.provider": "Провайдер",
@@ -455,6 +481,28 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "more_info.body.unavailable": "# Дополнительная информация недоступна\n\nНе удалось выполнить дополнительный поиск.\n\nОшибка: `{error}`",
         "more_info.body.no_results": "Для этой статьи пока не найдено дополнительного публичного контекста.",
         "more_info.body.loading": "# Подробнее\n\nСбор дополнительного контекста для:\n\n**{title}**\n\nТекущий шаг: {stage}",
+        "brief.binding.close": "Закрыть",
+        "brief.binding.generate": "Создать",
+        "brief.header": "Краткий обзор",
+        "brief.period.label": "Период",
+        "brief.period.last_24h": "Последние 24 часа",
+        "brief.period.last_week": "Последняя неделя",
+        "brief.period.all_unread": "Всё непрочитанное",
+        "brief.option.include_topics": "Включить отслеживаемые темы",
+        "brief.option.mark_read": "Отметить выбранные источники прочитанными",
+        "brief.button.generate": "Создать",
+        "brief.button.cancel": "Отмена",
+        "brief.hint": "Tab/Стрелки: переход   Enter/Space: переключить или нажать   G: создать   Esc: отмена/закрыть",
+        "brief.body.ready": "# Обзор\n\nВыберите период и нажмите Создать.",
+        "brief.body.starting": "# Обзор\n\nЗапуск создания обзора...",
+        "brief.body.generating": "# Обзор\n\nСоздание отчёта...\n\nТекущий шаг: {status}",
+        "brief.body.cancelled": "# Обзор\n\nСоздание отменено.",
+        "brief.body.failed": "# Обзор недоступен\n\nНе удалось создать обзор.\n\nОшибка: `{error}`",
+        "brief_reader.binding.close": "Закрыть",
+        "brief_reader.binding.pgup": "PgUp",
+        "brief_reader.binding.pgdn": "PgDn",
+        "brief_reader.header": "Краткий обзор",
+        "brief_reader.hint": "Esc: закрыть   Up/Down: прокрутка   Space/B: страница",
         "quick_nav.binding.close": "Закрыть",
         "quick_nav.header": "Быстрый переход",
         "quick_nav.empty": "Нет переведённых статей.",

@@ -86,6 +86,7 @@ class ProviderHomeScreen(ModalScreen[None]):
         selected_scope_id: str,
     ) -> None:
         super().__init__()
+        self._bindings.bind("b", "show_brief", ui.text("app.binding.brief"))
         self._bindings.bind("c", "show_source_manager", ui.text("app.binding.sources"))
         self._bindings.bind("ctrl+p", "show_command_palette", show=False)
         self._bindings.bind("w", "watch_topic", ui.text("app.binding.watch_topic"))
@@ -143,6 +144,9 @@ class ProviderHomeScreen(ModalScreen[None]):
 
     def action_show_help(self) -> None:
         self.app.action_show_help()
+
+    def action_show_brief(self) -> None:
+        self.app.action_show_brief()
 
     def action_show_command_palette(self) -> None:
         self.app.action_command_palette()

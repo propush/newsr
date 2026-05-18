@@ -52,6 +52,7 @@ def test_bootstrap_config_creates_local_config_with_locale_suggestion(tmp_path: 
     assert config.llm.url == "http://localhost:8081/v1"
     assert config.llm.model_translation == "local-translate"
     assert config.llm.model_summary == "local-translate"
+    assert config.llm.brief_context == 100000
     assert config.translation.target_language == "Serbian"
     assert config.export.image.quality == "fhd"
     assert "Suggested UI language from locale: English" in output.getvalue()
@@ -114,6 +115,7 @@ def test_bootstrap_config_creates_cloud_config_and_retries_bad_headers(tmp_path:
     assert config.llm.model_translation == "gpt-4.1-mini"
     assert config.llm.model_summary == "gpt-4.1-mini"
     assert config.llm.api_key == "sk-test"
+    assert config.llm.brief_context == 100000
     assert config.ui.locale == "en"
     assert config.ui.show_all is True
     assert config.articles.timeout == 180
@@ -239,3 +241,4 @@ def test_default_config_includes_show_all_enabled(tmp_path: Path) -> None:
     assert config.ui.show_all is True
     assert config.articles.timeout == 180
     assert config.articles.update_schedule == "0 * * * *"
+    assert config.llm.brief_context == 100000

@@ -19,6 +19,7 @@ class LLMConfig:
     api_key: str | None = None
     headers: dict[str, str] | None = None
     request_retries: int = 2
+    brief_context: int = 100000
 
 
 @dataclass(slots=True)

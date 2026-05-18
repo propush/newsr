@@ -51,6 +51,7 @@ def _load_llm(raw: dict) -> LLMConfig:
     api_key = _load_optional_string(raw.get("api_key"))
     headers = _load_headers(raw.get("headers"))
     request_retries = int(raw.get("request_retries", 2))
+    brief_context = int(raw.get("brief_context", 100000))
     if not url:
         raise ValueError("llm.url is required")
     if not model_translation:
@@ -59,6 +60,8 @@ def _load_llm(raw: dict) -> LLMConfig:
         raise ValueError("llm.model_summary is required")
     if request_retries < 0:
         raise ValueError("llm.request_retries must be non-negative")
+    if brief_context <= 0:
+        raise ValueError("llm.brief_context must be positive")
     return LLMConfig(
         url=url,
         model_translation=model_translation,
@@ -66,6 +69,7 @@ def _load_llm(raw: dict) -> LLMConfig:
         api_key=api_key,
         headers=headers,
         request_retries=request_retries,
+        brief_context=brief_context,
     )
 
 

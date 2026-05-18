@@ -10,9 +10,11 @@ from unittest.mock import patch
 from rich.cells import cell_len
 from rich.text import Text
 from textual.color import Color
+from textual.containers import VerticalScroll
 from textual.widgets import DataTable
 from textual.widgets import Footer, Input, ListView, LoadingIndicator, Markdown, Static
 
+from newsr.brief import BriefPeriod
 from newsr.export import ExportAction, ExportResult
 from newsr.cancellation import RefreshCancellation
 import pytest
@@ -22,6 +24,8 @@ from newsr.providers.llm import OpenAILLMClient
 from newsr.providers.search import SearchResult
 from newsr.ui import (
     ArticleQuestionScreen,
+    BriefReaderScreen,
+    BriefScreen,
     CategorySelectionScreen,
     ConfirmDialogScreen,
     ExportScreen,
@@ -109,6 +113,38 @@ def article_qa_source_list(app: NewsReaderApp) -> ListView:
     screen = article_qa_screen(app)
     assert screen is not None
     return screen.query_one("#article-qa-source-list", ListView)
+
+
+def brief_screen(app: NewsReaderApp) -> BriefScreen | None:
+    for screen in reversed(app.screen_stack):
+        if isinstance(screen, BriefScreen):
+            return screen
+    return None
+
+
+def brief_reader_screen(app: NewsReaderApp) -> BriefReaderScreen | None:
+    for screen in reversed(app.screen_stack):
+        if isinstance(screen, BriefReaderScreen):
+            return screen
+    return None
+
+
+def brief_body(app: NewsReaderApp) -> str:
+    screen = brief_screen(app)
+    assert screen is not None
+    return screen.query_one("#brief-body", Markdown).source
+
+
+def brief_reader_body(app: NewsReaderApp) -> str:
+    screen = brief_reader_screen(app)
+    assert screen is not None
+    return screen.query_one("#brief-reader-body", Markdown).source
+
+
+def brief_reader_pane(app: NewsReaderApp) -> VerticalScroll:
+    screen = brief_reader_screen(app)
+    assert screen is not None
+    return screen.query_one("#brief-reader-pane", VerticalScroll)
 
 
 def open_link_confirm_screen(app: NewsReaderApp) -> OpenLinkConfirmScreen | None:
@@ -499,6 +535,61 @@ class FakeArticleQALLM:
         )
         index = min(len(self.answer_calls) - 1, len(self.answers) - 1)
         return self.answers[index]
+
+
+class FakeBriefLLM:
+    def __init__(self, report: str = "# Brief\n\nGenerated report") -> None:
+        self.report = report
+        self.shorten_calls: list[tuple[str, str, int]] = []
+        self.report_calls: list[tuple[str, str, int]] = []
+
+    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
+        return None
+
+    def shorten_brief_notes(
+        self,
+        system_prompt: str,
+        notes: str,
+        *,
+        max_tokens: int,
+        cancellation: RefreshCancellation | None = None,
+    ) -> str:
+        self.shorten_calls.append((system_prompt, notes, max_tokens))
+        return "Short note"
+
+    def synthesize_brief_report(
+        self,
+        system_prompt: str,
+        notes: str,
+        *,
+        max_tokens: int,
+        cancellation: RefreshCancellation | None = None,
+    ) -> str:
+        self.report_calls.append((system_prompt, notes, max_tokens))
+        return self.report
+
+
+class BlockingBriefLLM(FakeBriefLLM):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = Event()
+        self.cancelled = Event()
+
+    def shorten_brief_notes(
+        self,
+        system_prompt: str,
+        notes: str,
+        *,
+        max_tokens: int,
+        cancellation: RefreshCancellation | None = None,
+    ) -> str:
+        assert cancellation is not None
+        self.started.set()
+        cancellation.cancelled_event.wait(timeout=5)
+        if cancellation.is_cancelled:
+            self.cancelled.set()
+        cancellation.raise_if_cancelled()
+        return "unused"
 
 
 class FlakyArticleQALLM(FakeArticleQALLM):
@@ -4608,6 +4699,7 @@ def test_ui_provider_home_hides_reader_only_bindings_from_footer(app_config, tmp
         async with app.run_test() as pilot:
             await pilot.pause()
             assert footer_bindings(app) == [
+                ("b", "Brief Review", "brief_or_page_up"),
                 ("c", "Sources", "show_source_manager"),
                 ("w", "Watch Topic", "watch_topic"),
                 ("d", "Refresh", "download_articles"),
@@ -4681,6 +4773,7 @@ def test_ui_provider_home_help_shows_provider_only_bindings(app_config, tmp_path
             await pilot.pause()
             help_text = plain_content(app.screen.query_one("#help-text", Static).content)
             assert "Enter/Space: open the selected provider" in help_text
+            assert "B: brief review" in help_text
             assert "C: manage sources" in help_text
             assert "W: create watched topic" in help_text
             assert "D: force refresh all providers" in help_text
@@ -4690,6 +4783,222 @@ def test_ui_provider_home_help_shows_provider_only_bindings(app_config, tmp_path
             assert "S: cycle reader mode" not in help_text
             assert "M: more info" not in help_text
             assert "L: article list" not in help_text
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_b_opens_brief_screen_with_defaults(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            screen = brief_screen(app)
+            assert screen is not None
+            options = screen.current_options()
+            assert options.period == "last_24h"
+            assert options.include_topics is False
+            assert options.mark_read is True
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_brief_setup_tab_moves_between_control_groups(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            assert brief_screen(app) is not None
+            assert getattr(app.focused, "id", None) == "brief-period"
+
+            await pilot.press("tab")
+            await pilot.pause()
+            assert getattr(app.focused, "id", None) == "brief-include-topics"
+
+            await pilot.press("tab")
+            await pilot.pause()
+            assert getattr(app.focused, "id", None) == "brief-mark-read"
+
+            await pilot.press("shift+tab")
+            await pilot.pause()
+            assert getattr(app.focused, "id", None) == "brief-include-topics"
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_brief_generate_shows_report_and_marks_provider_read(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report")  # type: ignore[assignment]
+    seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="brief-1",
+        title="Brief item",
+        body="Translated body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            screen = brief_screen(app)
+            assert screen is not None
+            screen.period = BriefPeriod.ALL_UNREAD
+            app.generate_brief()
+            for _ in range(20):
+                await pilot.pause()
+                reader = brief_reader_screen(app)
+                if reader is not None and "Generated provider report" in brief_reader_body(app):
+                    break
+            else:
+                raise AssertionError("brief report was not rendered")
+
+            assert "## Statistics" in brief_reader_body(app)
+            assert "BBC News: 1" in brief_reader_body(app)
+            assert brief_screen(app) is None
+            assert brief_reader_screen(app) is not None
+            assert app.storage.load_reader_state("bbc").article_id == "bbc:brief-1"
+            assert app.storage.load_reader_state("[ALL]").article_id is None
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_brief_reader_escape_returns_to_provider_home(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report")  # type: ignore[assignment]
+    seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="brief-reader-close",
+        title="Brief reader close",
+        body="Translated body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            screen = brief_screen(app)
+            assert screen is not None
+            screen.period = BriefPeriod.ALL_UNREAD
+            app.generate_brief()
+            for _ in range(20):
+                await pilot.pause()
+                if brief_reader_screen(app) is not None:
+                    break
+            else:
+                raise AssertionError("brief reader was not opened")
+
+            await pilot.press("escape")
+            await pilot.pause()
+
+            assert brief_reader_screen(app) is None
+            assert brief_screen(app) is None
+            assert app.provider_home_open is True
+            assert getattr(app.focused, "id", None) == "provider-home-table"
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_brief_reader_up_down_scroll_report(app_config, tmp_path) -> None:
+    report = "# Brief\n\n" + "\n\n".join(f"Paragraph {index}" for index in range(80))
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.llm_client = FakeBriefLLM(report)  # type: ignore[assignment]
+    seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="brief-reader-scroll",
+        title="Brief reader scroll",
+        body="Translated body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            screen = brief_screen(app)
+            assert screen is not None
+            screen.period = BriefPeriod.ALL_UNREAD
+            app.generate_brief()
+            for _ in range(20):
+                await pilot.pause()
+                if brief_reader_screen(app) is not None:
+                    break
+            else:
+                raise AssertionError("brief reader was not opened")
+
+            pane = brief_reader_pane(app)
+            assert pane.scroll_y == 0
+
+            await pilot.press("down")
+            await pilot.pause()
+            assert pane.scroll_y > 0
+
+            await pilot.press("up")
+            await pilot.pause()
+            assert pane.scroll_y == 0
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_brief_escape_cancels_generation(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    llm = BlockingBriefLLM()
+    app.llm_client = llm  # type: ignore[assignment]
+    seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="brief-cancel",
+        title="Brief cancel",
+        body="Translated body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            screen = brief_screen(app)
+            assert screen is not None
+            screen.period = BriefPeriod.ALL_UNREAD
+            app.generate_brief()
+            for _ in range(20):
+                await pilot.pause()
+                if llm.started.is_set():
+                    break
+            assert llm.started.is_set()
+            await pilot.press("escape")
+            for _ in range(20):
+                await pilot.pause()
+                if llm.cancelled.is_set():
+                    break
+            assert llm.cancelled.is_set()
+            assert "Generation was cancelled" in brief_body(app)
+            assert app.storage.load_reader_state("bbc").article_id is None
 
     asyncio.run(runner())
 

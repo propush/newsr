@@ -178,6 +178,38 @@ class OpenAILLMClient:
         content = f"Article context:\n{article_text}\n\nSearch results:\n{results_text}"
         return self._chat(self.summary_model, prompt, content, cancellation)
 
+    def shorten_brief_notes(
+        self,
+        system_prompt: str,
+        notes: str,
+        *,
+        max_tokens: int,
+        cancellation: RefreshCancellation | None = None,
+    ) -> str:
+        return self._chat(
+            self.summary_model,
+            system_prompt,
+            notes,
+            cancellation,
+            max_tokens=max_tokens,
+        )
+
+    def synthesize_brief_report(
+        self,
+        system_prompt: str,
+        notes: str,
+        *,
+        max_tokens: int,
+        cancellation: RefreshCancellation | None = None,
+    ) -> str:
+        return self._chat(
+            self.summary_model,
+            system_prompt,
+            notes,
+            cancellation,
+            max_tokens=max_tokens,
+        )
+
     def build_article_question_query(
         self,
         article_title: str,
@@ -267,9 +299,11 @@ class OpenAILLMClient:
         system_prompt: str,
         content: str,
         cancellation: RefreshCancellation | None = None,
+        *,
+        max_tokens: int | None = None,
     ) -> str:
         with self._slot_lock:
-            return self._chat_locked(model, system_prompt, content, cancellation)
+            return self._chat_locked(model, system_prompt, content, cancellation, max_tokens=max_tokens)
 
     def _chat_locked(
         self,
@@ -277,17 +311,20 @@ class OpenAILLMClient:
         system_prompt: str,
         content: str,
         cancellation: RefreshCancellation | None = None,
+        *,
+        max_tokens: int | None = None,
     ) -> str:
         request_id = next(self._request_ids)
-        payload = json.dumps(
-            {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": content},
-                ],
-            }
-        ).encode("utf-8")
+        payload_body: dict[str, object] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": content},
+            ],
+        }
+        if max_tokens is not None:
+            payload_body["max_tokens"] = max_tokens
+        payload = json.dumps(payload_body).encode("utf-8")
 
         started_at = perf_counter()
         LOGGER.info(

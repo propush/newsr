@@ -1,4 +1,6 @@
 from .article_qa import ArticleQuestionScreen
+from .brief import BriefScreen
+from .brief_reader import BriefReaderScreen
 from .categories import SourceSelectionScreen
 from .confirm_dialog import ConfirmDialogScreen
 from .export import ExportScreen
@@ -14,6 +16,8 @@ CategorySelectionScreen = SourceSelectionScreen
 
 __all__ = [
     "ArticleQuestionScreen",
+    "BriefReaderScreen",
+    "BriefScreen",
     "CategorySelectionScreen",
     "ConfirmDialogScreen",
     "ExportScreen",

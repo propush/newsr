@@ -31,6 +31,7 @@ from .controllers.article_rendering import (
     provider_display_names,
     visible_status_text,
 )
+from .controllers.brief import BriefController
 from .controllers.export import ExportController
 from .controllers.more_info import MoreInfoController
 from .controllers.navigation import NavigationController
@@ -151,7 +152,7 @@ class NewsReaderApp(App[None]):
             for _key, binding in self._bindings
             if binding.system
         ]
-        self._bindings = BindingsMap(self._build_bindings())
+        self._set_provider_home_footer_bindings(provider_home_open=False)
         for binding in palette_bindings:
             self._bindings._add_binding(binding)
         self.register_theme(OLD_FIDO_THEME)
@@ -171,6 +172,7 @@ class NewsReaderApp(App[None]):
         self._provider_home = ProviderHomeController(self)
         self._article_qa = ArticleQAController(self)
         self._article_categories = ArticleCategorizationController(self)
+        self._brief = BriefController(self)
         self._more_info = MoreInfoController(self)
         self._navigation = NavigationController(self)
         self._export = ExportController(self)
@@ -192,7 +194,7 @@ class NewsReaderApp(App[None]):
             finally:
                 self._restoring_theme = False
 
-    def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
+    def _build_bindings(self, *, provider_home_open: bool = False) -> list[Binding | tuple[str, str, str]]:
         return [
             Binding("left", "previous_article", self.ui.text("app.binding.previous"), show=False),
             Binding("right", "next_article", self.ui.text("app.binding.next"), show=False),
@@ -200,7 +202,7 @@ class NewsReaderApp(App[None]):
             Binding("down", "scroll_down", self.ui.text("app.binding.down"), show=False),
             Binding("pageup", "page_up", self.ui.text("app.binding.pgup"), show=False),
             Binding("pagedown", "page_down", self.ui.text("app.binding.pgdn"), show=False),
-            Binding("b", "page_up", self.ui.text("app.binding.back"), show=False),
+            Binding("b", "brief_or_page_up", self.ui.text("app.binding.brief"), show=provider_home_open),
             ("k", "classify_article_categories", self.ui.text("app.binding.classify")),
             Binding("space", "space_down", self.ui.text("app.binding.space"), show=False),
             ("s", "cycle_view_mode", self.ui.text("app.binding.mode")),
@@ -217,6 +219,16 @@ class NewsReaderApp(App[None]):
             Binding("escape", "return_to_provider_home", self.ui.text("app.binding.providers"), show=False),
             ("q", "quit_reader", self.ui.text("app.binding.quit")),
         ]
+
+    def _set_provider_home_footer_bindings(self, *, provider_home_open: bool) -> None:
+        palette_bindings = [
+            binding
+            for _key, binding in self._bindings
+            if binding.system
+        ]
+        self._bindings = BindingsMap(self._build_bindings(provider_home_open=provider_home_open))
+        for binding in palette_bindings:
+            self._bindings._add_binding(binding)
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -352,6 +364,12 @@ class NewsReaderApp(App[None]):
     def action_page_up(self) -> None:
         self._navigation.page_up()
 
+    def action_brief_or_page_up(self) -> None:
+        if self.provider_home_open:
+            self._brief.show()
+            return
+        self._navigation.page_up()
+
     def action_page_down(self) -> None:
         self._navigation.page_down()
 
@@ -415,6 +433,7 @@ class NewsReaderApp(App[None]):
         self._more_info.cancel()
         self._article_qa.cancel()
         self._article_categories.cancel()
+        self._brief.cancel()
         self._cleanup_before_exit()
         self._persist_reader_state()
         self.exit()
@@ -426,6 +445,9 @@ class NewsReaderApp(App[None]):
 
     def action_watch_topic(self) -> None:
         self._topic_watch.start()
+
+    def action_show_brief(self) -> None:
+        self._brief.show()
 
     def action_return_to_provider_home(self) -> None:
         if self.provider_home_open:
@@ -562,6 +584,15 @@ class NewsReaderApp(App[None]):
     def close_export_screen(self) -> None:
         self._export.close()
 
+    def generate_brief(self) -> None:
+        self._brief.generate()
+
+    def close_brief(self) -> None:
+        self._brief.close()
+
+    def close_brief_reader(self) -> None:
+        self._brief.close_reader()
+
     # ------------------------------------------------------------------
     # Textual event handlers
     # ------------------------------------------------------------------
@@ -695,6 +726,7 @@ class NewsReaderApp(App[None]):
         self.close_open_link_confirm()
         self.close_article_qa()
         self._article_categories.cancel()
+        self.close_brief()
         self.close_more_info()
         self.close_provider_home()
         self.storage.delete_incomplete_articles()

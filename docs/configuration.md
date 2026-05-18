@@ -28,6 +28,7 @@ llm:
   model_translation: local-translate
   model_summary: local-translate
   request_retries: 2
+  brief_context: 100000
   # api_key: sk-...
   # headers:
   #   OpenAI-Organization: org-...
@@ -60,10 +61,11 @@ export:
 
 - `url`: required base URL for the OpenAI-compatible chat endpoint. Trailing `/` is stripped on load.
 - `model_translation`: required model used for title translation, body translation, responsiveness checks, and article categorization.
-- `model_summary`: required model used for summaries, watched-topic extraction, search-query generation, `More Info`, and article Q&A.
+- `model_summary`: required model used for summaries, brief reviews, watched-topic extraction, search-query generation, `More Info`, and article Q&A.
 - `api_key`: optional bearer token.
 - `headers`: optional mapping of additional HTTP headers. Keys and values must be non-empty strings.
 - `request_retries`: number of retries after the first failed request. Must be zero or greater. Loader default: `2`.
+- `brief_context`: maximum estimated token budget for each brief-generation LLM request, counting input plus requested output. Must be a positive integer. Loader default: `100000`.
 
 ### `translation`
 

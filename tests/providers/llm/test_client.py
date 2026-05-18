@@ -215,6 +215,28 @@ def test_llm_client_check_responsive_rejects_empty_response() -> None:
         client.check_responsive()
 
 
+def test_llm_client_brief_requests_use_summary_model_and_max_tokens() -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "brief notes"}}]}),
+        FakeResponse({"choices": [{"message": {"content": "brief report"}}]}),
+    ]
+    client = OpenAILLMClient(make_config())
+
+    notes = client.shorten_brief_notes("Shorten in Russian.", "Long summaries", max_tokens=123)
+    report = client.synthesize_brief_report("Report in Russian.", "Brief notes", max_tokens=456)
+
+    assert notes == "brief notes"
+    assert report == "brief report"
+    first_payload = json.loads(FakeHTTPConnection.requests[0]["body"].decode("utf-8"))
+    second_payload = json.loads(FakeHTTPConnection.requests[1]["body"].decode("utf-8"))
+    assert first_payload["model"] == "summary"
+    assert first_payload["max_tokens"] == 123
+    assert first_payload["messages"][0]["content"] == "Shorten in Russian."
+    assert second_payload["model"] == "summary"
+    assert second_payload["max_tokens"] == 456
+    assert second_payload["messages"][0]["content"] == "Report in Russian."
+
+
 def test_llm_client_raises_http_errors_without_retrying() -> None:
     FakeHTTPConnection.plan = [
         FakeResponse({"error": {"message": "bad api key"}}, status=401),

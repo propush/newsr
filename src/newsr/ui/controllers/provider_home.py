@@ -141,6 +141,7 @@ class ProviderHomeController:
     def show(self) -> None:
         self._selected_scope_id = self._active_scope_id
         self._open = True
+        self._app._set_provider_home_footer_bindings(provider_home_open=True)
         self.refresh_rows()
         self._notify_bindings_changed()
         self._app.refresh_view()
@@ -153,6 +154,7 @@ class ProviderHomeController:
 
     def close(self) -> None:
         self._open = False
+        self._app._set_provider_home_footer_bindings(provider_home_open=False)
         self._notify_bindings_changed()
         self._app.refresh_view()
         self._app.restore_reader_focus()
