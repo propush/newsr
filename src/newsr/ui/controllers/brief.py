@@ -57,6 +57,9 @@ class BriefController:
             return
         if self.article_open:
             return
+        if self._refresh_blocks_brief():
+            self._show_refresh_busy()
+            return
         screen = BriefScreen(self._app.ui)
         self._screen = screen
         self._app.push_screen(screen)
@@ -64,6 +67,9 @@ class BriefController:
     def generate(self) -> None:
         screen = self._screen
         if screen is None or self._cancellation is not None:
+            return
+        if self._refresh_blocks_brief():
+            self._show_refresh_busy(screen)
             return
         options = screen.current_options()
         screen.set_generating(True)
@@ -283,3 +289,18 @@ class BriefController:
             if article.number == number:
                 return article
         return None
+
+    def _refresh_blocks_brief(self) -> bool:
+        return self._app._refresh.is_busy
+
+    def _show_refresh_busy(self, screen: BriefScreen | None = None) -> None:
+        message = self._app.ui.text("brief.status.refresh_busy")
+        self._app._refresh.set_status_text(
+            message,
+            busy=self._app._refresh.status_busy,
+            hold_seconds=1.2,
+        )
+        if screen is not None:
+            screen.set_generating(False)
+            screen.set_content(message)
+        self._app.refresh_view()

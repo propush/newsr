@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import webbrowser
 from datetime import UTC, datetime, timedelta
-from threading import Event
+from threading import Event, Thread
 from types import MethodType
 from unittest.mock import patch
 
@@ -12,7 +12,7 @@ from rich.text import Text
 from textual.color import Color
 from textual.containers import VerticalScroll
 from textual.widgets import DataTable
-from textual.widgets import Footer, Input, ListView, LoadingIndicator, Markdown, Static
+from textual.widgets import Button, Footer, Input, ListView, LoadingIndicator, Markdown, Static
 
 from newsr.brief import BriefPeriod
 from newsr.export import ExportAction, ExportResult
@@ -4851,6 +4851,63 @@ def test_ui_brief_setup_tab_moves_between_control_groups(app_config, tmp_path) -
             await pilot.press("shift+tab")
             await pilot.pause()
             assert getattr(app.focused, "id", None) == "brief-include-topics"
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_provider_home_b_does_not_open_brief_during_refresh_preflight(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            app._refresh._preflight_thread = Thread(name="test-refresh-preflight")
+            await pilot.press("b")
+            await pilot.pause()
+
+            assert brief_screen(app) is None
+            assert app.status_text == "Brief review is unavailable while refresh is running."
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_brief_generate_does_not_start_when_refresh_becomes_busy(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    llm = FakeBriefLLM("# Brief\n\nGenerated provider report")
+    app.llm_client = llm  # type: ignore[assignment]
+    seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="brief-refresh-busy",
+        title="Brief refresh busy",
+        body="Translated body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            screen = brief_screen(app)
+            assert screen is not None
+
+            app.refresh_in_progress = True
+            app.generate_brief()
+            await pilot.pause()
+
+            assert brief_screen(app) is screen
+            assert brief_reader_screen(app) is None
+            assert "Brief review is unavailable while refresh is running." in brief_body(app)
+            assert screen.generating is False
+            assert screen.query_one("#brief-generate", Button).disabled is False
+            assert llm.shorten_calls == []
+            assert llm.report_calls == []
+            assert app.storage.load_reader_state("bbc").article_id is None
 
     asyncio.run(runner())
 
