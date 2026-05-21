@@ -173,7 +173,9 @@ class MoreInfoController:
         for index, article in enumerate(self._app.articles):
             if article.article_id != article_id:
                 continue
-            self._app.articles[index] = replace(article, more_info=more_info)
+            updated_article = replace(article, more_info=more_info)
+            self._app.articles[index] = updated_article
+            self._app._brief.update_active_article(updated_article)
             break
 
     def _schedule_progress(

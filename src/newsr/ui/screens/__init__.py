@@ -1,4 +1,5 @@
 from .article_qa import ArticleQuestionScreen
+from .brief_article_jump import BriefArticleJumpScreen
 from .brief import BriefScreen
 from .brief_reader import BriefReaderScreen
 from .categories import SourceSelectionScreen
@@ -16,6 +17,7 @@ CategorySelectionScreen = SourceSelectionScreen
 
 __all__ = [
     "ArticleQuestionScreen",
+    "BriefArticleJumpScreen",
     "BriefReaderScreen",
     "BriefScreen",
     "CategorySelectionScreen",

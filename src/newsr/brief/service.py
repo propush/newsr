@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -26,6 +27,7 @@ class BriefOptions:
 
 @dataclass(frozen=True, slots=True)
 class BriefArticle:
+    number: int
     article_id: str
     provider_id: str
     provider_name: str
@@ -54,6 +56,7 @@ ProgressCallback = Callable[[BriefProgress], None]
 _MIN_OUTPUT_TOKENS = 16
 _MAX_BATCH_OUTPUT_TOKENS = 1024
 _MAX_FINAL_OUTPUT_TOKENS = 2048
+_SOURCE_REF_RE = re.compile(r"\[(?P<number>\d+)\]")
 
 
 class BriefService:
@@ -81,11 +84,12 @@ class BriefService:
 
         notes = self._summarize_articles(articles, cancellation, on_progress)
         report = self._synthesize_report(notes, cancellation, on_progress)
+        report, cited_articles = self._renumber_article_references(report, articles)
         report = self._append_statistics(report, articles, provider_ids)
         self._raise_if_cancelled(cancellation)
         if options.mark_read:
             self.mark_sources_read(provider_ids)
-        return BriefResult(report=report, articles=articles, provider_ids=provider_ids)
+        return BriefResult(report=report, articles=cited_articles, provider_ids=provider_ids)
 
     def select_articles(self, options: BriefOptions, *, now: datetime | None = None) -> list[BriefArticle]:
         selected_providers = self._selected_providers(options)
@@ -109,7 +113,10 @@ class BriefService:
             cutoff = self._cutoff_for_period(options.period, now or datetime.now(UTC))
             records = [article for article in records if self._article_timestamp(article) >= cutoff]
 
-        return [self._brief_article(article, provider_by_id[article.provider_id]) for article in records]
+        return [
+            self._brief_article(index, article, provider_by_id[article.provider_id])
+            for index, article in enumerate(records, start=1)
+        ]
 
     def mark_articles_read(self, articles: Sequence[BriefArticle]) -> None:
         latest_by_provider: dict[str, BriefArticle] = {}
@@ -215,14 +222,15 @@ class BriefService:
         return (
             "Shorten these news summaries into compact brief notes in "
             f"{self._config.translation.target_language}. "
-            "Keep only distinct important facts. Return concise Markdown bullets."
+            "Keep only distinct important facts. Preserve source markers like [1]. "
+            "Return concise Markdown bullets."
         )
 
     def _final_prompt(self) -> str:
         return (
             f"Markdown brief in {self._config.translation.target_language}: "
             "# title; ## topic sections separated by ---; bullets per topic. "
-            "Group related items, remove repetition."
+            "Group related items, remove repetition, preserve source markers like [1]."
         )
 
     def _selected_provider_ids(self, options: BriefOptions) -> list[str]:
@@ -280,8 +288,9 @@ class BriefService:
         return value.astimezone(UTC) if value.tzinfo else value.replace(tzinfo=UTC)
 
     @staticmethod
-    def _brief_article(article: ArticleRecord, provider: ProviderRecord) -> BriefArticle:
+    def _brief_article(number: int, article: ArticleRecord, provider: ProviderRecord) -> BriefArticle:
         return BriefArticle(
+            number=number,
             article_id=article.article_id,
             provider_id=article.provider_id,
             provider_name=provider.display_name,
@@ -294,6 +303,7 @@ class BriefService:
     def _format_article(self, article: BriefArticle, input_budget: int) -> str:
         timestamp = article.published_at or article.created_at
         prefix = (
+            f"Source: [{article.number}]\n"
             f"Provider: {article.provider_name}\n"
             f"Title: {article.title}\n"
             f"Published: {timestamp.astimezone().strftime('%Y-%m-%d %H:%M %Z')}\n"
@@ -351,6 +361,50 @@ class BriefService:
             BriefPeriod.ALL_UNREAD: "all unread articles",
         }[options.period]
         return f"# Brief\n\nNo completed article summaries were found for {period}."
+
+    @staticmethod
+    def _renumber_article_references(
+        report: str,
+        articles: Sequence[BriefArticle],
+    ) -> tuple[str, list[BriefArticle]]:
+        if not articles:
+            return report, []
+
+        articles_by_number = {article.number: article for article in articles}
+        display_by_source_number: dict[int, int] = {}
+        cited_articles: list[BriefArticle] = []
+        next_display_number = 1
+
+        def replace_reference(match: re.Match[str]) -> str:
+            nonlocal next_display_number
+
+            source_number = int(match.group("number"))
+            article = articles_by_number.get(source_number)
+            if article is None:
+                return match.group(0)
+
+            display_number = display_by_source_number.get(source_number)
+            if display_number is None:
+                display_number = next_display_number
+                display_by_source_number[source_number] = display_number
+                cited_articles.append(BriefService._renumber_article(article, display_number))
+                next_display_number += 1
+            return f"[{display_number}]"
+
+        return _SOURCE_REF_RE.sub(replace_reference, report), cited_articles
+
+    @staticmethod
+    def _renumber_article(article: BriefArticle, number: int) -> BriefArticle:
+        return BriefArticle(
+            number=number,
+            article_id=article.article_id,
+            provider_id=article.provider_id,
+            provider_name=article.provider_name,
+            title=article.title,
+            summary=article.summary,
+            published_at=article.published_at,
+            created_at=article.created_at,
+        )
 
     @staticmethod
     def _append_statistics(

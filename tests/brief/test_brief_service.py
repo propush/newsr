@@ -11,8 +11,9 @@ from newsr.storage import NewsStorage
 
 
 class FakeBriefLLM:
-    def __init__(self, *, long_first_pass: bool = False) -> None:
+    def __init__(self, *, long_first_pass: bool = False, report: str = "# Brief\n\nFinal report") -> None:
         self.long_first_pass = long_first_pass
+        self.report = report
         self.shorten_calls: list[tuple[str, str, int]] = []
         self.report_calls: list[tuple[str, str, int]] = []
 
@@ -42,7 +43,7 @@ class FakeBriefLLM:
         if cancellation is not None:
             cancellation.raise_if_cancelled()
         self.report_calls.append((system_prompt, notes, max_tokens))
-        return "# Brief\n\nFinal report"
+        return self.report
 
 
 def seed_article(
@@ -85,7 +86,7 @@ def test_brief_selects_enabled_http_sources_and_marks_real_provider_read(
     seed_article(storage, provider_id="bbc", article_id="old", minutes_ago=180, summary="Old summary", now=now)
     seed_article(storage, provider_id="bbc", article_id="new", minutes_ago=30, summary="New summary", now=now)
     seed_article(storage, provider_id=topic.provider_id, article_id="topic", minutes_ago=20, summary="Topic summary", now=now)
-    llm = FakeBriefLLM()
+    llm = FakeBriefLLM(report="# Brief\n\nOld [1]\n\nNew [2]")
     service = BriefService(app_config, storage, llm)
 
     result = service.generate(
@@ -94,6 +95,7 @@ def test_brief_selects_enabled_http_sources_and_marks_real_provider_read(
     )
 
     assert [article.article_id for article in result.articles] == ["bbc:old", "bbc:new"]
+    assert [article.number for article in result.articles] == [1, 2]
     assert result.provider_ids == ["bbc"]
     assert storage.load_reader_state("bbc").article_id == "bbc:new"
     assert storage.load_reader_state(topic.provider_id).article_id is None
@@ -130,7 +132,7 @@ def test_brief_appends_article_counts_for_contributing_providers(
     seed_article(storage, provider_id="bbc", article_id="one", minutes_ago=10, summary="BBC summary 1", now=now)
     seed_article(storage, provider_id="bbc", article_id="two", minutes_ago=20, summary="BBC summary 2", now=now)
     seed_article(storage, provider_id="techcrunch", article_id="one", minutes_ago=30, summary="TC summary", now=now)
-    llm = FakeBriefLLM()
+    llm = FakeBriefLLM(report="# Brief\n\nTC [3]\n\nBBC [1]\n\nAgain [3]\n\nUnknown [99]")
     service = BriefService(app_config, storage, llm)
 
     result = service.generate(
@@ -138,7 +140,15 @@ def test_brief_appends_article_counts_for_contributing_providers(
         now=now,
     )
 
-    assert result.report == "# Brief\n\nFinal report\n\n## Statistics\n\nBBC News: 2\n\nTechCrunch: 1"
+    assert result.report == (
+        "# Brief\n\nTC [1]\n\nBBC [2]\n\nAgain [1]\n\nUnknown [99]\n\n"
+        "## Statistics\n\nBBC News: 2\n\nTechCrunch: 1"
+    )
+    assert [article.article_id for article in result.articles] == ["techcrunch:one", "bbc:one"]
+    assert [article.number for article in result.articles] == [1, 2]
+    assert "Source: [1]" in llm.shorten_calls[0][1]
+    assert "Preserve source markers like [1]" in llm.shorten_calls[0][0]
+    assert "preserve source markers like [1]" in llm.report_calls[0][0]
     assert "Statistics" not in llm.report_calls[0][1]
 
 
@@ -156,7 +166,7 @@ def test_brief_marks_selected_sources_read_even_without_articles_in_period(
     seed_article(storage, provider_id="bbc", article_id="older-1", minutes_ago=60 * 48, summary="Older summary", now=now)
     seed_article(storage, provider_id="bbc", article_id="older-2", minutes_ago=60 * 47, summary="Latest old summary", now=now)
     seed_article(storage, provider_id=topic.provider_id, article_id="topic", minutes_ago=20, summary="Topic summary", now=now)
-    service = BriefService(app_config, storage, FakeBriefLLM())
+    service = BriefService(app_config, storage, FakeBriefLLM(report="# Brief\n\nNew [1]"))
 
     result = service.generate(
         BriefOptions(period=BriefPeriod.LAST_24H, include_topics=False, mark_read=True),
@@ -190,7 +200,7 @@ def test_brief_marks_all_selected_sources_read_not_only_sources_in_report(
         summary="New summary",
         now=now,
     )
-    service = BriefService(app_config, storage, FakeBriefLLM())
+    service = BriefService(app_config, storage, FakeBriefLLM(report="# Brief\n\nNew [1]"))
 
     result = service.generate(
         BriefOptions(period=BriefPeriod.LAST_24H, include_topics=False, mark_read=True),
@@ -257,7 +267,8 @@ def test_brief_context_limit_reduces_notes_until_final_request_fits(
         now=now,
     )
 
-    assert result.report == "# Brief\n\nFinal report\n\n## Statistics\n\nBBC News: 6"
+    assert result.report.startswith("# Brief\n\nFinal report\n\n## Statistics")
+    assert result.report.endswith("## Statistics\n\nBBC News: 6")
     assert len(llm.shorten_calls) > 2
     assert len(llm.report_calls) == 1
     for system_prompt, content, max_tokens in [*llm.shorten_calls, *llm.report_calls]:

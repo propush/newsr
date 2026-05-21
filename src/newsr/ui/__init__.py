@@ -1,6 +1,7 @@
 from .app import NewsReaderApp
 from .screens import (
     ArticleQuestionScreen,
+    BriefArticleJumpScreen,
     BriefReaderScreen,
     BriefScreen,
     CategorySelectionScreen,
@@ -20,6 +21,7 @@ from .themes import OLD_FIDO_THEME
 
 __all__ = [
     "ArticleQuestionScreen",
+    "BriefArticleJumpScreen",
     "BriefReaderScreen",
     "BriefScreen",
     "CategorySelectionScreen",

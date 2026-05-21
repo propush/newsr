@@ -274,7 +274,7 @@ class ProviderHomeController:
         self._app.refresh_view()
 
     def check_action(self, action: str) -> bool | None:
-        if not self._open:
+        if not self._open or self._app._brief.article_open:
             return True
         provider_home_actions = {
             "scroll_up",

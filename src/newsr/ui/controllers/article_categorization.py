@@ -116,5 +116,7 @@ class ArticleCategorizationController:
         for index, article in enumerate(self._app.articles):
             if article.article_id != article_id:
                 continue
-            self._app.articles[index] = replace(article, categories=categories)
+            updated_article = replace(article, categories=categories)
+            self._app.articles[index] = updated_article
+            self._app._brief.update_active_article(updated_article)
             break

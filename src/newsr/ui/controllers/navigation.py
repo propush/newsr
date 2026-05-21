@@ -111,6 +111,8 @@ class NavigationController:
     # ------------------------------------------------------------------
 
     def persist_reader_state(self) -> None:
+        if self._app._brief.article_open:
+            return
         if self._state_persisted:
             return
         self._app.storage.save_reader_state(
@@ -119,10 +121,14 @@ class NavigationController:
         self._state_persisted = True
 
     def save_reader_state_now(self) -> None:
+        if self._app._brief.article_open:
+            return
         self._state_persisted = False
         self.persist_reader_state()
 
     def save_reader_state_now_without_scroll_capture(self) -> None:
+        if self._app._brief.article_open:
+            return
         article = self.current_article
         self._app.reader_state.article_id = article.article_id if article else None
         self._app.storage.save_reader_state(
@@ -196,6 +202,8 @@ class NavigationController:
     # ------------------------------------------------------------------
 
     def previous(self) -> None:
+        if self._app._brief.article_open:
+            return
         if self._app.provider_home_open or self._app._article_qa.is_active:
             return
         if self.current_index == 0:
@@ -207,6 +215,8 @@ class NavigationController:
         self.save_reader_state_now()
 
     def next(self) -> None:
+        if self._app._brief.article_open:
+            return
         if self._app.provider_home_open or self._app._article_qa.is_active:
             return
         if not self.articles:
@@ -226,16 +236,18 @@ class NavigationController:
 
         if self._app.provider_home_open:
             return
-        article = self.current_article
+        article = self._app.current_article
+        reader_state = self._app.active_reader_state
         if article is None:
             return
-        next_mode = self._next_view_mode(self._app.reader_state.view_mode, has_summary=bool(article.summary))
-        if next_mode == self._app.reader_state.view_mode:
+        next_mode = self._next_view_mode(reader_state.view_mode, has_summary=bool(article.summary))
+        if next_mode == reader_state.view_mode:
             return
-        self._app.reader_state.view_mode = next_mode
+        reader_state.view_mode = next_mode
         self.reset_scroll()
         self._app.refresh_view()
-        self.save_reader_state_now_without_scroll_capture()
+        if not self._app._brief.article_open:
+            self.save_reader_state_now_without_scroll_capture()
 
     @staticmethod
     def _next_view_mode(current: ViewMode, *, has_summary: bool) -> ViewMode:
@@ -283,7 +295,7 @@ class NavigationController:
     def open_article(self) -> None:
         if self._app.provider_home_open:
             return
-        article = self.current_article
+        article = self._app.current_article
         if article is None:
             return
         self.request_open_link(article.translated_title or article.title, article.url)
@@ -309,6 +321,8 @@ class NavigationController:
         self._app.refresh_view()
 
     def open_by_id(self, article_id: str) -> None:
+        if self._app._brief.article_open:
+            return
         if self._app._article_qa.is_active:
             return
         for index, article in enumerate(self.articles):
@@ -325,7 +339,7 @@ class NavigationController:
         self._pending_scroll_restore = False
         self._scroll_restore_attempts_remaining = 0
         self._scroll_restore_scheduled = False
-        self._app.reader_state.scroll_offset = 0
+        self._app.active_reader_state.scroll_offset = 0
         self._app.query_one("#article-pane", VerticalScroll).scroll_to(y=0, animate=False)
 
     # ------------------------------------------------------------------

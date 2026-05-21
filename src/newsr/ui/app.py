@@ -285,11 +285,26 @@ class NewsReaderApp(App[None]):
 
     @property
     def current_article(self) -> ArticleRecord | None:
+        if self._brief.active_article is not None:
+            return self._brief.active_article
         return self._navigation.current_article
 
     @property
     def provider_home_open(self) -> bool:
+        if self._brief.article_open:
+            return False
         return self._provider_home.is_open
+
+    @property
+    def active_reader_state(self) -> ReaderState:
+        return self._brief.active_reader_state or self.reader_state
+
+    @property
+    def active_article_position(self) -> tuple[int, int]:
+        brief_position = self._brief.active_article_position
+        if brief_position is not None:
+            return brief_position
+        return self.current_index, len(self.articles)
 
     @property
     def refresh_in_progress(self) -> bool:
@@ -344,9 +359,13 @@ class NewsReaderApp(App[None]):
     # ------------------------------------------------------------------
 
     def action_previous_article(self) -> None:
+        if self._brief.article_open:
+            return
         self._navigation.previous()
 
     def action_next_article(self) -> None:
+        if self._brief.article_open:
+            return
         self._navigation.next()
 
     def action_cycle_view_mode(self) -> None:
@@ -401,7 +420,7 @@ class NewsReaderApp(App[None]):
         self._article_qa.show(article)
 
     def action_show_quick_nav(self) -> None:
-        if self.provider_home_open:
+        if self.provider_home_open or self._brief.article_open:
             return
         self.push_screen(
             QuickNavScreen(
@@ -439,17 +458,24 @@ class NewsReaderApp(App[None]):
         self.exit()
 
     def action_download_articles(self) -> None:
+        if self._brief.article_open:
+            return
         provider_ids = self._manual_refresh_provider_ids()
         if provider_ids:
             self._refresh.start(provider_ids, force=True)
 
     def action_watch_topic(self) -> None:
+        if self._brief.article_open:
+            return
         self._topic_watch.start()
 
     def action_show_brief(self) -> None:
         self._brief.show()
 
     def action_return_to_provider_home(self) -> None:
+        if self._brief.article_open:
+            self._brief.return_to_reader()
+            return
         if self.provider_home_open:
             return
         if len(self.screen_stack) > 1:
@@ -593,6 +619,15 @@ class NewsReaderApp(App[None]):
     def close_brief_reader(self) -> None:
         self._brief.close_reader()
 
+    def show_brief_article_jump(self, initial_value: str) -> None:
+        self._brief.show_jump(initial_value)
+
+    def close_brief_article_jump(self, *, cancelled: bool) -> None:
+        self._brief.close_jump(cancelled=cancelled)
+
+    def open_brief_article_by_number(self, number: int) -> None:
+        self._brief.open_article_number(number)
+
     # ------------------------------------------------------------------
     # Textual event handlers
     # ------------------------------------------------------------------
@@ -680,15 +715,16 @@ class NewsReaderApp(App[None]):
             else:
                 border_title = article_frame_title(article, header.size.width, self.providers)
                 active_theme = self.get_theme(self.theme)
+                current_index, total = self.active_article_position
                 header_text = article_header(
                     self.ui,
-                    self.current_index,
-                    len(self.articles),
+                    current_index,
+                    total,
                     article,
-                    self.reader_state,
+                    self.active_reader_state,
                     active_theme.accent if active_theme is not None else "#ffffff",
                 )
-                body_text = article_text(self.reader_state, article)
+                body_text = article_text(self.active_reader_state, article)
                 url_text = article_url_text(self.ui, article, article_url_widget.size.width)
         if header.display and header.size.width == 0:
             # Widget is visible but layout has not been computed yet.

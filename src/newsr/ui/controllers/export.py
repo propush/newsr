@@ -32,10 +32,11 @@ class ExportController:
             return
         if self._screen is not None:
             return
+        reader_state = self._app.active_reader_state
         self._screen = ExportScreen(
             self._app.ui,
-            article_title(self._app.reader_state, article),
-            view_mode_label(self._app.ui, self._app.reader_state, article),
+            article_title(reader_state, article),
+            view_mode_label(self._app.ui, reader_state, article),
         )
         self._app.push_screen(self._screen)
 
@@ -51,7 +52,7 @@ class ExportController:
         result = self._app.export_service.export(
             action,
             article=article,
-            view_mode=self._app.reader_state.view_mode,
+            view_mode=self._app.active_reader_state.view_mode,
             theme=self._app.get_theme(self._app.theme),
             config=self._app.config,
         )
