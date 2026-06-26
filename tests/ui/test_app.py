@@ -5033,6 +5033,52 @@ def test_ui_brief_generate_shows_repair_progress_step(app_config, tmp_path) -> N
 
 
 @pytest.mark.provider_home
+def test_ui_brief_generate_localizes_repair_progress_step_in_russian(app_config, tmp_path) -> None:
+    app_config.ui.locale = "ru"
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    llm = PausingFinalRepairBriefLLM()
+    app.llm_client = llm  # type: ignore[assignment]
+    seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="brief-repair-progress-ru",
+        title="Brief repair progress ru",
+        body="Translated body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            screen = brief_screen(app)
+            assert screen is not None
+            screen.period = BriefPeriod.ALL_UNREAD
+            app.generate_brief()
+            for _ in range(30):
+                await pilot.pause()
+                body = brief_body(app)
+                if "исправление итогового обзора, попытка 1 из 5" in body:
+                    break
+            else:
+                raise AssertionError("localized brief repair progress was not rendered")
+
+            assert "repairing final brief, attempt 1 of 5" not in brief_body(app)
+            assert llm.repair_started.is_set()
+            llm.release_repair.set()
+            for _ in range(30):
+                await pilot.pause()
+                if brief_reader_screen(app) is not None and "Fixed report [1]" in brief_reader_body(app):
+                    break
+            else:
+                raise AssertionError("brief reader was not opened after repair")
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
 def test_ui_brief_reader_escape_returns_to_provider_home(app_config, tmp_path) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)

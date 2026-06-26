@@ -226,17 +226,20 @@ def test_brief_progress_reports_compressed_note_repair(
         ],
         report="# Brief\n\nOne [1]",
     )
-    progress: list[str] = []
+    progress: list[tuple[str, dict[str, object]]] = []
     service = BriefService(app_config, storage, llm)
 
     service.generate(
         BriefOptions(period=BriefPeriod.LAST_24H, include_topics=False, mark_read=False),
         now=now,
-        on_progress=lambda value: progress.append(value.status),
+        on_progress=lambda value: progress.append((value.message_key, value.message_args)),
     )
 
-    assert "selecting articles" in progress
-    assert "repairing compressed summary batch 1 of 1, attempt 1 of 5" in progress
+    assert ("brief.status.selecting_articles", {}) in progress
+    assert (
+        "brief.status.repairing_compressed",
+        {"batch_index": 1, "batch_count": 1, "attempt": 1, "attempts": 5},
+    ) in progress
 
 
 def test_brief_repairs_compressed_notes_without_source_markers(
@@ -302,17 +305,20 @@ def test_brief_progress_reports_final_report_repair(
             "# Brief\n\nOne [1]",
         ]
     )
-    progress: list[str] = []
+    progress: list[tuple[str, dict[str, object]]] = []
     service = BriefService(app_config, storage, llm)
 
     service.generate(
         BriefOptions(period=BriefPeriod.LAST_24H, include_topics=False, mark_read=False),
         now=now,
-        on_progress=lambda value: progress.append(value.status),
+        on_progress=lambda value: progress.append((value.message_key, value.message_args)),
     )
 
-    assert "writing final brief" in progress
-    assert "repairing final brief, attempt 1 of 5" in progress
+    assert ("brief.status.writing_final", {}) in progress
+    assert (
+        "brief.status.repairing_final",
+        {"attempt": 1, "attempts": 5},
+    ) in progress
 
 
 def test_brief_repairs_final_report_with_missing_articles(
@@ -388,17 +394,20 @@ def test_brief_progress_reports_final_fallback_after_failed_repairs(
             "# Brief\n\nBad [99]",
         ]
     )
-    progress: list[str] = []
+    progress: list[tuple[str, dict[str, object]]] = []
     service = BriefService(app_config, storage, llm)
 
     service.generate(
         BriefOptions(period=BriefPeriod.LAST_24H, include_topics=False, mark_read=False),
         now=now,
-        on_progress=lambda value: progress.append(value.status),
+        on_progress=lambda value: progress.append((value.message_key, value.message_args)),
     )
 
-    assert "repairing final brief, attempt 5 of 5" in progress
-    assert "using fallback for final brief" in progress
+    assert (
+        "brief.status.repairing_final",
+        {"attempt": 5, "attempts": 5},
+    ) in progress
+    assert ("brief.status.final_fallback", {}) in progress
 
 
 def test_brief_logs_repair_metadata_without_source_text(

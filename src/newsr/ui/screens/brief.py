@@ -170,8 +170,9 @@ class BriefScreen(ModalScreen[None]):
             progress.update(total=100, progress=percent)
         except NoMatches:
             pass
+        status = self._ui.text(progress_value.message_key, **progress_value.message_args)
         self.set_content(
-            self._ui.text("brief.body.generating", status=self._ui.status(progress_value.status))
+            self._ui.text("brief.body.generating", status=status)
         )
 
     def set_report(self, report: str) -> None:

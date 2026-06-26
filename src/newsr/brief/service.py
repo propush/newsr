@@ -55,7 +55,8 @@ class BriefArticle:
 class BriefProgress:
     completed: int
     total: int
-    status: str
+    message_key: str
+    message_args: dict[str, object]
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,7 +106,7 @@ class BriefService:
     ) -> BriefResult:
         started_at = perf_counter()
         self._raise_if_cancelled(cancellation)
-        self._emit(on_progress, 0, 1, "selecting articles")
+        self._emit(on_progress, 0, 1, "brief.status.selecting_articles")
         articles = self.select_articles(options, now=now)
         provider_ids = self._selected_provider_ids(options)
         LOGGER.info(
@@ -119,7 +120,7 @@ class BriefService:
         if not articles:
             report = self._empty_report(options)
             if options.mark_read:
-                self._emit(on_progress, 0, 1, "marking selected sources read")
+                self._emit(on_progress, 0, 1, "brief.status.marking_read")
                 self.mark_sources_read(provider_ids)
             LOGGER.info(
                 "brief_generate_done articles=0 providers=%s duration_s=%.3f",
@@ -134,7 +135,7 @@ class BriefService:
         report = self._append_statistics(report, articles, provider_ids)
         self._raise_if_cancelled(cancellation)
         if options.mark_read:
-            self._emit(on_progress, 1, 1, "marking selected sources read")
+            self._emit(on_progress, 1, 1, "brief.status.marking_read")
             self.mark_sources_read(provider_ids)
         LOGGER.info(
             "brief_generate_done articles=%s cited_articles=%s providers=%s duration_s=%.3f",
@@ -218,7 +219,14 @@ class BriefService:
         notes: list[str] = []
         for index, batch in enumerate(batches, start=1):
             self._raise_if_cancelled(cancellation)
-            self._emit(on_progress, index - 1, total, f"compressing summaries {index} of {len(batches)}")
+            self._emit(
+                on_progress,
+                index - 1,
+                total,
+                "brief.status.compressing_summaries",
+                index=index,
+                total=len(batches),
+            )
             batch_started_at = perf_counter()
             LOGGER.info(
                 "brief_compress_batch_start batch=%s batches=%s articles=%s source_markers=%s",
@@ -272,7 +280,13 @@ class BriefService:
             batches = self._batch_texts(notes, input_budget)
             reduced: list[str] = []
             for index, batch in enumerate(batches, start=1):
-                self._emit(on_progress, index, len(batches) + 1, f"reducing notes pass {iteration}")
+                self._emit(
+                    on_progress,
+                    index,
+                    len(batches) + 1,
+                    "brief.status.reducing_notes",
+                    pass_number=iteration,
+                )
                 trimmed_batch = self._trim_to_budget(batch, input_budget)
                 reduce_started_at = perf_counter()
                 LOGGER.info(
@@ -327,7 +341,7 @@ class BriefService:
         input_budget = self._input_budget(prompt, output_tokens)
         content = self._trim_to_budget("\n\n".join(notes), input_budget)
         self._raise_if_cancelled(cancellation)
-        self._emit(on_progress, 1, 1, "writing final brief")
+        self._emit(on_progress, 1, 1, "brief.status.writing_final")
         started_at = perf_counter()
         LOGGER.info(
             "brief_final_start notes=%s input_budget=%s output_tokens=%s",
@@ -376,7 +390,11 @@ class BriefService:
                 on_progress,
                 max(0, batch_index - 1),
                 max(1, batch_count + 1),
-                f"repairing compressed summary batch {batch_index} of {batch_count}, attempt {attempt} of {MAX_BRIEF_REPAIR_ATTEMPTS}",
+                "brief.status.repairing_compressed",
+                batch_index=batch_index,
+                batch_count=batch_count,
+                attempt=attempt,
+                attempts=MAX_BRIEF_REPAIR_ATTEMPTS,
             )
             started_at = perf_counter()
             LOGGER.info(
@@ -421,7 +439,9 @@ class BriefService:
             on_progress,
             max(0, batch_index - 1),
             max(1, batch_count + 1),
-            f"using fallback for compressed summary batch {batch_index} of {batch_count}",
+            "brief.status.compressed_fallback",
+            batch_index=batch_index,
+            batch_count=batch_count,
         )
         LOGGER.warning(
             "brief_repair_compressed_fallback batch=%s batches=%s attempts=%s",
@@ -457,7 +477,9 @@ class BriefService:
                 on_progress,
                 1,
                 1,
-                f"repairing final brief, attempt {attempt} of {MAX_BRIEF_REPAIR_ATTEMPTS}",
+                "brief.status.repairing_final",
+                attempt=attempt,
+                attempts=MAX_BRIEF_REPAIR_ATTEMPTS,
             )
             started_at = perf_counter()
             LOGGER.info(
@@ -496,7 +518,7 @@ class BriefService:
             if validation.ok:
                 return repaired
             self._log_validation("final", validation, attempt=attempt)
-        self._emit(on_progress, 1, 1, "using fallback for final brief")
+        self._emit(on_progress, 1, 1, "brief.status.final_fallback")
         LOGGER.warning(
             "brief_repair_final_fallback attempts=%s articles=%s",
             MAX_BRIEF_REPAIR_ATTEMPTS,
@@ -867,10 +889,29 @@ class BriefService:
         return f"{report.rstrip()}\n\n## Statistics\n\n" + "\n\n".join(lines)
 
     @staticmethod
-    def _emit(callback: ProgressCallback | None, completed: int, total: int, status: str) -> None:
-        LOGGER.info("brief_progress completed=%s total=%s status=%r", completed, max(1, total), status)
+    def _emit(
+        callback: ProgressCallback | None,
+        completed: int,
+        progress_total: int,
+        message_key: str,
+        **message_args: object,
+    ) -> None:
+        LOGGER.info(
+            "brief_progress completed=%s total=%s message_key=%r message_args=%r",
+            completed,
+            max(1, progress_total),
+            message_key,
+            message_args,
+        )
         if callback is not None:
-            callback(BriefProgress(completed=completed, total=max(1, total), status=status))
+            callback(
+                BriefProgress(
+                    completed=completed,
+                    total=max(1, progress_total),
+                    message_key=message_key,
+                    message_args=dict(message_args),
+                )
+            )
 
     @staticmethod
     def _raise_if_cancelled(cancellation: RefreshCancellation | None) -> None:
