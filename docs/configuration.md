@@ -95,5 +95,5 @@ export:
 
 - `newsr.yml`: global app configuration.
 - `cache/newsr.sqlite3`: providers, targets, topic watches, article content, translations, summaries, cached `more_info`, reader state, options, and refresh bookkeeping.
-- `cache/newsr-llm.log`: LLM request log plus non-provider network request metadata. Entries include request method, URL, status, and errors without logging response contents.
+- `cache/newsr-llm.log`: LLM request log, brief-generation stage metadata, repair retry metadata, and non-provider network request metadata. Entries include request method, URL, status, brief stage, validation counts, and errors without logging response contents.
 - `exports/`: Markdown and PNG exports created by the export flow.

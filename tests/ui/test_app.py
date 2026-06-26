@@ -575,7 +575,7 @@ class FakeBriefLLM:
         cancellation: RefreshCancellation | None = None,
     ) -> str:
         self.shorten_calls.append((system_prompt, notes, max_tokens))
-        return "Short note"
+        return "\n".join(f"- Short note [{number}]" for number in _source_numbers(notes))
 
     def synthesize_brief_report(
         self,
@@ -587,6 +587,42 @@ class FakeBriefLLM:
     ) -> str:
         self.report_calls.append((system_prompt, notes, max_tokens))
         return self.report
+
+
+class PausingFinalRepairBriefLLM(FakeBriefLLM):
+    def __init__(self) -> None:
+        super().__init__("# Brief\n\nFixed report [1]")
+        self.repair_started = Event()
+        self.release_repair = Event()
+
+    def synthesize_brief_report(
+        self,
+        system_prompt: str,
+        notes: str,
+        *,
+        max_tokens: int,
+        cancellation: RefreshCancellation | None = None,
+    ) -> str:
+        self.report_calls.append((system_prompt, notes, max_tokens))
+        if len(self.report_calls) == 1:
+            return "# Brief\n\nBad report [99]"
+        self.repair_started.set()
+        self.release_repair.wait(timeout=5)
+        if cancellation is not None:
+            cancellation.raise_if_cancelled()
+        return self.report
+
+
+def _source_numbers(value: str) -> list[int]:
+    numbers: list[int] = []
+    for part in value.split("[")[1:]:
+        raw_number = part.split("]", 1)[0]
+        if not raw_number.isdigit():
+            continue
+        number = int(raw_number)
+        if number not in numbers:
+            numbers.append(number)
+    return numbers or [1]
 
 
 class BlockingBriefLLM(FakeBriefLLM):
@@ -4916,7 +4952,7 @@ def test_ui_brief_generate_does_not_start_when_refresh_becomes_busy(app_config, 
 def test_ui_brief_generate_shows_report_and_marks_provider_read(app_config, tmp_path) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
-    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report")  # type: ignore[assignment]
+    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report [1]")  # type: ignore[assignment]
     seed_provider_article(
         app,
         provider_id="bbc",
@@ -4954,10 +4990,53 @@ def test_ui_brief_generate_shows_report_and_marks_provider_read(app_config, tmp_
 
 
 @pytest.mark.provider_home
+def test_ui_brief_generate_shows_repair_progress_step(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    llm = PausingFinalRepairBriefLLM()
+    app.llm_client = llm  # type: ignore[assignment]
+    seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="brief-repair-progress",
+        title="Brief repair progress",
+        body="Translated body",
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            screen = brief_screen(app)
+            assert screen is not None
+            screen.period = BriefPeriod.ALL_UNREAD
+            app.generate_brief()
+            for _ in range(30):
+                await pilot.pause()
+                if "repairing final brief, attempt 1 of 5" in brief_body(app):
+                    break
+            else:
+                raise AssertionError("brief repair progress was not rendered")
+
+            assert llm.repair_started.is_set()
+            llm.release_repair.set()
+            for _ in range(30):
+                await pilot.pause()
+                if brief_reader_screen(app) is not None and "Fixed report [1]" in brief_reader_body(app):
+                    break
+            else:
+                raise AssertionError("brief reader was not opened after repair")
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
 def test_ui_brief_reader_escape_returns_to_provider_home(app_config, tmp_path) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
-    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report")  # type: ignore[assignment]
+    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report [1]")  # type: ignore[assignment]
     seed_provider_article(
         app,
         provider_id="bbc",
@@ -4996,7 +5075,7 @@ def test_ui_brief_reader_escape_returns_to_provider_home(app_config, tmp_path) -
 
 @pytest.mark.provider_home
 def test_ui_brief_reader_up_down_scroll_report(app_config, tmp_path) -> None:
-    report = "# Brief\n\n" + "\n\n".join(f"Paragraph {index}" for index in range(80))
+    report = "# Brief\n\n" + "\n\n".join(f"Paragraph {index} [1]" for index in range(80))
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
     app.llm_client = FakeBriefLLM(report)  # type: ignore[assignment]
@@ -5043,7 +5122,7 @@ def test_ui_brief_reader_up_down_scroll_report(app_config, tmp_path) -> None:
 def test_ui_brief_reader_number_jump_opens_article_without_saving_reader_state(app_config, tmp_path) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
-    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report [2]")  # type: ignore[assignment]
+    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report [2]\n\nOther report item [1]")  # type: ignore[assignment]
     fake_export = FakeExportService()
     app.export_service = fake_export
     first_id = seed_provider_article(
@@ -5097,7 +5176,7 @@ def test_ui_brief_reader_number_jump_opens_article_without_saving_reader_state(a
             assert app.current_article is not None
             assert app.current_article.article_id == second_id
             assert body_source(app) == "Translated body two"
-            assert "Article # 1 of 1" in header_text(app)
+            assert "Article # 1 of 2" in header_text(app)
 
             await pilot.press("left", "right")
             await pilot.pause()
@@ -5133,7 +5212,7 @@ def test_ui_brief_mark_read_survives_article_jump_from_active_provider(app_confi
     storage_path = tmp_path / "newsr.sqlite3"
     app = NewsReaderApp(app_config, storage_path)
     disable_startup_refresh(app)
-    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report [2]")  # type: ignore[assignment]
+    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report [2]\n\nOther report item [1]")  # type: ignore[assignment]
     first_id = seed_provider_article(
         app,
         provider_id="bbc",
@@ -5249,7 +5328,7 @@ def test_ui_brief_article_jump_rejects_out_of_range_numbers(app_config, tmp_path
 
 @pytest.mark.provider_home
 def test_ui_brief_reader_restores_scroll_after_article_jump(app_config, tmp_path) -> None:
-    report = "# Brief\n\n[1]\n\n" + "\n\n".join(f"Paragraph {index}" for index in range(120))
+    report = "# Brief\n\n[1]\n\n" + "\n\n".join(f"Paragraph {index} [1]" for index in range(120))
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
     app.llm_client = FakeBriefLLM(report)  # type: ignore[assignment]
