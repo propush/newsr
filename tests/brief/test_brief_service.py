@@ -152,6 +152,26 @@ def test_brief_appends_article_counts_for_contributing_providers(
     assert "Statistics" not in llm.report_calls[0][1]
 
 
+def test_brief_prompts_include_current_datetime(
+    app_config: AppConfig,
+    storage: NewsStorage,
+) -> None:
+    now = datetime(2026, 5, 18, 12, 0, tzinfo=UTC)
+    prompt_time = datetime(2026, 6, 26, 13, 4, 5, tzinfo=UTC)
+    seed_article(storage, provider_id="bbc", article_id="one", minutes_ago=10, summary="BBC summary", now=now)
+    llm = FakeBriefLLM(report="# Brief\n\nBBC [1]")
+    service = BriefService(app_config, storage, llm, current_time=lambda: prompt_time)
+
+    service.generate(
+        BriefOptions(period=BriefPeriod.LAST_24H, include_topics=False, mark_read=False),
+        now=now,
+    )
+
+    expected = "Current local date and time: 2026-06-26 13:04:05 UTC."
+    assert expected in llm.shorten_calls[0][0]
+    assert expected in llm.report_calls[0][0]
+
+
 def test_brief_marks_selected_sources_read_even_without_articles_in_period(
     app_config: AppConfig,
     storage: NewsStorage,

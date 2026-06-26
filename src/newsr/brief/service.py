@@ -9,6 +9,7 @@ from enum import StrEnum
 from ..cancellation import RefreshCancellation
 from ..config.models import AppConfig
 from ..domain import ArticleRecord, ProviderRecord, ReaderState, ViewMode
+from ..providers.llm.client import current_datetime_prompt_value
 from ..storage.facade import NewsStorage
 
 
@@ -52,6 +53,7 @@ class BriefResult:
 
 
 ProgressCallback = Callable[[BriefProgress], None]
+Clock = Callable[[], datetime]
 
 _MIN_OUTPUT_TOKENS = 16
 _MAX_BATCH_OUTPUT_TOKENS = 1024
@@ -60,10 +62,18 @@ _SOURCE_REF_RE = re.compile(r"\[(?P<number>\d+)\]")
 
 
 class BriefService:
-    def __init__(self, config: AppConfig, storage: NewsStorage, llm_client) -> None:  # type: ignore[no-untyped-def]
+    def __init__(
+        self,
+        config: AppConfig,
+        storage: NewsStorage,
+        llm_client,
+        *,
+        current_time: Clock | None = None,
+    ) -> None:  # type: ignore[no-untyped-def]
         self._config = config
         self._storage = storage
         self._llm_client = llm_client
+        self._current_time = current_time
 
     def generate(
         self,
@@ -222,6 +232,7 @@ class BriefService:
         return (
             "Shorten these news summaries into compact brief notes in "
             f"{self._config.translation.target_language}. "
+            f"Current local date and time: {self._current_datetime_prompt_value()}. "
             "Keep only distinct important facts. Preserve source markers like [1]. "
             "Return concise Markdown bullets."
         )
@@ -229,9 +240,15 @@ class BriefService:
     def _final_prompt(self) -> str:
         return (
             f"Markdown brief in {self._config.translation.target_language}: "
+            f"Current local date and time: {self._current_datetime_prompt_value()}. "
             "# title; ## topic sections separated by ---; bullets per topic. "
             "Group related items, remove repetition, preserve source markers like [1]."
         )
+
+    def _current_datetime_prompt_value(self) -> str:
+        if self._current_time is None:
+            return current_datetime_prompt_value()
+        return current_datetime_prompt_value(self._current_time())
 
     def _selected_provider_ids(self, options: BriefOptions) -> list[str]:
         return [provider.provider_id for provider in self._selected_providers(options)]

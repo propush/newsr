@@ -3,6 +3,7 @@ from __future__ import annotations
 import http.client
 import json
 import logging
+from datetime import datetime
 from itertools import count
 from threading import Lock
 from time import perf_counter
@@ -23,6 +24,13 @@ LOGGER.propagate = False
 
 def _configure_logger() -> None:
     configure_cache_logger(LOGGER, filename="newsr-llm.log")
+
+
+def current_datetime_prompt_value(now: datetime | None = None) -> str:
+    value = now or datetime.now().astimezone()
+    if value.tzinfo is None:
+        value = value.astimezone()
+    return value.strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
 class OpenAILLMClient:
@@ -88,6 +96,7 @@ class OpenAILLMClient:
     ) -> str:
         prompt = (
             f"Summarize the article '{article_title}' in {self.target_language}. "
+            f"Current local date and time: {current_datetime_prompt_value()}. "
             "Return a concise, readable summary with the main facts only. "
             "Use short paragraphs and occasional bullet points only when helpful."
         )

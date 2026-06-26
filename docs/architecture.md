@@ -33,6 +33,7 @@ Provider catalogs are not uniform. See [Current Providers](current_providers.md)
 - The reader supports translated full, translated summary, and original source views, per-scope saved article position, saved view mode, saved scroll offset, and a quick-navigation list that only includes translated articles.
 - Refresh work is scheduled per provider with a global default cron expression and optional per-provider overrides from the source manager.
 - Every refresh session performs an LLM responsiveness check before starting article processing.
+- Summary, brief-review, and article-Q&A LLM prompts include the current local date and time so relative time references are grounded at request time.
 - Articles are classified into the fixed app category vocabulary: `ADVERTISEMENT`, `SPORT`, `TECHNOLOGIES`, `AI`, `LIFE`, `MEETUP`, `BUSINESS`, `POLITICS`, `WAR`, `SCIENCE`, `HEALTH`, `SECURITY`, and `CULTURE`.
 - The reader can rerun category classification for the current article from stored source text.
 - `More Info` builds a cached article-specific context panel from DuckDuckGo results plus LLM synthesis.

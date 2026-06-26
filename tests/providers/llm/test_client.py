@@ -18,6 +18,7 @@ from newsr.config import (
     UIConfig,
 )
 from newsr.providers.llm import OpenAILLMClient
+from newsr.providers.search.duckduckgo import SearchResult
 
 
 class FakeResponse:
@@ -235,6 +236,59 @@ def test_llm_client_brief_requests_use_summary_model_and_max_tokens() -> None:
     assert second_payload["model"] == "summary"
     assert second_payload["max_tokens"] == 456
     assert second_payload["messages"][0]["content"] == "Report in Russian."
+
+
+def test_llm_client_summary_prompt_includes_current_datetime(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "newsr.providers.llm.client.current_datetime_prompt_value",
+        lambda: "2026-06-26 15:04:05 CEST",
+    )
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "summary"}}]}),
+    ]
+    client = OpenAILLMClient(make_config())
+
+    result = client.summarize("Headline", "Translated article")
+
+    assert result == "summary"
+    payload = json.loads(FakeHTTPConnection.requests[0]["body"].decode("utf-8"))
+    system_prompt = payload["messages"][0]["content"]
+    assert payload["model"] == "summary"
+    assert "Summarize the article 'Headline' in Russian." in system_prompt
+    assert "Current local date and time: 2026-06-26 15:04:05 CEST." in system_prompt
+    assert payload["messages"][1]["content"] == "Translated article"
+
+
+def test_llm_client_article_qa_prompts_include_supplied_current_datetime() -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "search query"}}]}),
+        FakeResponse({"choices": [{"message": {"content": "answer"}}]}),
+    ]
+    client = OpenAILLMClient(make_config())
+    current_datetime = "2026-06-26 15:04:05 CEST"
+
+    query = client.build_article_question_query(
+        "Headline",
+        "Article body",
+        "What happens next year?",
+        current_datetime,
+        [("Earlier?", "Earlier answer")],
+    )
+    answer = client.answer_article_question(
+        "Headline",
+        "Article body",
+        "What happens next year?",
+        current_datetime,
+        [("Earlier?", "Earlier answer")],
+        [SearchResult(title="Context", url="https://example.com", snippet="Snippet")],
+    )
+
+    assert query == "search query"
+    assert answer == "answer"
+    first_payload = json.loads(FakeHTTPConnection.requests[0]["body"].decode("utf-8"))
+    second_payload = json.loads(FakeHTTPConnection.requests[1]["body"].decode("utf-8"))
+    assert f"Current local date and time: {current_datetime}." in first_payload["messages"][0]["content"]
+    assert f"Current local date and time: {current_datetime}." in second_payload["messages"][0]["content"]
 
 
 def test_llm_client_raises_http_errors_without_retrying() -> None:

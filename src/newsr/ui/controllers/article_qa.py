@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from itertools import count
 from threading import Thread
 from typing import TYPE_CHECKING
 
 from ...cancellation import RefreshCancellation, RefreshCancelled
+from ...providers.llm.client import current_datetime_prompt_value
 from ...providers.search.duckduckgo import SearchResult
 from ..screens import ArticleQuestionScreen
 from . import article_context_source_text
@@ -124,7 +124,7 @@ class ArticleQAController:
         chat_history: list[tuple[str, str]],
         cancellation: RefreshCancellation,
     ) -> None:
-        current_datetime = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+        current_datetime = current_datetime_prompt_value()
         try:
             original_article_title = article.title
             original_article_text = article_context_source_text(article)
