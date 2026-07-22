@@ -131,7 +131,7 @@ class NewsPipeline:
     ) -> tuple[int, int]:
         new_articles = 0
         failed_articles = 0
-        pending_candidates: list[SectionCandidate] = []
+        pending_candidates_by_id: dict[str, tuple[SectionCandidate, str]] = {}
         selected_targets = self.storage.list_selected_targets(provider_id)
         for target in selected_targets:
             candidates, target_failed = self._fetch_target_candidates(
@@ -141,9 +141,21 @@ class NewsPipeline:
                 cancellation,
             )
             failed_articles += target_failed
-            pending_candidates.extend(candidates)
+            for candidate in candidates:
+                previous = pending_candidates_by_id.get(candidate.article_id)
+                if previous is not None:
+                    _LOG.info(
+                        "duplicate_candidate_deduplicated provider_id=%s article_id=%s "
+                        "replaced_target_key=%s selected_target_key=%s",
+                        provider_id,
+                        candidate.article_id,
+                        previous[1],
+                        target.target_key,
+                    )
+                pending_candidates_by_id[candidate.article_id] = (candidate, target.target_key)
         if not selected_targets:
             self._emit(on_status, f"no targets selected for {provider.display_name}")
+        pending_candidates = [candidate for candidate, _ in pending_candidates_by_id.values()]
         progress = RefreshProgress(completed_articles=0, total_articles=len(pending_candidates))
         for candidate in pending_candidates:
             self._raise_if_cancelled(cancellation)
