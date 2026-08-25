@@ -53,7 +53,7 @@ export:
 ### `articles`
 
 - `fetch`: how many article candidates each selected target keeps from a provider refresh. Must be a positive integer. Loader default: `5`.
-- `store`: retention window in days for cached article rows. On startup, NewsR prunes articles whose `created_at` is older than this cutoff. Must be a positive integer. Loader default: `10`.
+- `store`: retention window in days for cached article rows and maximum publication age for watched-topic articles. On startup, NewsR prunes article rows whose `created_at` is older than this cutoff. During watched-topic refreshes, NewsR filters pages whose parsed publication time is older than this cutoff. Must be a positive integer. Loader default: `10`.
 - `timeout`: total per-article processing budget in seconds, covering fetch plus all LLM stages. Must be a positive integer. Loader default: `180`.
 - `update_schedule`: default 5-field cron expression used by enabled providers whose own `update_schedule` is blank. Loader default: `0 * * * *`.
 

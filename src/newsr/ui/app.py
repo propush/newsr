@@ -668,6 +668,7 @@ class NewsReaderApp(App[None]):
                 display_name=provider_record.display_name,
                 topic_query=topic_query,
                 search_client=self.search_client,
+                max_article_age_days=self.config.articles.store,
             )
         self.providers = providers
         self.pipeline.providers = providers

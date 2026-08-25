@@ -22,6 +22,7 @@ import pytest
 from newsr.domain import AppOptions, ArticleContent, ProviderTarget, ViewMode
 from newsr.providers.llm import OpenAILLMClient
 from newsr.providers.search import SearchResult
+from newsr.providers.topic import TopicWatchProvider
 from newsr.ui import (
     ArticleQuestionScreen,
     BriefArticleJumpScreen,
@@ -4135,6 +4136,23 @@ def test_ui_source_manager_status_counts_selected_targets_across_providers_and_t
             assert f"Selected {selected_before + 1} targets globally." in status_text
 
     asyncio.run(runner())
+
+
+def test_rebuild_topic_provider_uses_configured_article_retention(app_config, tmp_path) -> None:
+    app_config.articles.store = 21
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    app.storage.create_topic_provider(
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        update_schedule=None,
+    )
+
+    app.rebuild_provider_registry()
+
+    provider = app.providers["topic:openai-policy"]
+    assert isinstance(provider, TopicWatchProvider)
+    assert provider._max_article_age_days == 21
+    app.storage.close()
 
 
 def test_ui_source_manager_toggling_provider_keeps_cursor_position(app_config, tmp_path) -> None:

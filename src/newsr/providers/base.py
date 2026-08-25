@@ -6,6 +6,10 @@ from ..cancellation import RefreshCancellation
 from ..domain import ArticleContent, ProviderTarget, SectionCandidate
 
 
+class SkipArticle(RuntimeError):
+    """Signal that a fetched candidate is intentionally ineligible for processing."""
+
+
 class NewsProvider(Protocol):
     provider_id: str
     display_name: str

@@ -13,7 +13,7 @@ For the concrete built-in provider list, bootstrap defaults, and catalog behavio
 - `newsr.providers.base`: `NewsProvider` protocol used by the refresh pipeline
 - `newsr.providers.registry`: built-in provider registration; see [Current Providers](current_providers.md) for the current built-in news provider set
 - `newsr.providers.<provider_id>`: built-in provider packages for target discovery, section parsing, article extraction, and provider-specific URL helpers; see [Current Providers](current_providers.md)
-- `newsr.providers.topic`: dynamic watched-topic provider that searches the web for a stored topic query and extracts readable article content from search results
+- `newsr.providers.topic`: dynamic watched-topic provider that searches the web for a stored topic query, extracts readable article content, and filters parsed publication times using the configured article retention window
 - `newsr.providers.llm`: OpenAI-compatible client for article categorization, headline translation, body translation, summaries, "more info" synthesis, search-query generation, and article Q&A answers
 - `newsr.providers.search`: DuckDuckGo search adapter used by the "more info" and article Q&A flows
 - `newsr.cancellation`: cooperative cancellation primitive (`RefreshCancellation`) and shared `cancellable_read` helper used by all HTTP-fetching providers

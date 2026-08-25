@@ -71,6 +71,10 @@ class ArticleStore:
             ).fetchone()
         return row is not None
 
+    def mark_article_known(self, article_id: str) -> None:
+        with self._db.transaction():
+            self._insert_known_article_id(article_id, datetime.now(UTC).isoformat())
+
     def upsert_article_source(self, article: ArticleContent) -> None:
         now = datetime.now(UTC).isoformat()
         with self._db.transaction():

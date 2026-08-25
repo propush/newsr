@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from bs4 import BeautifulSoup
 
 from ...cancellation import RefreshCancellation
 from ...domain import ArticleContent, ProviderTarget, SectionCandidate
+from ..base import SkipArticle
 from ..search.duckduckgo import DuckDuckGoSearchClient, normalize_result_url
 from ..transport import browser_headers, read_text_url
 
@@ -18,11 +19,13 @@ class TopicWatchProvider:
         display_name: str,
         topic_query: str,
         search_client: DuckDuckGoSearchClient,
+        max_article_age_days: int,
     ) -> None:
         self.provider_id = provider_id
         self.display_name = display_name
         self._topic_query = topic_query
         self._search_client = search_client
+        self._max_article_age_days = max_article_age_days
 
     def default_targets(self) -> list[ProviderTarget]:
         return [self._build_target()]
@@ -71,6 +74,15 @@ class TopicWatchProvider:
     ) -> ArticleContent:
         html = _read_url(candidate.url, cancellation)
         parsed = _parse_article_html(html, fallback_url=candidate.url)
+        if (
+            parsed.published_at is not None
+            and parsed.published_at
+            < _utc_now() - timedelta(days=self._max_article_age_days)
+        ):
+            raise SkipArticle(
+                f"published at {parsed.published_at.isoformat()}, older than "
+                f"{self._max_article_age_days} days"
+            )
         return ArticleContent(
             article_id=candidate.article_id,
             provider_id=candidate.provider_id,
@@ -113,6 +125,10 @@ class ParsedTopicArticle:
 
 def _article_id_for_url(url: str) -> str:
     return f"web:{normalize_result_url(url)}"
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 def _read_url(url: str, cancellation: RefreshCancellation | None = None) -> str:

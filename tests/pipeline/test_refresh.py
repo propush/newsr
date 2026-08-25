@@ -7,6 +7,7 @@ from types import MethodType
 from newsr.cancellation import RefreshCancellation
 from newsr.domain import ArticleContent, ProviderTarget, SectionCandidate
 from newsr.pipeline import NewsPipeline
+from newsr.providers.base import SkipArticle
 from newsr.providers.llm import OpenAILLMClient
 
 
@@ -81,6 +82,41 @@ class FakeLLM:
         cancellation: RefreshCancellation | None = None,
     ) -> str:
         return f"summary {translated_text}"
+
+
+class SkippingProvider(FakeProvider):
+    def __init__(self) -> None:
+        self.fetch_article_calls = 0
+
+    def fetch_article(
+        self, candidate: SectionCandidate, cancellation: RefreshCancellation | None = None
+    ) -> ArticleContent:
+        self.fetch_article_calls += 1
+        raise SkipArticle("outside configured retention window")
+
+
+def test_pipeline_remembers_skipped_articles_without_counting_failures(
+    app_config, storage
+) -> None:
+    storage.set_selected_targets("bbc", ["world"])
+    provider = SkippingProvider()
+    llm = RecordingLLM()
+    pipeline = NewsPipeline(app_config, storage, {"bbc": provider}, llm)
+
+    first_result = pipeline.refresh()
+    second_result = pipeline.refresh()
+
+    assert first_result.new_articles == 0
+    assert first_result.failed_articles == 0
+    assert second_result.new_articles == 0
+    assert second_result.failed_articles == 0
+    assert provider.fetch_article_calls == 1
+    assert llm.calls == []
+    assert storage.get_article("bbc:world-1") is None
+    assert storage.has_article("bbc:world-1") is True
+    assert storage.connection.execute(
+        "SELECT COUNT(*) FROM jobs WHERE article_id = ?", ("bbc:world-1",)
+    ).fetchone()[0] == 0
 
 
 def test_pipeline_refresh_processes_new_articles(app_config, storage) -> None:
@@ -179,6 +215,26 @@ def test_pipeline_refresh_emits_progress_aware_statuses(app_config, storage) -> 
         "summarizing bbc:technology-1, done 1 of 2",
         "ready",
     ]
+
+
+class SkipWorldProvider(FakeProvider):
+    def fetch_article(
+        self, candidate: SectionCandidate, cancellation: RefreshCancellation | None = None
+    ) -> ArticleContent:
+        if candidate.category == "world":
+            raise SkipArticle("outside configured retention window")
+        return super().fetch_article(candidate, cancellation)
+
+
+def test_pipeline_skipped_article_advances_progress(app_config, storage) -> None:
+    pipeline = NewsPipeline(app_config, storage, {"bbc": SkipWorldProvider()}, FakeLLM())
+    statuses: list[str] = []
+
+    result = pipeline.refresh(statuses.append)
+
+    assert result.new_articles == 1
+    assert result.failed_articles == 0
+    assert "classifying bbc:technology-1, done 1 of 2" in statuses
 
 
 def test_pipeline_refresh_excludes_cached_articles_from_progress_total(

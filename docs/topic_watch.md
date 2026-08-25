@@ -30,11 +30,12 @@ Watched topics are fetched through the topic provider:
 1. Run a DuckDuckGo web search using the saved topic query.
 2. Turn normalized result URLs into stable article ids of the form `web:<normalized_url>`.
 3. Download the linked page and extract readable article text.
-4. Skip any article id that already exists in the permanent duplicate-id table.
-5. Process new articles through the standard categorization, translation, and summary pipeline.
+4. Filter articles whose parsed publication time is older than the `articles.store` retention window. Articles exactly on the cutoff and pages without a parseable publication time remain eligible.
+5. Skip any article id that already exists in the permanent duplicate-id table.
+6. Process new articles through the standard categorization, translation, and summary pipeline.
 
 The topic provider stores its own `provider_id` as the watched-topic scope, but article identity is URL-based. The same normalized web URL is treated as the same article even when it appears in multiple watched topics.
 
 ## Duplicate Tracking
 
-NewsR keeps a permanent `known_article_ids` table in SQLite. Existing `articles.article_id` values are backfilled into that table during schema initialization. During refresh, an article id is registered only after the article completes the full processing pipeline or when refresh reaches a permanent fetch failure. Duplicate checks use `known_article_ids` as the source of truth even after old article rows are pruned from `articles`.
+NewsR keeps a permanent `known_article_ids` table in SQLite. Existing `articles.article_id` values are backfilled into that table during schema initialization. During refresh, an article id is registered after the article completes the full processing pipeline, when refresh reaches a permanent fetch failure, or when a watched-topic article is filtered by publication age. Duplicate checks use `known_article_ids` as the source of truth even after old article rows are pruned from `articles`. Age-filtered articles do not create article or failed-job rows and are not downloaded again during later refreshes.

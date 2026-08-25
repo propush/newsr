@@ -7,7 +7,7 @@ from threading import Lock
 from ..cancellation import RefreshCancellation, RefreshCancelled, RefreshTimedOut
 from ..config.models import AppConfig
 from ..domain import ProviderTarget, SectionCandidate
-from ..providers.base import NewsProvider
+from ..providers.base import NewsProvider, SkipArticle
 from ..providers.llm.client import OpenAILLMClient
 from ..storage.facade import NewsStorage
 from .types import ArticleReadyCallback, RefreshProgress, RefreshResult, StatusCallback
@@ -205,6 +205,12 @@ class NewsPipeline:
             except RefreshCancelled:
                 self._emit(on_status, "refresh cancelled")
                 raise
+            except SkipArticle as exc:
+                progress.completed_articles += 1
+                _LOG.info(
+                    "article_skipped article_id=%s reason=%s", candidate.article_id, exc,
+                )
+                self.storage.mark_article_known(candidate.article_id)
             except ValueError as exc:
                 failed_articles += 1
                 _LOG.warning(

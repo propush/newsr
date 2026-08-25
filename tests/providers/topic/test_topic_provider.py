@@ -3,7 +3,10 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
+import pytest
+
 from newsr.domain import SectionCandidate
+from newsr.providers.base import SkipArticle
 from newsr.providers.search.duckduckgo import DuckDuckGoSearchClient, SearchResult
 from newsr.providers.topic.provider import TopicWatchProvider
 
@@ -63,6 +66,7 @@ def test_topic_provider_fetch_candidates_uses_normalized_url_ids(monkeypatch) ->
                 SearchResult(title="Two", url="https://example.com/b", snippet="C"),
             ]
         ),
+        max_article_age_days=10,
     )
     target = provider.default_targets()[0]
 
@@ -81,6 +85,7 @@ def test_topic_provider_fetch_article_extracts_generic_web_content(monkeypatch) 
         display_name="OpenAI policy",
         topic_query="OpenAI policy",
         search_client=FakeSearchClient([]),
+        max_article_age_days=10,
     )
     html = """
     <html>
@@ -100,6 +105,10 @@ def test_topic_provider_fetch_article_extracts_generic_web_content(monkeypatch) 
     </html>
     """
     monkeypatch.setattr("newsr.providers.topic.provider._read_url", lambda url, cancellation=None: html)
+    monkeypatch.setattr(
+        "newsr.providers.topic.provider._utc_now",
+        lambda: datetime(2026, 4, 1, 10, 15, tzinfo=UTC),
+    )
 
     article = provider.fetch_article(
         SectionCandidate(
@@ -143,6 +152,7 @@ def test_topic_provider_search_requests_do_not_emit_non_provider_network_logs(
         display_name="OpenAI policy",
         topic_query="OpenAI policy",
         search_client=DuckDuckGoSearchClient(),
+        max_article_age_days=10,
     )
     logger = logging.getLogger("newsr.llm")
     original_propagate = logger.propagate
@@ -154,3 +164,67 @@ def test_topic_provider_search_requests_do_not_emit_non_provider_network_logs(
         logger.propagate = original_propagate
 
     assert not any("network_request_" in record.message for record in caplog.records)
+
+
+@pytest.mark.parametrize(
+    ("published_at", "should_skip"),
+    [
+        ("2026-03-26T11:59:59Z", True),
+        ("2026-03-26T12:00:00Z", False),
+        ("2026-03-26T14:00:00+02:00", False),
+        ("2026-04-01T12:00:00Z", False),
+        ("2026-04-06T12:00:00Z", False),
+        (None, False),
+    ],
+)
+def test_topic_provider_enforces_maximum_article_age(
+    monkeypatch, published_at: str | None, should_skip: bool
+) -> None:
+    published_meta = (
+        f'<meta property="article:published_time" content="{published_at}" />'
+        if published_at is not None
+        else ""
+    )
+    html = f"""
+    <html>
+      <head>
+        <meta property="og:title" content="Topic article" />
+        {published_meta}
+      </head>
+      <body>
+        <article>
+          <p>{"A detailed article paragraph with readable source content. " * 5}</p>
+        </article>
+      </body>
+    </html>
+    """
+    monkeypatch.setattr("newsr.providers.topic.provider._read_url", lambda url, cancellation=None: html)
+    monkeypatch.setattr(
+        "newsr.providers.topic.provider._utc_now",
+        lambda: datetime(2026, 4, 5, 12, tzinfo=UTC),
+    )
+    provider = TopicWatchProvider(
+        provider_id="topic:openai-policy",
+        display_name="OpenAI policy",
+        topic_query="OpenAI policy",
+        search_client=FakeSearchClient([]),
+        max_article_age_days=10,
+    )
+    candidate = SectionCandidate(
+        article_id="web:https://example.com/topic",
+        provider_id="topic:openai-policy",
+        provider_article_id="https://example.com/topic",
+        url="https://example.com/topic",
+        category="topic",
+    )
+
+    if should_skip:
+        with pytest.raises(SkipArticle, match="older than 10 days"):
+            provider.fetch_article(candidate)
+    else:
+        article = provider.fetch_article(candidate)
+        assert article.published_at == (
+            datetime.fromisoformat(published_at.replace("Z", "+00:00")).astimezone(UTC)
+            if published_at is not None
+            else None
+        )
