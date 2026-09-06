@@ -13,6 +13,7 @@ from textual.widgets import Markdown, Static
 from textual.widgets._markdown import MarkdownBlock
 
 from ...ui_text import UILocalizer
+from ..themes import BRIEF_ARTICLE_REFERENCE_COLOR
 
 _ARTICLE_REF_RE = re.compile(r"\[(\d+)\]")
 _SCROLL_RESTORE_ATTEMPTS = 30
@@ -177,5 +178,6 @@ def _style_article_references(content: Content) -> Content:
     if not matches:
         return content
     spans = list(content.spans)
-    spans.extend(Span(match.start(), match.end(), "$accent bold") for match in matches)
+    reference_style = f"${BRIEF_ARTICLE_REFERENCE_COLOR} bold"
+    spans.extend(Span(match.start(), match.end(), reference_style) for match in matches)
     return Content(text, spans=spans)

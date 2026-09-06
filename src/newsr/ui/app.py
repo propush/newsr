@@ -44,7 +44,7 @@ from .screens import (
     QuickNavScreen,
     SourceSelectionScreen,
 )
-from .themes import OLD_FIDO_THEME
+from .themes import BRIEF_ARTICLE_REFERENCE_COLOR, OLD_FIDO_THEME
 
 
 class NewsReaderApp(App[None]):
@@ -143,6 +143,12 @@ class NewsReaderApp(App[None]):
     """
 
     BINDINGS = []
+
+    def get_theme_variable_defaults(self) -> dict[str, str]:
+        theme = self.current_theme
+        return {
+            BRIEF_ARTICLE_REFERENCE_COLOR: theme.accent or theme.primary,
+        }
 
     def __init__(self, config: AppConfig, storage_path: Path, config_path: Path | None = None) -> None:
         super().__init__()
