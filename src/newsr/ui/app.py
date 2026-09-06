@@ -8,7 +8,7 @@ from textual.binding import Binding, BindingsMap
 from textual.command import CommandPalette
 from textual.css.query import NoMatches
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import DataTable, Footer, Header, LoadingIndicator, Markdown, Static
+from textual.widgets import DataTable, Footer, LoadingIndicator, Markdown, Static
 
 from ..config.models import AppConfig
 from ..domain import ArticleRecord
@@ -21,6 +21,7 @@ from ..providers.search.duckduckgo import DuckDuckGoSearchClient
 from ..providers.topic import TopicWatchProvider
 from ..storage.facade import NewsStorage
 from ..ui_text import UILocalizer
+from .clock import ConfiguredHeader
 from .controllers.article_qa import ArticleQAController
 from .controllers.article_categorization import ArticleCategorizationController
 from .controllers.article_rendering import (
@@ -231,7 +232,7 @@ class NewsReaderApp(App[None]):
             self._bindings._add_binding(binding)
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
+        yield ConfiguredHeader(self.config.ui.clock)
         with Vertical(id="chrome"):
             yield Static(id="article-header")
             with Vertical(id="article-frame"):

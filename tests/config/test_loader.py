@@ -44,6 +44,7 @@ export:
     assert config.articles.update_schedule == "0 * * * *"
     assert config.translation.target_language == "Serbian"
     assert config.ui.locale == "en"
+    assert config.ui.clock == "no_seconds"
     assert config.ui.show_all is True
     assert config.ui.provider_sort.primary == "unread"
     assert config.ui.provider_sort.direction == "desc"
@@ -175,6 +176,74 @@ export:
     config = load_config(config_path)
 
     assert config.ui.show_all is False
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ("none", "none"),
+        ("SECONDS", "seconds"),
+        ('" no_seconds "', "no_seconds"),
+    ],
+)
+def test_load_config_accepts_clock_modes(
+    tmp_path: Path,
+    configured: str,
+    expected: str,
+) -> None:
+    config_path = tmp_path / "newsr.yml"
+    config_path.write_text(
+        f"""
+articles:
+  fetch: 7
+  store: 14
+llm:
+  url: http://localhost:8081/v1
+  model_translation: translate
+  model_summary: summary
+translation:
+  target_language: Serbian
+ui:
+  locale: en
+  clock: {configured}
+export:
+  image:
+    quality: fhd
+""",
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.ui.clock == expected
+
+
+@pytest.mark.parametrize("configured", ["null", "true", "15", "minutes"])
+def test_load_config_rejects_invalid_clock_modes(tmp_path: Path, configured: str) -> None:
+    config_path = tmp_path / "newsr.yml"
+    config_path.write_text(
+        f"""
+articles:
+  fetch: 7
+  store: 14
+llm:
+  url: http://localhost:8081/v1
+  model_translation: translate
+  model_summary: summary
+translation:
+  target_language: Serbian
+ui:
+  locale: en
+  clock: {configured}
+export:
+  image:
+    quality: fhd
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="ui.clock must be one of"):
+        load_config(config_path)
 
 
 def test_load_config_accepts_brief_context_override(tmp_path: Path) -> None:

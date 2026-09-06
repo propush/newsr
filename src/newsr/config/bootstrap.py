@@ -19,6 +19,7 @@ from ..ui_text import (
     parse_ui_locale,
     resolve_ui_locale_name,
 )
+from .models import DEFAULT_UI_CLOCK
 
 DEFAULT_ARTICLES_FETCH = 5
 DEFAULT_ARTICLES_STORE = 10
@@ -220,6 +221,7 @@ def render_config(answers: BootstrapAnswers) -> str:
         },
         "ui": {
             "locale": answers.ui_locale,
+            "clock": DEFAULT_UI_CLOCK,
             "show-all": True,
             "provider_sort": {
                 "primary": "unread",

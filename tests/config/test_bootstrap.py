@@ -46,6 +46,7 @@ def test_bootstrap_config_creates_local_config_with_locale_suggestion(tmp_path: 
 
     assert created is True
     assert config.ui.locale == "en"
+    assert config.ui.clock == "no_seconds"
     assert config.ui.show_all is True
     assert config.articles.timeout == 180
     assert config.articles.update_schedule == "0 * * * *"
@@ -238,6 +239,8 @@ def test_default_config_includes_show_all_enabled(tmp_path: Path) -> None:
     config_path.write_text(DEFAULT_CONFIG, encoding="utf-8")
     config = load_config(config_path)
 
+    assert "clock: no_seconds" in DEFAULT_CONFIG
+    assert config.ui.clock == "no_seconds"
     assert config.ui.show_all is True
     assert config.articles.timeout == 180
     assert config.articles.update_schedule == "0 * * * *"

@@ -10,6 +10,7 @@ from ..ui_text import parse_ui_locale
 from .models import (
     AppConfig,
     ArticlesConfig,
+    DEFAULT_UI_CLOCK,
     ExportConfig,
     ExportImageConfig,
     LLMConfig,
@@ -88,7 +89,18 @@ def _load_ui(raw: dict) -> UIConfig:
         locale=locale,
         show_all=_load_bool(raw.get("show-all"), default=True, field_name="ui.show-all"),
         provider_sort=_load_provider_sort(raw.get("provider_sort", {})),
+        clock=_load_clock(raw),
     )
+
+
+def _load_clock(raw: dict) -> str:
+    value = raw.get("clock", DEFAULT_UI_CLOCK)
+    if not isinstance(value, str):
+        raise ValueError("ui.clock must be one of: none, seconds, no_seconds")
+    clock = value.strip().lower()
+    if clock not in {"none", "seconds", "no_seconds"}:
+        raise ValueError("ui.clock must be one of: none, seconds, no_seconds")
+    return clock
 
 
 def _load_provider_sort(raw: object) -> ProviderSortConfig:

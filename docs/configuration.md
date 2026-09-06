@@ -38,6 +38,7 @@ translation:
 
 ui:
   locale: en
+  clock: no_seconds
   show-all: true
   provider_sort:
     primary: unread
@@ -74,6 +75,7 @@ export:
 ### `ui`
 
 - `locale`: required UI language. Current supported values are `en` and `ru`.
+- `clock`: titlebar clock mode. Allowed values are `none` (hidden with no clock refresh work), `seconds` (system-local time refreshed every second), and `no_seconds` (system-local hours and minutes refreshed when the minute changes). Loader default: `no_seconds`.
 - `show-all`: controls whether the synthetic `[ALL]` scope appears in provider home. Must be a boolean. Loader default: `true`.
 - `provider_sort.primary`: provider-home sort key. Allowed values: `unread`, `name`. Loader default: `unread`.
 - `provider_sort.direction`: provider-home sort direction. Allowed values: `asc`, `desc`. Loader default: `desc`.

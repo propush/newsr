@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+DEFAULT_UI_CLOCK = "no_seconds"
+
+
 @dataclass(slots=True)
 class ArticlesConfig:
     fetch: int
@@ -38,6 +41,7 @@ class UIConfig:
     locale: str
     show_all: bool
     provider_sort: ProviderSortConfig
+    clock: str = DEFAULT_UI_CLOCK
 
 
 @dataclass(slots=True)
