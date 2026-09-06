@@ -39,6 +39,7 @@ from newsr.ui import (
     TextInputDialogScreen,
     WatchTopicDialogScreen,
 )
+from newsr.ui.themes import BRIEF_ARTICLE_REFERENCE_COLOR
 
 
 def body_source(app: NewsReaderApp) -> str:
@@ -3965,6 +3966,21 @@ def test_ui_registers_old_fido_theme(app_config, tmp_path) -> None:
     assert theme.primary == "#d8c24a"
     assert theme.accent == "#c8c8c8"
     assert theme.background == "#000000"
+    assert theme.variables[BRIEF_ARTICLE_REFERENCE_COLOR] == "#d8c24a"
+    app.theme = "old fido"
+    assert app.get_css_variables()[BRIEF_ARTICLE_REFERENCE_COLOR] == "#d8c24a"
+
+
+def test_ui_defaults_brief_article_reference_color_to_active_theme_accent(
+    app_config, tmp_path
+) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+
+    assert app.current_theme.accent is not None
+    assert (
+        app.get_theme_variable_defaults()[BRIEF_ARTICLE_REFERENCE_COLOR]
+        == app.current_theme.accent
+    )
 
 
 def test_ui_keeps_mode_hotkey_fixed_when_localizing_labels(app_config, tmp_path) -> None:
