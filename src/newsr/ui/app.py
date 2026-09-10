@@ -168,7 +168,9 @@ class NewsReaderApp(App[None]):
         self.storage = NewsStorage(storage_path)
         self.storage.initialize()
         self.builtin_providers = build_provider_registry()
-        self.search_client = DuckDuckGoSearchClient()
+        self.search_client = DuckDuckGoSearchClient(
+            request_retries=config.llm.request_retries
+        )
         self.llm_client = OpenAILLMClient(config)
         self.providers = dict(self.builtin_providers)
         self.pipeline = NewsPipeline(config, self.storage, self.providers, self.llm_client)

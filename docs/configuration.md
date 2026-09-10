@@ -65,7 +65,7 @@ export:
 - `model_summary`: required model used for summaries, brief reviews, watched-topic extraction, search-query generation, `More Info`, and article Q&A.
 - `api_key`: optional bearer token.
 - `headers`: optional mapping of additional HTTP headers. Keys and values must be non-empty strings.
-- `request_retries`: number of retries after the first failed request. Must be zero or greater. Loader default: `2`.
+- `request_retries`: number of retries after the first transient transport failure for LLM requests and DuckDuckGo searches created by the app. HTTP error responses and DuckDuckGo challenge pages are not retried. Must be zero or greater. Loader default: `2`.
 - `brief_context`: maximum estimated token budget for each brief-generation LLM request, counting input plus requested output. Must be a positive integer. Loader default: `100000`.
 
 ### `translation`
@@ -97,5 +97,5 @@ export:
 
 - `newsr.yml`: global app configuration.
 - `cache/newsr.sqlite3`: providers, targets, topic watches, article content, translations, summaries, cached `more_info`, reader state, options, and refresh bookkeeping.
-- `cache/newsr-llm.log`: LLM request log, brief-generation stage metadata, repair retry metadata, and non-provider network request metadata. Entries include request method, URL, status, brief stage, validation counts, and errors without logging response contents.
+- `cache/newsr-llm.log`: LLM request log, transient transport retry metadata, brief-generation stage metadata, repair retry metadata, and non-provider network request metadata. Entries include request method, URL, status, retry attempt, brief stage, validation counts, and errors without logging response contents.
 - `exports/`: Markdown and PNG exports created by the export flow.

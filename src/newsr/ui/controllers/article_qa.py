@@ -55,6 +55,7 @@ class ArticleQAController:
         )
         self._turns.append(turn)
         screen = self._ensure_screen(article)
+        screen.remember_question(cleaned_question)
         screen.set_question("")
         self._update_loading_state(article, "asking configured llm for web search query...")
         self._start_request(article, turn.turn_id, cleaned_question, chat_history)

@@ -347,11 +347,16 @@ class OpenAILLMClient:
         try:
             if cancellation is not None:
                 cancellation.raise_if_cancelled()
-            response = self._perform_request(payload, cancellation)
-            raw = json.loads(cancellable_read(response, cancellation).decode("utf-8"))
-            if response.status >= 400:
+            response_status, response_body = self._perform_request(
+                payload,
+                cancellation,
+                request_id=request_id,
+                model=model,
+            )
+            raw = json.loads(response_body.decode("utf-8"))
+            if response_status >= 400:
                 message = _extract_error_message(raw)
-                raise RuntimeError(f"LLM request failed with HTTP {response.status}: {message}")
+                raise RuntimeError(f"LLM request failed with HTTP {response_status}: {message}")
             text = str(raw["choices"][0]["message"]["content"]).strip()
             LOGGER.info(
                 "request_done id=%s model=%s duration_s=%.3f response_chars=%s",
@@ -375,10 +380,13 @@ class OpenAILLMClient:
         self,
         payload: bytes,
         cancellation: RefreshCancellation | None,
-    ) -> http.client.HTTPResponse:
-        remaining_attempts = self.request_retries + 1
+        *,
+        request_id: int,
+        model: str,
+    ) -> tuple[int, bytes]:
+        max_attempts = self.request_retries + 1
         last_error: Exception | None = None
-        while remaining_attempts > 0:
+        for attempt in range(1, max_attempts + 1):
             if cancellation is not None:
                 cancellation.raise_if_cancelled()
             conn = self._ensure_connection(resolve_request_timeout(cancellation, 300))
@@ -389,13 +397,25 @@ class OpenAILLMClient:
                     body=payload,
                     headers=self._request_headers(),
                 )
-                return conn.getresponse()
-            except (http.client.RemoteDisconnected, ConnectionError, OSError) as exc:
+                response = conn.getresponse()
+                return response.status, cancellable_read(response, cancellation)
+            except (http.client.HTTPException, OSError) as exc:
                 last_error = exc
-                remaining_attempts -= 1
                 self._reset_connection()
-                if remaining_attempts == 0:
+                if cancellation is not None:
+                    cancellation.raise_if_cancelled()
+                if attempt == max_attempts:
                     raise
+                LOGGER.warning(
+                    "request_retry id=%s model=%s attempt=%s max_attempts=%s "
+                    "error_type=%s error=%s",
+                    request_id,
+                    model,
+                    attempt,
+                    max_attempts,
+                    type(exc).__name__,
+                    exc,
+                )
         raise RuntimeError("LLM request failed without a captured transport error") from last_error
 
     def _request_headers(self) -> dict[str, str]:

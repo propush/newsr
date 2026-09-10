@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import http.client
 import logging
 from time import perf_counter
 from urllib.error import HTTPError
@@ -31,6 +32,11 @@ class SearchResult:
 
 
 class DuckDuckGoSearchClient:
+    def __init__(self, request_retries: int = 2) -> None:
+        if request_retries < 0:
+            raise ValueError("request_retries must be non-negative")
+        self.request_retries = request_retries
+
     def search(
         self,
         query: str,
@@ -42,8 +48,8 @@ class DuckDuckGoSearchClient:
         html = self._read_url(query, cancellation, log_request=log_request)
         return parse_search_results(html)[:limit]
 
-    @staticmethod
     def _read_url(
+        self,
         query: str,
         cancellation: RefreshCancellation | None = None,
         *,
@@ -54,45 +60,76 @@ class DuckDuckGoSearchClient:
             headers=browser_headers(),
         )
         configure_cache_logger(LOGGER, filename="newsr-llm.log")
-        if not log_request:
-            with open_request(req, cancellation, timeout=30) as response:
-                return read_text_response(response, cancellation)
         method = req.get_method()
         url = req.full_url
         started_at = perf_counter()
-        try:
-            with open_request(req, cancellation, timeout=30) as response:
-                status = getattr(response, "status", "unknown")
-                payload = read_text_response(response, cancellation)
-                LOGGER.info(
-                    "network_request_done method=%s url=%s status=%s duration_s=%.3f",
-                    method,
-                    url,
-                    status,
-                    perf_counter() - started_at,
-                )
+        max_attempts = self.request_retries + 1
+        for attempt in range(1, max_attempts + 1):
+            try:
+                with open_request(req, cancellation, timeout=30) as response:
+                    status = getattr(response, "status", "unknown")
+                    payload = read_text_response(response, cancellation)
+                if log_request:
+                    LOGGER.info(
+                        "network_request_done method=%s url=%s status=%s duration_s=%.3f",
+                        method,
+                        url,
+                        status,
+                        perf_counter() - started_at,
+                    )
                 _raise_if_search_page_unavailable(status, payload)
                 return payload
-        except HTTPError as exc:
-            LOGGER.warning(
-                "network_request_failed method=%s url=%s status=%s duration_s=%.3f error=%s",
-                method,
-                url,
-                exc.code,
-                perf_counter() - started_at,
-                exc,
-            )
-            raise
-        except Exception as exc:
-            LOGGER.exception(
-                "network_request_failed method=%s url=%s duration_s=%.3f error_type=%s error=%s",
-                method,
-                url,
-                perf_counter() - started_at,
-                type(exc).__name__,
-                exc,
-            )
-            raise
+            except HTTPError as exc:
+                if log_request:
+                    LOGGER.warning(
+                        "network_request_failed method=%s url=%s status=%s duration_s=%.3f error=%s",
+                        method,
+                        url,
+                        exc.code,
+                        perf_counter() - started_at,
+                        exc,
+                    )
+                raise
+            except (OSError, http.client.HTTPException) as exc:
+                if cancellation is not None:
+                    cancellation.raise_if_cancelled()
+                if attempt < max_attempts:
+                    if log_request:
+                        LOGGER.warning(
+                            "network_request_retry method=%s url=%s attempt=%s max_attempts=%s "
+                            "error_type=%s error=%s",
+                            method,
+                            url,
+                            attempt,
+                            max_attempts,
+                            type(exc).__name__,
+                            exc,
+                        )
+                    continue
+                if log_request:
+                    LOGGER.exception(
+                        "network_request_failed method=%s url=%s duration_s=%.3f "
+                        "error_type=%s error=%s",
+                        method,
+                        url,
+                        perf_counter() - started_at,
+                        type(exc).__name__,
+                        exc,
+                    )
+                raise
+            except Exception as exc:
+                if log_request:
+                    LOGGER.exception(
+                        "network_request_failed method=%s url=%s duration_s=%.3f "
+                        "error_type=%s error=%s",
+                        method,
+                        url,
+                        perf_counter() - started_at,
+                        type(exc).__name__,
+                        exc,
+                    )
+                raise
+        raise RuntimeError("DuckDuckGo request failed without a captured transport error")
 
 
 def parse_search_results(html: str) -> list[SearchResult]:

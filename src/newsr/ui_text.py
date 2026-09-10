@@ -195,7 +195,10 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "article_qa.binding.pgdn": "PgDn",
         "article_qa.label.sources": "Sources",
         "article_qa.placeholder": "Ask anything about this article",
-        "article_qa.hint": "Enter: ask/open source   Tab: input/sources   Esc: close   PgUp/PgDn: scroll answer",
+        "article_qa.hint": (
+            "Enter: ask/open source   Up/Down: question history   Tab: input/sources   "
+            "Esc: close   PgUp/PgDn: scroll answer"
+        ),
         "article_qa.header": "Ask About This Article\nTitle: {title}\nState: {state}",
         "article_qa.transcript.empty": (
             "# Article Q&A\n\n"
@@ -473,7 +476,10 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "article_qa.binding.pgdn": "PgDn",
         "article_qa.label.sources": "Источники",
         "article_qa.placeholder": "Спросите что угодно об этой статье",
-        "article_qa.hint": "Enter: спросить/открыть источник   Tab: поле/источники   Esc: закрыть   PgUp/PgDn: прокрутка ответа",
+        "article_qa.hint": (
+            "Enter: спросить/открыть источник   Up/Down: история вопросов   "
+            "Tab: поле/источники   Esc: закрыть   PgUp/PgDn: прокрутка ответа"
+        ),
         "article_qa.header": "Вопросы по статье\nЗаголовок: {title}\nСостояние: {state}",
         "article_qa.transcript.empty": (
             "# Вопросы по статье\n\n"

@@ -6,7 +6,7 @@ import logging
 
 import pytest
 
-from newsr.cancellation import RefreshCancellation
+from newsr.cancellation import RefreshCancellation, RefreshCancelled
 from newsr.config import (
     AppConfig,
     ArticlesConfig,
@@ -39,6 +39,23 @@ class FakeResponse:
 
     def close(self) -> None:
         return None
+
+
+class FailingReadResponse(FakeResponse):
+    def __init__(
+        self,
+        error: Exception,
+        *,
+        cancellation: RefreshCancellation | None = None,
+    ) -> None:
+        super().__init__({"choices": []})
+        self._error = error
+        self._cancellation = cancellation
+
+    def read(self, _size: int = -1) -> bytes:
+        if self._cancellation is not None:
+            self._cancellation.cancel()
+        raise self._error
 
 
 class FakeHTTPConnection:
@@ -189,6 +206,50 @@ def test_llm_client_retries_transient_transport_failures() -> None:
     assert len(FakeHTTPConnection.requests) == 2
     assert len(FakeHTTPConnection.instances) == 2
     assert FakeHTTPConnection.instances[0].closed is True
+
+
+def test_llm_client_retries_transient_response_read_failures() -> None:
+    FakeHTTPConnection.plan = [
+        FailingReadResponse(http.client.IncompleteRead(b"partial")),
+        FakeResponse({"choices": [{"message": {"content": "translated"}}]}),
+    ]
+    client = OpenAILLMClient(make_config(request_retries=1))
+
+    result = client.translate_title("Headline")
+
+    assert result == "translated"
+    assert len(FakeHTTPConnection.requests) == 2
+    assert len(FakeHTTPConnection.instances) == 2
+    assert FakeHTTPConnection.instances[0].closed is True
+
+
+def test_llm_client_raises_after_response_read_retry_budget_is_exhausted() -> None:
+    FakeHTTPConnection.plan = [
+        FailingReadResponse(http.client.IncompleteRead(b"partial one")),
+        FailingReadResponse(http.client.IncompleteRead(b"partial two")),
+    ]
+    client = OpenAILLMClient(make_config(request_retries=1))
+
+    with pytest.raises(http.client.IncompleteRead):
+        client.translate_title("Headline")
+
+    assert len(FakeHTTPConnection.requests) == 2
+
+
+def test_llm_client_cancellation_prevents_response_read_retry() -> None:
+    cancellation = RefreshCancellation()
+    FakeHTTPConnection.plan = [
+        FailingReadResponse(
+            http.client.IncompleteRead(b"partial"),
+            cancellation=cancellation,
+        ),
+    ]
+    client = OpenAILLMClient(make_config(request_retries=2))
+
+    with pytest.raises(RefreshCancelled):
+        client.translate_title("Headline", cancellation)
+
+    assert len(FakeHTTPConnection.requests) == 1
 
 
 def test_llm_client_check_responsive_uses_translation_model() -> None:

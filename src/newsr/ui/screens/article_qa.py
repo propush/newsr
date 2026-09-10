@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingsMap
 from textual.containers import Vertical, VerticalScroll
@@ -91,6 +92,9 @@ class ArticleQuestionScreen(ModalScreen[None]):
         self.loading = False
         self.status_text = "ready"
         self.body_text = ""
+        self._question_history: list[str] = []
+        self._question_history_index: int | None = None
+        self._question_history_draft = ""
 
     def _build_bindings(self) -> list[Binding | tuple[str, str, str]]:
         return [
@@ -176,6 +180,56 @@ class ArticleQuestionScreen(ModalScreen[None]):
         except NoMatches:
             return
         input_widget.value = value
+        input_widget.cursor_position = len(value)
+
+    def remember_question(self, value: str) -> None:
+        self._question_history.append(value)
+        self._question_history_index = None
+        self._question_history_draft = ""
+
+    def on_key(self, event: events.Key) -> None:
+        try:
+            input_widget = self.query_one("#article-qa-input", Input)
+        except NoMatches:
+            return
+        if not input_widget.has_focus:
+            return
+        if event.key == "up":
+            event.stop()
+            event.prevent_default()
+            self._show_previous_question(input_widget)
+        elif event.key == "down":
+            event.stop()
+            event.prevent_default()
+            self._show_next_question(input_widget)
+
+    def _show_previous_question(self, input_widget: Input) -> None:
+        if not self._question_history:
+            return
+        history_index = self._question_history_index
+        if history_index is None or input_widget.value != self._question_history[history_index]:
+            self._question_history_draft = input_widget.value
+            history_index = len(self._question_history) - 1
+        elif history_index > 0:
+            history_index -= 1
+        self._question_history_index = history_index
+        self.set_question(self._question_history[history_index])
+
+    def _show_next_question(self, input_widget: Input) -> None:
+        history_index = self._question_history_index
+        if history_index is None:
+            return
+        if input_widget.value != self._question_history[history_index]:
+            self._question_history_index = None
+            self._question_history_draft = input_widget.value
+            return
+        if history_index < len(self._question_history) - 1:
+            history_index += 1
+            self._question_history_index = history_index
+            self.set_question(self._question_history[history_index])
+            return
+        self._question_history_index = None
+        self.set_question(self._question_history_draft)
 
     def update_header(self) -> None:
         try:

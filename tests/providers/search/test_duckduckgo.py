@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import pytest
 
+from newsr.cancellation import RefreshCancellation, RefreshCancelled
 from newsr.providers.search import DuckDuckGoSearchClient, parse_search_results
 from newsr.providers.search.duckduckgo import SearchUnavailableError
 
@@ -191,6 +192,85 @@ def test_search_logs_request_metadata_without_logging_response_body(monkeypatch,
     assert "<html>" not in log_text
 
 
+@pytest.mark.parametrize("log_request", [True, False])
+def test_search_retries_transient_transport_failures(
+    monkeypatch, caplog, log_request: bool
+) -> None:
+    html = """
+    <div class="result">
+      <a class="result__a" href="https://example.com/story">Example Story</a>
+      <div class="result__snippet">Useful background context.</div>
+    </div>
+    """
+    attempts = 0
+
+    def open_with_one_failure(req, cancellation=None, timeout=30):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise URLError(ConnectionResetError("temporary reset"))
+        return FakeHTTPResponse(html)
+
+    monkeypatch.setattr("newsr.providers.search.duckduckgo.open_request", open_with_one_failure)
+    logger = logging.getLogger("newsr.llm")
+    original_propagate = logger.propagate
+    logger.propagate = True
+    try:
+        with caplog.at_level(logging.WARNING, logger="newsr.llm"):
+            results = DuckDuckGoSearchClient(request_retries=1).search(
+                "example query", log_request=log_request
+            )
+    finally:
+        logger.propagate = original_propagate
+
+    assert attempts == 2
+    assert [result.title for result in results] == ["Example Story"]
+    retry_records = [record for record in caplog.records if "network_request_retry" in record.message]
+    assert bool(retry_records) is log_request
+
+
+def test_search_raises_after_transient_retry_budget_is_exhausted(monkeypatch) -> None:
+    attempts = 0
+
+    def fail(req, cancellation=None, timeout=30):
+        nonlocal attempts
+        attempts += 1
+        raise URLError(ConnectionResetError("persistent reset"))
+
+    monkeypatch.setattr("newsr.providers.search.duckduckgo.open_request", fail)
+
+    with pytest.raises(URLError, match="persistent reset"):
+        DuckDuckGoSearchClient(request_retries=1).search("example query")
+
+    assert attempts == 2
+
+
+def test_search_cancellation_prevents_transport_retry(monkeypatch) -> None:
+    cancellation = RefreshCancellation()
+    attempts = 0
+
+    def fail_and_cancel(req, cancellation=None, timeout=30):
+        nonlocal attempts
+        attempts += 1
+        assert cancellation is not None
+        cancellation.cancel()
+        raise URLError(ConnectionResetError("temporary reset"))
+
+    monkeypatch.setattr("newsr.providers.search.duckduckgo.open_request", fail_and_cancel)
+
+    with pytest.raises(RefreshCancelled):
+        DuckDuckGoSearchClient(request_retries=2).search(
+            "example query", cancellation=cancellation
+        )
+
+    assert attempts == 1
+
+
+def test_search_rejects_negative_retry_count() -> None:
+    with pytest.raises(ValueError, match="request_retries"):
+        DuckDuckGoSearchClient(request_retries=-1)
+
+
 def test_search_raises_when_duckduckgo_returns_challenge_page(monkeypatch, caplog) -> None:
     html = """
     <html>
@@ -243,7 +323,11 @@ def test_search_raises_when_duckduckgo_returns_challenge_body_with_200(monkeypat
 
 
 def test_search_logs_http_errors_without_logging_error_body(monkeypatch, caplog) -> None:
+    attempts = 0
+
     def fail(req, cancellation=None, timeout=30):
+        nonlocal attempts
+        attempts += 1
         raise HTTPError(req.full_url, 503, "service unavailable", hdrs=None, fp=None)
 
     monkeypatch.setattr("newsr.providers.search.duckduckgo.open_request", fail)
@@ -264,5 +348,6 @@ def test_search_logs_http_errors_without_logging_error_body(monkeypatch, caplog)
         and "status=503" in record.message
         for record in caplog.records
     )
+    assert attempts == 1
     log_text = "\n".join(record.message for record in caplog.records)
     assert "<html>" not in log_text

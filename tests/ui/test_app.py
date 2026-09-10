@@ -2309,7 +2309,10 @@ def test_ui_article_qa_source_list_opens_browser_with_keyboard(
     )
     app.llm_client = FakeArticleQALLM(answers=["Direct answer"])  # type: ignore[assignment]
     app.search_client = FakeSearchClient(  # type: ignore[assignment]
-        [SearchResult(title="Context", url="https://example.com/context", snippet="Details")]
+        [
+            SearchResult(title="Context", url="https://example.com/context", snippet="Details"),
+            SearchResult(title="Second", url="https://example.com/second", snippet="More details"),
+        ]
     )
     opened_urls: list[tuple[str, int]] = []
     monkeypatch.setattr(webbrowser, "open", lambda url, new=0: opened_urls.append((url, new)) or True)
@@ -2331,18 +2334,20 @@ def test_ui_article_qa_source_list_opens_browser_with_keyboard(
             await pilot.press("tab")
             await pilot.pause()
             assert article_qa_source_list(app).has_focus
+            await pilot.press("down")
+            assert article_qa_source_list(app).index == 1
             await pilot.press("enter")
             await pilot.pause()
             confirm = open_link_confirm_screen(app)
             assert confirm is not None
-            assert "URL: https://example.com/context" in confirm.query_one("#open-link-body", Static).content
+            assert "URL: https://example.com/second" in confirm.query_one("#open-link-body", Static).content
             assert opened_urls == []
             await pilot.press("enter")
             await pilot.pause()
 
     asyncio.run(runner())
 
-    assert opened_urls == [("https://example.com/context", 2)]
+    assert opened_urls == [("https://example.com/second", 2)]
 
 
 def test_ui_article_qa_markdown_link_click_opens_browser(
@@ -2449,6 +2454,59 @@ def test_ui_article_qa_follow_up_uses_prior_turns(app_config, tmp_path, article_
     asyncio.run(runner())
 
 
+def test_ui_article_qa_recalls_questions_and_restores_draft(
+    app_config, tmp_path, article_content
+) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    app = NewsReaderApp(app_config, storage_path)
+    disable_startup_refresh(app)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(
+        article_content.article_id, "Translated title", "Translated text", "done"
+    )
+    app.llm_client = FakeArticleQALLM(answers=["Answer 1", "Answer 2"])  # type: ignore[assignment]
+    app.search_client = FakeSearchClient([])  # type: ignore[assignment]
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("?")
+            await pilot.pause()
+
+            await pilot.press("up", "down")
+            assert article_qa_input(app).value == ""
+
+            for question, expected_answer in [
+                ("First question?", "Answer 1"),
+                ("Second question?", "Answer 2"),
+            ]:
+                article_qa_input(app).value = question
+                await pilot.press("enter")
+                for _ in range(20):
+                    await pilot.pause()
+                    if expected_answer in article_qa_body(app):
+                        break
+
+            article_qa_input(app).value = "Unfinished draft"
+            await pilot.press("up")
+            assert article_qa_input(app).value == "Second question?"
+            await pilot.press("up", "up")
+            assert article_qa_input(app).value == "First question?"
+            await pilot.press("down")
+            assert article_qa_input(app).value == "Second question?"
+            await pilot.press("down", "down")
+            assert article_qa_input(app).value == "Unfinished draft"
+
+            await pilot.press("up")
+            article_qa_input(app).value = "Revised draft"
+            await pilot.press("down")
+            assert article_qa_input(app).value == "Revised draft"
+            await pilot.press("up", "down")
+            assert article_qa_input(app).value == "Revised draft"
+
+    asyncio.run(runner())
+
+
 def test_ui_article_qa_third_turn_uses_full_answered_history(
     app_config, tmp_path, article_content
 ) -> None:
@@ -2542,6 +2600,10 @@ def test_ui_article_qa_failed_turn_is_excluded_from_follow_up_history(
 
             assert llm.query_calls[2][4] == [("First question?", "Answer 1")]
             assert llm.answer_calls[2][4] == [("First question?", "Answer 1")]
+            await pilot.press("up")
+            assert article_qa_input(app).value == "What about now?"
+            await pilot.press("up")
+            assert article_qa_input(app).value == "This one fails?"
 
     asyncio.run(runner())
 
@@ -2594,6 +2656,8 @@ def test_ui_article_qa_escape_cancels_inflight_request_and_clears_session(
             await pilot.pause()
             assert "Need current context?" not in article_qa_body(app)
             assert "Nothing in this chat is saved" in article_qa_body(app)
+            await pilot.press("up")
+            assert article_qa_input(app).value == ""
 
     asyncio.run(runner())
 
