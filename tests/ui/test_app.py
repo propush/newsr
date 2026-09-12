@@ -5263,7 +5263,9 @@ def test_ui_brief_reader_up_down_scroll_report(app_config, tmp_path) -> None:
 
 
 @pytest.mark.provider_home
-def test_ui_brief_reader_number_jump_opens_article_without_saving_reader_state(app_config, tmp_path) -> None:
+def test_ui_brief_reader_number_jump_uses_default_mode_and_saves_explicit_provider_mode(
+    app_config, tmp_path
+) -> None:
     app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
     disable_startup_refresh(app)
     app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report [2]\n\nOther report item [1]")  # type: ignore[assignment]
@@ -5321,6 +5323,9 @@ def test_ui_brief_reader_number_jump_opens_article_without_saving_reader_state(a
             assert app.current_article.article_id == second_id
             assert body_source(app) == "Translated body two"
             assert "Article # 1 of 2" in header_text(app)
+            bbc_state = app.storage.load_reader_state("bbc")
+            assert bbc_state.article_id is None
+            assert bbc_state.view_mode == ViewMode.FULL
 
             await pilot.press("left", "right")
             await pilot.pause()
@@ -5331,6 +5336,9 @@ def test_ui_brief_reader_number_jump_opens_article_without_saving_reader_state(a
             await pilot.pause()
             assert app.active_reader_state.view_mode == ViewMode.SUMMARY
             assert body_source(app) == "Summary for Brief jump two"
+            bbc_state = app.storage.load_reader_state("bbc")
+            assert bbc_state.article_id is None
+            assert bbc_state.view_mode == ViewMode.SUMMARY
 
             await pilot.press("e")
             await pilot.pause()
@@ -5345,8 +5353,89 @@ def test_ui_brief_reader_number_jump_opens_article_without_saving_reader_state(a
             assert "Generated provider report [1]" in brief_reader_body(app)
             assert app.provider_home_open is True
             assert app.storage.load_reader_state("bbc").article_id is None
+            assert app.storage.load_reader_state("bbc").view_mode == ViewMode.SUMMARY
             assert app.storage.load_reader_state("[ALL]").article_id is None
+            assert app.storage.load_reader_state("[ALL]").view_mode == ViewMode.FULL
             assert first_id != second_id
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_brief_reader_number_jump_inherits_article_provider_mode(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.llm_client = FakeBriefLLM("# Brief\n\nGenerated provider report [1]")  # type: ignore[assignment]
+    article_id = seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="brief-provider-mode",
+        title="Brief provider mode",
+        body="Original provider body",
+        minute=1,
+    )
+    app.storage.update_translation(
+        article_id,
+        "Translated provider title",
+        "Translated provider body",
+        "done",
+    )
+    app.storage.save_reader_state(
+        "bbc",
+        app.reader_state.__class__(
+            article_id=None,
+            view_mode=ViewMode.ORIGINAL,
+            scroll_offset=11,
+        ),
+    )
+    app.storage.save_reader_state(
+        "[ALL]",
+        app.reader_state.__class__(
+            article_id=None,
+            view_mode=ViewMode.FULL,
+            scroll_offset=0,
+        ),
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            screen = brief_screen(app)
+            assert screen is not None
+            screen.period = BriefPeriod.ALL_UNREAD
+            screen.mark_read = False
+            app.generate_brief()
+            for _ in range(20):
+                await pilot.pause()
+                if brief_reader_screen(app) is not None:
+                    break
+            else:
+                raise AssertionError("brief reader was not opened")
+
+            await pilot.press("1")
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert app.current_article is not None
+            assert app.current_article.article_id == article_id
+            assert app.active_reader_state.view_mode == ViewMode.ORIGINAL
+            assert body_source(app) == "Original provider body"
+            bbc_state = app.storage.load_reader_state("bbc")
+            assert bbc_state.article_id is None
+            assert bbc_state.view_mode == ViewMode.ORIGINAL
+            assert bbc_state.scroll_offset == 11
+            assert app.storage.load_reader_state("[ALL]").view_mode == ViewMode.FULL
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert brief_reader_screen(app) is not None
+            bbc_state = app.storage.load_reader_state("bbc")
+            assert bbc_state.article_id is None
+            assert bbc_state.view_mode == ViewMode.ORIGINAL
+            assert bbc_state.scroll_offset == 11
 
     asyncio.run(runner())
 
@@ -5382,6 +5471,10 @@ def test_ui_brief_mark_read_survives_article_jump_from_active_provider(app_confi
             assert app.provider_home_open is False
             assert app.storage.load_reader_state("bbc").article_id is None
 
+            await pilot.press("s")
+            await pilot.pause()
+            assert app.reader_state.view_mode == ViewMode.SUMMARY
+
             app.action_return_to_provider_home()
             await pilot.pause()
             assert app.provider_home_open is True
@@ -5399,7 +5492,9 @@ def test_ui_brief_mark_read_survives_article_jump_from_active_provider(app_confi
                     break
             else:
                 raise AssertionError("brief reader was not opened")
-            assert app.storage.load_reader_state("bbc").article_id == second_id
+            bbc_state = app.storage.load_reader_state("bbc")
+            assert bbc_state.article_id == second_id
+            assert bbc_state.view_mode == ViewMode.SUMMARY
 
             await pilot.press("1")
             await pilot.pause()
@@ -5407,6 +5502,20 @@ def test_ui_brief_mark_read_survives_article_jump_from_active_provider(app_confi
             await pilot.pause()
             assert app.current_article is not None
             assert app.current_article.article_id == second_id
+            assert app.active_reader_state.view_mode == ViewMode.SUMMARY
+            assert body_source(app) == "Summary for Brief active provider two"
+
+            await pilot.press("s")
+            await pilot.pause()
+            assert app.active_reader_state.view_mode == ViewMode.ORIGINAL
+            bbc_state = app.storage.load_reader_state("bbc")
+            assert bbc_state.article_id == second_id
+            assert bbc_state.view_mode == ViewMode.ORIGINAL
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert brief_reader_screen(app) is not None
+            assert app.reader_state.view_mode == ViewMode.ORIGINAL
 
     asyncio.run(runner())
 
@@ -5416,7 +5525,9 @@ def test_ui_brief_mark_read_survives_article_jump_from_active_provider(app_confi
     async def restart_runner() -> None:
         async with restarted.run_test() as pilot:
             await pilot.pause()
-            assert restarted.storage.load_reader_state("bbc").article_id == second_id
+            bbc_state = restarted.storage.load_reader_state("bbc")
+            assert bbc_state.article_id == second_id
+            assert bbc_state.view_mode == ViewMode.ORIGINAL
             bbc_row = provider_home_rows(restarted)[provider_home_row_index(restarted, "BBC News")]
             assert bbc_row[1] == "0"
 

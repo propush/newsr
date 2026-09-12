@@ -520,6 +520,14 @@ def test_brief_marks_all_selected_sources_read_not_only_sources_in_report(
         summary="New summary",
         now=now,
     )
+    storage.save_reader_state(
+        "bbc",
+        ReaderState(article_id=None, view_mode=ViewMode.ORIGINAL, scroll_offset=7),
+    )
+    storage.save_reader_state(
+        "techcrunch",
+        ReaderState(article_id=None, view_mode=ViewMode.SUMMARY, scroll_offset=9),
+    )
     service = BriefService(app_config, storage, FakeBriefLLM(report="# Brief\n\nNew [1]"))
 
     result = service.generate(
@@ -528,8 +536,14 @@ def test_brief_marks_all_selected_sources_read_not_only_sources_in_report(
     )
 
     assert [article.article_id for article in result.articles] == ["techcrunch:new"]
-    assert storage.load_reader_state("bbc").article_id == "bbc:old"
-    assert storage.load_reader_state("techcrunch").article_id == "techcrunch:new"
+    bbc_state = storage.load_reader_state("bbc")
+    assert bbc_state.article_id == "bbc:old"
+    assert bbc_state.view_mode == ViewMode.ORIGINAL
+    assert bbc_state.scroll_offset == 0
+    techcrunch_state = storage.load_reader_state("techcrunch")
+    assert techcrunch_state.article_id == "techcrunch:new"
+    assert techcrunch_state.view_mode == ViewMode.SUMMARY
+    assert techcrunch_state.scroll_offset == 0
 
 
 def test_brief_all_unread_uses_provider_reader_state_without_all_virtual(

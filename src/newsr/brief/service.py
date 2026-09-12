@@ -10,7 +10,7 @@ from time import perf_counter
 
 from ..cancellation import RefreshCancellation
 from ..config.models import AppConfig
-from ..domain import ArticleRecord, ProviderRecord, ReaderState, ViewMode
+from ..domain import ArticleRecord, ProviderRecord
 from ..providers.llm.client import current_datetime_prompt_value
 from ..storage.facade import NewsStorage
 from .repair import (
@@ -178,10 +178,7 @@ class BriefService:
         for article in articles:
             latest_by_provider[article.provider_id] = article
         for provider_id, article in latest_by_provider.items():
-            self._storage.save_reader_state(
-                provider_id,
-                ReaderState(article_id=article.article_id, view_mode=ViewMode.FULL, scroll_offset=0),
-            )
+            self._mark_provider_read(provider_id, article.article_id)
 
     def mark_sources_read(self, provider_ids: Sequence[str]) -> None:
         provider_id_set = set(provider_ids)
@@ -192,10 +189,13 @@ class BriefService:
             if article.provider_id in provider_id_set and self._is_translated(article):
                 latest_by_provider[article.provider_id] = article
         for provider_id, article in latest_by_provider.items():
-            self._storage.save_reader_state(
-                provider_id,
-                ReaderState(article_id=article.article_id, view_mode=ViewMode.FULL, scroll_offset=0),
-            )
+            self._mark_provider_read(provider_id, article.article_id)
+
+    def _mark_provider_read(self, provider_id: str, article_id: str) -> None:
+        state = self._storage.load_reader_state(provider_id)
+        state.article_id = article_id
+        state.scroll_offset = 0
+        self._storage.save_reader_state(provider_id, state)
 
     def _summarize_articles(
         self,

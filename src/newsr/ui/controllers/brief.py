@@ -141,9 +141,10 @@ class BriefController:
         self._dismiss_reader_screen(restore_focus=False)
         self._active_article = article
         self._active_article_number = number
+        provider_state = self._app.storage.load_reader_state(article.provider_id)
         self._active_reader_state = ReaderState(
             article_id=article.article_id,
-            view_mode=self._app.reader_state.view_mode,
+            view_mode=provider_state.view_mode,
             scroll_offset=0,
         )
         self._app._set_provider_home_footer_bindings(provider_home_open=False)
@@ -167,6 +168,17 @@ class BriefController:
         if self._active_article is None or self._active_article.article_id != article.article_id:
             return
         self._active_article = article
+
+    def save_active_view_mode(self) -> None:
+        article = self._active_article
+        active_state = self._active_reader_state
+        if article is None or active_state is None:
+            return
+        provider_state = self._app.storage.load_reader_state(article.provider_id)
+        provider_state.view_mode = active_state.view_mode
+        self._app.storage.save_reader_state(article.provider_id, provider_state)
+        if self._app._provider_home.active_scope_id == article.provider_id:
+            self._app.reader_state.view_mode = active_state.view_mode
 
     def cancel(self) -> None:
         cancellation = self._cancellation

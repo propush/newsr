@@ -246,7 +246,9 @@ class NavigationController:
         reader_state.view_mode = next_mode
         self.reset_scroll()
         self._app.refresh_view()
-        if not self._app._brief.article_open:
+        if self._app._brief.article_open:
+            self._app._brief.save_active_view_mode()
+        else:
             self.save_reader_state_now_without_scroll_capture()
 
     @staticmethod
