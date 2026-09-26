@@ -12,7 +12,7 @@ from rich.text import Text
 from textual.color import Color
 from textual.containers import VerticalScroll
 from textual.widgets import DataTable
-from textual.widgets import Button, Footer, Input, ListView, LoadingIndicator, Markdown, Static
+from textual.widgets import Button, Checkbox, Footer, Input, ListView, LoadingIndicator, Markdown, RadioButton, RadioSet, Static
 
 from newsr.brief import BriefPeriod
 from newsr.export import ExportAction, ExportResult
@@ -4955,6 +4955,7 @@ def test_ui_provider_home_b_opens_brief_screen_with_defaults(app_config, tmp_pat
             assert screen is not None
             options = screen.current_options()
             assert options.period == "last_24h"
+            assert options.only_unread is True
             assert options.include_topics is False
             assert options.mark_read is True
 
@@ -4976,6 +4977,10 @@ def test_ui_brief_setup_tab_moves_between_control_groups(app_config, tmp_path) -
 
             await pilot.press("tab")
             await pilot.pause()
+            assert getattr(app.focused, "id", None) == "brief-only-unread"
+
+            await pilot.press("tab")
+            await pilot.pause()
             assert getattr(app.focused, "id", None) == "brief-include-topics"
 
             await pilot.press("tab")
@@ -4985,6 +4990,52 @@ def test_ui_brief_setup_tab_moves_between_control_groups(app_config, tmp_path) -
             await pilot.press("shift+tab")
             await pilot.pause()
             assert getattr(app.focused, "id", None) == "brief-include-topics"
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_brief_unread_toggle_is_implied_for_all_unread(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("b")
+            await pilot.pause()
+            screen = brief_screen(app)
+            assert screen is not None
+            checkbox = screen.query_one("#brief-only-unread", Checkbox)
+            assert checkbox.value is True
+            assert checkbox.disabled is False
+
+            await pilot.press("tab", "space")
+            await pilot.pause()
+            assert screen.current_options().only_unread is False
+
+            screen.query_one("#brief-period-unread", RadioButton).value = True
+            await pilot.pause()
+            assert screen.current_options().period == BriefPeriod.ALL_UNREAD
+            assert screen.current_options().only_unread is True
+            assert checkbox.value is True
+            assert checkbox.disabled is True
+
+            screen.query_one("#brief-period", RadioSet).focus()
+            await pilot.press("tab")
+            await pilot.pause()
+            assert getattr(app.focused, "id", None) == "brief-include-topics"
+
+            screen.set_generating(True)
+            screen.set_generating(False)
+            assert checkbox.disabled is True
+
+            screen.query_one("#brief-period-week", RadioButton).value = True
+            await pilot.pause()
+            assert screen.current_options().period == BriefPeriod.LAST_WEEK
+            assert screen.current_options().only_unread is False
+            assert checkbox.value is False
+            assert checkbox.disabled is False
 
     asyncio.run(runner())
 

@@ -83,6 +83,7 @@ class BriefScreen(ModalScreen[None]):
 
     _FOCUS_ORDER = (
         "brief-period",
+        "brief-only-unread",
         "brief-include-topics",
         "brief-mark-read",
         "brief-generate",
@@ -94,6 +95,7 @@ class BriefScreen(ModalScreen[None]):
         self._ui = ui
         self._bindings = BindingsMap(self._build_bindings())
         self.period = BriefPeriod.LAST_24H
+        self.only_unread = True
         self.include_topics = False
         self.mark_read = True
         self.generating = False
@@ -121,6 +123,11 @@ class BriefScreen(ModalScreen[None]):
                     yield RadioButton(self._ui.text("brief.period.all_unread"), id="brief-period-unread")
                 with Vertical(id="brief-options"):
                     yield Checkbox(
+                        self._ui.text("brief.option.only_unread"),
+                        value=True,
+                        id="brief-only-unread",
+                    )
+                    yield Checkbox(
                         self._ui.text("brief.option.include_topics"),
                         value=False,
                         id="brief-include-topics",
@@ -144,6 +151,7 @@ class BriefScreen(ModalScreen[None]):
     def current_options(self) -> BriefOptions:
         return BriefOptions(
             period=self.period,
+            only_unread=self.period == BriefPeriod.ALL_UNREAD or self.only_unread,
             include_topics=self.include_topics,
             mark_read=self.mark_read,
         )
@@ -155,6 +163,7 @@ class BriefScreen(ModalScreen[None]):
                 self.query_one(f"#{control_id}").disabled = value
             except NoMatches:
                 continue
+        self._sync_only_unread_control()
         try:
             progress = self.query_one("#brief-progress", ProgressBar)
             progress.display = value
@@ -203,12 +212,23 @@ class BriefScreen(ModalScreen[None]):
             "brief-period-unread": BriefPeriod.ALL_UNREAD,
         }
         self.period = period_by_id.get(event.pressed.id or "", self.period)
+        self._sync_only_unread_control()
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if event.checkbox.id == "brief-only-unread" and self.period != BriefPeriod.ALL_UNREAD:
+            self.only_unread = event.value
         if event.checkbox.id == "brief-include-topics":
             self.include_topics = event.value
         if event.checkbox.id == "brief-mark-read":
             self.mark_read = event.value
+
+    def _sync_only_unread_control(self) -> None:
+        try:
+            checkbox = self.query_one("#brief-only-unread", Checkbox)
+        except NoMatches:
+            return
+        checkbox.value = True if self.period == BriefPeriod.ALL_UNREAD else self.only_unread
+        checkbox.disabled = self.generating or self.period == BriefPeriod.ALL_UNREAD
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()

@@ -578,6 +578,34 @@ def test_brief_all_unread_uses_provider_reader_state_without_all_virtual(
     assert [article.article_id for article in selected] == ["bbc:unread"]
 
 
+def test_brief_timed_periods_optionally_filter_unread_articles(
+    app_config: AppConfig,
+    storage: NewsStorage,
+) -> None:
+    now = datetime(2026, 5, 18, 12, 0, tzinfo=UTC)
+    seed_article(storage, provider_id="bbc", article_id="read-week", minutes_ago=60 * 48, summary="Read week", now=now)
+    seed_article(storage, provider_id="bbc", article_id="read-day", minutes_ago=60 * 12, summary="Read day", now=now)
+    seed_article(storage, provider_id="bbc", article_id="unread-day", minutes_ago=30, summary="Unread day", now=now)
+    seed_article(storage, provider_id="bbc", article_id="unread-old", minutes_ago=60 * 24 * 9, summary="Unread old", now=now)
+    storage.save_reader_state("bbc", ReaderState("bbc:read-day", ViewMode.FULL, 0))
+    service = BriefService(app_config, storage, FakeBriefLLM())
+
+    def article_ids(period: BriefPeriod, *, only_unread: bool) -> list[str]:
+        options = BriefOptions(period=period, only_unread=only_unread)
+        return [article.article_id for article in service.select_articles(options, now=now)]
+
+    assert BriefOptions().only_unread is True
+    assert article_ids(BriefPeriod.LAST_24H, only_unread=True) == ["bbc:unread-day"]
+    assert article_ids(BriefPeriod.LAST_24H, only_unread=False) == ["bbc:read-day", "bbc:unread-day"]
+    assert article_ids(BriefPeriod.LAST_WEEK, only_unread=True) == ["bbc:unread-day"]
+    assert article_ids(BriefPeriod.LAST_WEEK, only_unread=False) == [
+        "bbc:read-week",
+        "bbc:read-day",
+        "bbc:unread-day",
+    ]
+    assert article_ids(BriefPeriod.ALL_UNREAD, only_unread=False) == ["bbc:unread-day", "bbc:unread-old"]
+
+
 def test_brief_context_limit_reduces_notes_until_final_request_fits(
     app_config: AppConfig,
     storage: NewsStorage,

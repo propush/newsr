@@ -158,7 +158,7 @@ NewsR starts in a provider home view. This is the default home screen shown afte
 
 ## Brief Review
 
-Press `B` from the provider home to create a brief review. The setup screen lets you choose `Last 24 hr`, `Last week`, or `All unread`, include watched-topic articles, and decide whether generated articles should be marked read. Use `Tab` or arrow keys to move between controls, `Enter` or `Space` to toggle or press the focused control, `G` to generate, and `Esc` to close.
+Press `B` from the provider home to create a brief review. The setup screen lets you choose `Last 24 hr`, `Last week`, or `All unread`, include watched-topic articles, and decide whether generated articles should be marked read. The `Only unread articles` checkbox starts on for the timed periods; clear it to include read articles within the period. It stays checked and disabled for `All unread`. Use `Tab` or arrow keys to move between controls, `Enter` or `Space` to toggle or press the focused control, `G` to generate, and `Esc` to close.
 
 After generation, NewsR opens the brief in a scrollable Markdown reader. The report is synthesized by the configured summary model from the selected cached articles and includes provider statistics. Use `Up` / `Down` to scroll, `PgUp` / `PgDn` / `B` / `Space` to page, and `Esc` to return to the provider home.
 

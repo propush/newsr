@@ -37,6 +37,7 @@ class BriefOptions:
     period: BriefPeriod = BriefPeriod.LAST_24H
     include_topics: bool = False
     mark_read: bool = True
+    only_unread: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,10 +111,11 @@ class BriefService:
         articles = self.select_articles(options, now=now)
         provider_ids = self._selected_provider_ids(options)
         LOGGER.info(
-            "brief_generate_start period=%s include_topics=%s mark_read=%s articles=%s providers=%s",
+            "brief_generate_start period=%s include_topics=%s mark_read=%s only_unread=%s articles=%s providers=%s",
             options.period,
             options.include_topics,
             options.mark_read,
+            options.only_unread,
             len(articles),
             len(provider_ids),
         )
@@ -158,13 +160,13 @@ class BriefService:
             if article.provider_id in provider_by_id and self._is_translated(article)
         ]
         records = [article for article in translated_records if self._has_completed_summary(article)]
-        if options.period == BriefPeriod.ALL_UNREAD:
+        if options.period == BriefPeriod.ALL_UNREAD or options.only_unread:
             unread_ids = {
                 article.article_id
                 for article in self._unread_records(translated_records, set(provider_by_id))
             }
             records = [article for article in records if article.article_id in unread_ids]
-        else:
+        if options.period != BriefPeriod.ALL_UNREAD:
             cutoff = self._cutoff_for_period(options.period, now or datetime.now(UTC))
             records = [article for article in records if self._article_timestamp(article) >= cutoff]
 
