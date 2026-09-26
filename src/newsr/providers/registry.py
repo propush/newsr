@@ -15,6 +15,7 @@ from .marketingdive.provider import MarketingDiveProvider
 from .medcitynews.provider import MedCityNewsProvider
 from .ninetofivemac.provider import NineToFiveMacProvider
 from .ninetofivegoogle.provider import NineToFiveGoogleProvider
+from .paymentsdive.provider import PaymentsDiveProvider
 from .sciencedaily.provider import ScienceDailyProvider
 from .techcrunch.provider import TechCrunchProvider
 from .thehackernews.provider import TheHackerNewsProvider
@@ -34,6 +35,7 @@ def build_provider_registry() -> dict[str, NewsProvider]:
         HyperallergicProvider(),
         EdSurgeProvider(),
         MarketingDiveProvider(),
+        PaymentsDiveProvider(),
         TomsHardwareProvider(),
         CanaryMediaProvider(),
         LawfareProvider(),

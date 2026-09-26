@@ -96,6 +96,13 @@ Provider types:
 - default selected targets: `Brand Strategy`, `Social Media`
 - catalog behavior: static built-in topic/latest catalog with `Marketing` mapped to the site root and topic-backed targets for `Brand Strategy`, `Mobile`, `Creative`, `Social Media`, `Video`, `Agencies`, `Data/Analytics`, `Influencer`, `Ad Tech`, and `CMO Corner`
 
+### Payments Dive
+
+- provider id: `paymentsdive`
+- bootstrap state: disabled by default
+- default selected targets: `Technology`, `Fraud`
+- catalog behavior: static built-in catalog with `Latest` mapped to the site root and topic-backed targets for `Retail`, `Banking`, `Restaurants`, `Regulations & Policy`, `Consumer Risk`, `Technology`, `B2B`, and `Fraud`; candidate extraction accepts written Payments Dive articles and filters sponsored cards and trendlines
+
 ### Tom's Hardware
 
 - provider id: `tomshardware`
