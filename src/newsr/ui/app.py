@@ -429,7 +429,7 @@ class NewsReaderApp(App[None]):
         article = self.current_article
         if article is None:
             return
-        self._article_qa.show(article)
+        self._article_qa.show(article, initial_question=self._clipboard_controller.selected_text())
 
     def action_show_quick_nav(self) -> None:
         if self.provider_home_open or self._brief.article_open:

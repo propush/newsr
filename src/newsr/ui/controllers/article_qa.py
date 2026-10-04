@@ -74,10 +74,12 @@ class ArticleQAController:
         source = sources[index]
         self._app.request_open_link(source.title, source.url)
 
-    def show(self, article: ArticleRecord) -> None:
+    def show(self, article: ArticleRecord, initial_question: str | None = None) -> None:
         self._app.close_more_info()
         screen = self._ensure_screen(article)
         screen.focus_input()
+        if initial_question:
+            screen.call_after_refresh(screen.set_question, initial_question)
 
     def _ensure_screen(self, article: ArticleRecord) -> ArticleQuestionScreen:
         existing = self._screen
