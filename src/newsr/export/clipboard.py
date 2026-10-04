@@ -13,18 +13,19 @@ class ClipboardError(RuntimeError):
 
 
 class ClipboardManager:
-    def __init__(self, system_name: str | None = None) -> None:
+    def __init__(self, system_name: str | None = None, *, timeout: float | None = None) -> None:
         self.system_name = system_name or platform.system()
+        self.timeout = timeout
 
     def copy_text(self, text: str) -> None:
         if self.system_name == "Darwin":
-            self._run(["pbcopy"], input_bytes=text.encode("utf-8"), error_prefix="pbcopy")
+            self._run(["pbcopy"], input_bytes=text.encode("utf-8"), error_prefix="pbcopy", timeout=self.timeout)
             return
         if self.system_name == "Linux":
             self._copy_text_linux(text)
             return
         if self.system_name == "Windows":
-            self._run(["clip"], input_bytes=text.encode("utf-16le"), error_prefix="clip")
+            self._run(["clip"], input_bytes=text.encode("utf-16le"), error_prefix="clip", timeout=self.timeout)
             return
         raise ClipboardError(f"clipboard text export is not supported on {self.system_name}")
 
@@ -42,17 +43,22 @@ class ClipboardManager:
 
     def _copy_text_linux(self, text: str) -> None:
         payload = text.encode("utf-8")
-        if self._command_exists("wl-copy"):
-            self._run(["wl-copy", "--type", "text/plain;charset=utf-8"], input_bytes=payload, error_prefix="wl-copy")
-            return
-        if self._command_exists("xclip"):
-            self._run(
-                ["xclip", "-selection", "clipboard", "-in"],
-                input_bytes=payload,
-                error_prefix="xclip",
-            )
-            return
-        raise ClipboardError("clipboard text export requires wl-copy or xclip")
+        commands: list[list[str]] = []
+        if os.environ.get("WAYLAND_DISPLAY") and self._command_exists("wl-copy"):
+            commands.append(["wl-copy", "--type", "text/plain;charset=utf-8"])
+        if os.environ.get("DISPLAY") and self._command_exists("xclip"):
+            commands.append(["xclip", "-selection", "clipboard", "-in"])
+        errors: list[str] = []
+        for command in commands:
+            try:
+                self._run(command, input_bytes=payload, error_prefix=command[0], timeout=self.timeout)
+            except ClipboardError as exc:
+                errors.append(str(exc))
+            else:
+                return
+        if errors:
+            raise ClipboardError("; ".join(errors))
+        raise ClipboardError("clipboard text export requires wl-copy with Wayland or xclip with X11")
 
     def _copy_image_linux(self, png_bytes: bytes) -> None:
         if self._command_exists("wl-copy"):
@@ -101,11 +107,16 @@ class ClipboardManager:
         return False
 
     @staticmethod
-    def _run(command: list[str], *, input_bytes: bytes | None = None, error_prefix: str) -> None:
+    def _run(
+        command: list[str], *, input_bytes: bytes | None = None,
+        error_prefix: str, timeout: float | None = None,
+    ) -> None:
         try:
-            completed = subprocess.run(command, input=input_bytes, capture_output=True, check=False)
-        except FileNotFoundError as exc:
-            raise ClipboardError(f"{error_prefix} is not available") from exc
+            completed = subprocess.run(command, input=input_bytes, capture_output=True, check=False, timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            raise ClipboardError(f"{error_prefix} timed out") from exc
+        except OSError as exc:
+            raise ClipboardError(f"{error_prefix} is not available: {exc}") from exc
         if completed.returncode == 0:
             return
         error_text = completed.stderr.decode("utf-8", errors="replace").strip() or f"exit code {completed.returncode}"

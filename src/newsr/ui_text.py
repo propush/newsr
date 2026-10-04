@@ -58,6 +58,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.help": "Help",
         "app.binding.providers": "Providers",
         "app.binding.quit": "Quit",
+        "clipboard.error": "Native clipboard unavailable: {error}. Terminal clipboard copy was also requested.",
         "app.empty.header": "No cached articles",
         "app.empty.body": "Press D to fetch articles.",
         "app.article.position": "Article # {current} of {total}",
@@ -94,6 +95,8 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "confirm_dialog.button.retry": "Retry",
         "confirm_dialog.button.cancel": "Cancel",
         "help.body.reader": (
+            "Ctrl+C: copy selected text (also in macOS Terminal)\n"
+            "Cmd+C / Ctrl+Shift+C: copy when forwarded by the terminal\n"
             "Left/Right: previous/next article\n"
             "Up/Down/PgUp/PgDn/B: scroll\n"
             "K: classify categories\n"
@@ -113,6 +116,8 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Q: quit"
         ),
         "help.body.provider_home": (
+            "Ctrl+C: copy selected text (also in macOS Terminal)\n"
+            "Cmd+C / Ctrl+Shift+C: copy when forwarded by the terminal\n"
             "Up/Down/PgUp/PgDn: move through providers\n"
             "Enter/Space: open the selected provider\n"
             "B: brief review\n"
@@ -340,6 +345,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "app.binding.help": "Справка",
         "app.binding.providers": "Провайдеры",
         "app.binding.quit": "Выход",
+        "clipboard.error": "Системный буфер обмена недоступен: {error}. Копирование через терминал также запрошено.",
         "app.empty.header": "Нет статей в кеше",
         "app.empty.body": "Нажмите D, чтобы загрузить статьи.",
         "app.article.position": "Статья № {current} из {total}",
@@ -376,6 +382,8 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "confirm_dialog.button.retry": "Повторить",
         "confirm_dialog.button.cancel": "Отмена",
         "help.body.reader": (
+            "Ctrl+C: копировать выделенный текст (включая macOS Terminal)\n"
+            "Cmd+C / Ctrl+Shift+C: копировать, если терминал передаёт сочетание\n"
             "Left/Right: предыдущая/следующая статья\n"
             "Up/Down/PgUp/PgDn/B: прокрутка\n"
             "K: классифицировать категории\n"
@@ -395,6 +403,8 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
             "Q: выход"
         ),
         "help.body.provider_home": (
+            "Ctrl+C: копировать выделенный текст (включая macOS Terminal)\n"
+            "Cmd+C / Ctrl+Shift+C: копировать, если терминал передаёт сочетание\n"
             "Up/Down/PgUp/PgDn: перемещение по провайдерам\n"
             "Enter/Space: открыть выбранного провайдера\n"
             "B: краткий обзор\n"

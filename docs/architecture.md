@@ -21,7 +21,7 @@ For the concrete built-in provider list, bootstrap defaults, and catalog behavio
 - `newsr.storage`: SQLite connection, schema setup, article persistence, provider/target persistence, permanent duplicate-id tracking, scoped reader state, and single-row global options. The `NewsStorage` facade delegates article methods to `ArticleStore` via `__getattr__` and defines provider, reader-state, options, and lifecycle methods explicitly.
 - `newsr.pipeline`: refresh orchestration that runs a scoped provider set, stores source content, classifies article categories, then runs translation and summary jobs
 - `newsr.ui`: the Textual app, themes, provider-home table, and modal screens for help, sources, quick navigation, export, article Q&A, watched-topic creation, open-link confirmation, retry/confirm prompts, free-text input, and "more info"
-- `newsr.ui.controllers`: controller objects that encapsulate feature-specific state and logic for article Q&A, article categorization, article rendering, navigation, provider home management, watched-topic creation, export, and background refresh, while the main `NewsReaderApp` stays focused on widget composition, thin forwarding methods for bindings/screen callbacks, `refresh_view()`, and lifecycle cleanup
+- `newsr.ui.controllers`: controller objects that encapsulate feature-specific state and logic for article Q&A, article categorization, article rendering, navigation, provider home management, watched-topic creation, clipboard copying, export, and background refresh, while the main `NewsReaderApp` stays focused on widget composition, thin forwarding methods for bindings/screen callbacks, `refresh_view()`, and lifecycle cleanup
 
 All network-facing providers use `cancellable_read` from `newsr.cancellation` for chunked HTTP reads with cooperative cancellation support.
 
@@ -41,8 +41,17 @@ Provider catalogs are not uniform. See [Current Providers](current_providers.md)
 - Watched topics are dynamic providers backed by DuckDuckGo search and generic readable-content extraction; see [Topic Watch](topic_watch.md).
 - Brief review opens from provider home when refresh is idle, collects period and source options in a setup screen, then shows the generated report with contributor article counts and numbered article references in a full-size reader screen. The last 24 hours and last week include only unread articles by default, using each provider's saved reader position; the setup screen can include read articles for those periods. All unread always uses the unread filter, and its checkbox is disabled. Brief generation shows visible localized progress for article selection, summary compression, repair retries, final synthesis, fallback, and read-state updates according to `ui.locale`. It also validates article markers during summary compression and final report synthesis, retries invalid or incomplete marker coverage up to a bounded limit, and keeps article jumps aligned with valid cited articles. Typing an article number opens that article in a transient reader view with the normal article actions and returns to the brief with `Esc`.
 - Export supports saving or copying Markdown and PNG output for the current article view, including original source mode.
+- Selected rendered text and input selections can be copied with `Ctrl+C` throughout the reader and dialogs. `Cmd+C` and `Ctrl+Shift+C` also copy when the terminal forwards those keys to NewsR. Copying preserves selection, focus, and reader position; selection alone does not write to the clipboard.
 - Opening an article URL uses an in-app confirmation screen before handing the link to the browser.
 - UI language currently supports `en` and `ru`, and the selected Textual theme is persisted in SQLite options.
+
+## Clipboard Support
+
+NewsR keeps Textual's internal clipboard for input paste and sends text through the terminal's OSC 52 clipboard protocol. Local sessions additionally write to the operating system clipboard with `pbcopy` on macOS, `clip` on Windows, `wl-copy` with a Wayland display, or `xclip` with an X11 display on Linux. Linux users need the applicable clipboard utility installed; when both displays are available, NewsR tries Wayland first and can fall back to X11. Native text writes run in order off the UI thread with a two-second timeout per command. Native failures produce a localized warning while terminal copying remains available.
+
+In macOS Terminal, use `Ctrl+C` for text selected inside NewsR. `Cmd+C` is handled by Terminal for its own selection. Other terminals may handle `Cmd+C` or `Ctrl+Shift+C` themselves; NewsR recognizes these combinations when they reach the app.
+
+Sessions identified by `SSH_CONNECTION`, `SSH_CLIENT`, or `SSH_TTY` use terminal clipboard copying to reach the client computer. The client terminal must support and permit OSC 52, and multiplexers such as tmux must allow clipboard forwarding. Terminal clipboard writes have no success acknowledgement; remote copying requires compatible terminal settings.
 
 ## Runtime Flow
 

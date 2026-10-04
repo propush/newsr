@@ -33,6 +33,7 @@ from .controllers.article_rendering import (
     visible_status_text,
 )
 from .controllers.brief import BriefController
+from .controllers.clipboard import ClipboardController
 from .controllers.export import ExportController
 from .controllers.more_info import MoreInfoController
 from .controllers.navigation import NavigationController
@@ -175,6 +176,7 @@ class NewsReaderApp(App[None]):
         self.providers = dict(self.builtin_providers)
         self.pipeline = NewsPipeline(config, self.storage, self.providers, self.llm_client)
         self.export_service = ExportService()
+        self._clipboard_controller = ClipboardController(self)
 
         # Controllers
         self._refresh = RefreshController(self)
@@ -205,6 +207,7 @@ class NewsReaderApp(App[None]):
 
     def _build_bindings(self, *, provider_home_open: bool = False) -> list[Binding | tuple[str, str, str]]:
         return [
+            Binding("ctrl+c,super+c,ctrl+shift+c", "copy_selection", show=False, priority=True),
             Binding("left", "previous_article", self.ui.text("app.binding.previous"), show=False),
             Binding("right", "next_article", self.ui.text("app.binding.next"), show=False),
             Binding("up", "scroll_up", self.ui.text("app.binding.up"), show=False),
@@ -642,7 +645,16 @@ class NewsReaderApp(App[None]):
     # ------------------------------------------------------------------
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "copy_selection":
+            return bool(self._clipboard_controller.selected_text())
         return self._provider_home.check_action(action)
+
+    def action_copy_selection(self) -> None:
+        self._clipboard_controller.copy_selection()
+
+    def copy_to_clipboard(self, text: str) -> None:
+        super().copy_to_clipboard(text)
+        self._clipboard_controller.copy_native(text)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         self._provider_home.handle_row_selected(event)
@@ -768,6 +780,7 @@ class NewsReaderApp(App[None]):
     def _cleanup_before_exit(self) -> None:
         if self._exit_cleanup_done:
             return
+        self._clipboard_controller.shutdown()
         self.close_export_screen()
         self.close_open_link_confirm()
         self.close_article_qa()
