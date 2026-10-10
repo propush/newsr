@@ -10,20 +10,20 @@ from newsr.providers.ninetofivegoogle.catalog import (
 
 class TestTargetOption:
     def test_target_option_frozen(self):
-        option = TargetOption("pixel", "Pixel", "/guides/pixel/")
+        option = TargetOption("pixel", "Pixel", "/guides/google-pixel/")
         with pytest.raises(AttributeError):
             option.slug = "new-slug"
 
     def test_target_option_slots(self):
-        option = TargetOption("pixel", "Pixel", "/guides/pixel/")
+        option = TargetOption("pixel", "Pixel", "/guides/google-pixel/")
         # With slots=True, __dict__ should not exist
         assert not hasattr(option, "__dict__")
 
     def test_target_option_fields(self):
-        option = TargetOption("pixel", "Pixel", "/guides/pixel/")
+        option = TargetOption("pixel", "Pixel", "/guides/google-pixel/")
         assert option.slug == "pixel"
         assert option.label == "Pixel"
-        assert option.path == "/guides/pixel/"
+        assert option.path == "/guides/google-pixel/"
 
 
 class TestBaseTargetOptions:
@@ -31,7 +31,7 @@ class TestBaseTargetOptions:
         assert len(BASE_TARGET_OPTIONS) > 0
 
     def test_base_target_options_count(self):
-        assert len(BASE_TARGET_OPTIONS) == 12
+        assert len(BASE_TARGET_OPTIONS) == 21
 
     def test_base_target_options_latest(self):
         latest = BASE_TARGET_OPTIONS[0]
@@ -43,7 +43,7 @@ class TestBaseTargetOptions:
         pixel = BASE_TARGET_OPTIONS[1]
         assert pixel.slug == "pixel"
         assert pixel.label == "Pixel"
-        assert pixel.path == "/guides/pixel/"
+        assert pixel.path == "/guides/google-pixel/"
 
     def test_base_target_options_android(self):
         android = BASE_TARGET_OPTIONS[2]
@@ -55,19 +55,19 @@ class TestBaseTargetOptions:
         chrome = BASE_TARGET_OPTIONS[3]
         assert chrome.slug == "chrome"
         assert chrome.label == "Chrome"
-        assert chrome.path == "/guides/chrome/"
+        assert chrome.path == "/guides/google-chrome/"
 
     def test_base_target_options_tv(self):
         tv = BASE_TARGET_OPTIONS[4]
         assert tv.slug == "tv"
         assert tv.label == "TV"
-        assert tv.path == "/guides/tv/"
+        assert tv.path == "/guides/google-tv/"
 
     def test_base_target_options_workspace(self):
         workspace = BASE_TARGET_OPTIONS[5]
         assert workspace.slug == "workspace"
         assert workspace.label == "Workspace"
-        assert workspace.path == "/guides/workspace/"
+        assert workspace.path == "/guides/google-workspace/"
 
     def test_all_options_have_unique_slugs(self):
         slugs = [opt.slug for opt in BASE_TARGET_OPTIONS]

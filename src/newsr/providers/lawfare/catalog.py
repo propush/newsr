@@ -19,4 +19,16 @@ BASE_TARGET_OPTIONS = [
         "Foreign Relations & International Law",
         "/topics/foreign-relations-international-law",
     ),
+    TargetOption("armed-conflict", "Armed Conflict", "/topics/armed-conflict"),
+    TargetOption("congress", "Congress", "/topics/congress"),
+    TargetOption("courts-litigation", "Courts & Litigation", "/topics/courts-litigation"),
+    TargetOption(
+        "criminal-justice-rule-of-law",
+        "Criminal Justice & Rule of Law",
+        "/topics/criminal-justice-rule-of-law",
+    ),
+    TargetOption("democracy-elections", "Democracy & Elections", "/topics/democracy-elections"),
+    TargetOption("executive-branch", "Executive Branch", "/topics/executive-branch"),
+    TargetOption("states-localities", "States & Localities", "/topics/states-localities"),
+    TargetOption("terrorism-extremism", "Terrorism & Extremism", "/topics/terrorism-extremism"),
 ]

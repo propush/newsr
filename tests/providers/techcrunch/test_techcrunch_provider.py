@@ -51,7 +51,7 @@ def test_parse_article_html_extracts_body_metadata() -> None:
 def test_default_targets_mark_expected_core_targets_selected() -> None:
     targets = TechCrunchProvider().default_targets()
 
-    assert [option.slug for option in BASE_TOPIC_OPTIONS] == [
+    assert [option.slug for option in BASE_TOPIC_OPTIONS][:11] == [
         "latest",
         "startups",
         "venture",

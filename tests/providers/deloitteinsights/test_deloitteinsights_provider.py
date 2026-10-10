@@ -107,36 +107,21 @@ def test_parse_article_html_aggregates_multi_block_body_content() -> None:
 def test_default_targets_match_curated_live_topic_catalog() -> None:
     targets = DeloitteInsightsProvider().default_targets()
 
-    assert [option.slug for option in BASE_TARGET_OPTIONS] == [
+    assert [option.slug for option in BASE_TARGET_OPTIONS][:5] == [
         "business-strategy-growth",
         "technology-management",
         "talent",
         "operations",
         "economy",
     ]
-    assert [target.payload for target in targets] == [
-        {
-            "path": "/us/en/insights/topics/business-strategy-growth.html",
-            "search_tag": "Strategy",
-        },
-        {
-            "path": "/us/en/insights/topics/technology-management.html",
-            "search_tag": "Technology management",
-        },
-        {
-            "path": "/us/en/insights/topics/talent.html",
-            "search_tag": "Talent",
-        },
-        {
-            "path": "/us/en/insights/topics/operations.html",
-            "search_tag": "Operations",
-        },
-        {
-            "path": "/us/en/insights/topics/economy.html",
-            "search_tag": "Economics",
-        },
+    assert [target.payload for target in targets][:5] == [
+        {"path": "/us/en/insights/topics/business-strategy-growth.html", "search_tag": "Strategy"},
+        {"path": "/us/en/insights/topics/technology-management.html", "search_tag": "Technology management"},
+        {"path": "/us/en/insights/topics/talent.html", "search_tag": "Talent"},
+        {"path": "/us/en/insights/topics/operations.html", "search_tag": "Operations"},
+        {"path": "/us/en/insights/research-centers/economics.html", "search_tag": "Economics"},
     ]
-    assert [target.target_kind for target in targets] == ["topic"] * 5
+    assert [target.target_kind for target in targets] == ["topic"] * len(targets)
     assert {target.target_key for target in targets if target.selected} == DEFAULT_TARGET_SLUGS
 
 

@@ -55,14 +55,19 @@ class ProviderHomeController:
         ]
         self._app.storage.sync_providers(provider_records)
         for provider in self._app.builtin_providers.values():
-            if self._app.storage.list_provider_targets(provider.provider_id):
-                continue
+            current_targets = self._app.storage.list_provider_targets(provider.provider_id)
             default_targets = provider.default_targets()
+            if provider.provider_id == "bbc":
+                default_keys = {target.target_key for target in default_targets}
+                default_targets.extend(
+                    target for target in current_targets if target.target_key not in default_keys
+                )
             self._app.storage.replace_provider_targets(provider.provider_id, default_targets)
-            self._app.storage.set_selected_targets(
-                provider.provider_id,
-                [target.target_key for target in default_targets if target.selected],
-            )
+            if not current_targets:
+                self._app.storage.set_selected_targets(
+                    provider.provider_id,
+                    [target.target_key for target in default_targets if target.selected],
+                )
 
     def rows(self) -> list[ProviderHomeRow]:
         all_articles = self._app._articles_for_scope(ALL_PROVIDERS_SCOPE_ID)
@@ -387,8 +392,6 @@ class ProviderHomeController:
         targets = provider.discover_targets()
         self._app.storage.replace_provider_targets(provider_id, targets)
         selected_keys = [target.target_key for target in targets if target.target_key in current_selected]
-        if not selected_keys:
-            selected_keys = [target.target_key for target in targets if target.selected]
         self._app.storage.set_selected_targets(provider_id, selected_keys)
         return self._app.storage.list_provider_targets(provider_id)
 

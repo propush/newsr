@@ -57,15 +57,15 @@ def test_parse_article_html_extracts_body_metadata() -> None:
 def test_default_targets_match_curated_hyperallergic_catalog() -> None:
     targets = HyperallergicProvider().default_targets()
 
-    assert [option.slug for option in BASE_TARGET_OPTIONS] == [
+    assert [option.slug for option in BASE_TARGET_OPTIONS][:4] == [
         "news",
         "reviews",
         "opinion",
         "film",
     ]
-    assert [target.payload for target in targets] == [
+    assert [target.payload for target in targets][:4] == [
         {"path": "/tag/news/"},
-        {"path": "/tag/reviews/"},
+        {"path": "/tag/review/"},
         {"path": "/tag/opinion/"},
         {"path": "/tag/film/"},
     ]

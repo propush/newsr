@@ -1,14 +1,33 @@
 from __future__ import annotations
 
+import re
 from urllib.parse import urljoin, urlparse
 
 
 BBC_ROOT = "https://www.bbc.com"
 _CATEGORY_EXCLUDE = {"articles", "av", "future", "in_pictures", "live", "topics"}
+_SECTION_SLUGS = {
+    "/news": "latest",
+    "/technology": "technology",
+    "/business": "business",
+    "/health": "health",
+    "/culture/entertainment-news": "entertainment_and_arts",
+    "/culture": "culture",
+    "/arts": "arts",
+    "/travel": "travel",
+    "/future-planet": "earth",
+    "/news/science_and_environment": "science-environment",
+}
+_FEATURE_ARTICLE_RE = re.compile(r"^/(?:future|culture|travel|worklife|earth|innovation|arts)/article/[^/]+$")
 
 
 def is_article_url(url: str) -> bool:
-    path = urlparse(url).path.rstrip("/")
+    parsed = urlparse(url)
+    if parsed.netloc.lower() not in {"bbc.com", "www.bbc.com", "bbc.co.uk", "www.bbc.co.uk"}:
+        return False
+    path = parsed.path.rstrip("/")
+    if _FEATURE_ARTICLE_RE.fullmatch(path):
+        return True
     if not path.startswith("/news/"):
         return False
     if path.startswith("/news/live/"):
@@ -20,8 +39,8 @@ def is_article_url(url: str) -> bool:
     if not slug:
         return False
     if path.startswith("/news/articles/"):
-        return True
-    return any(character.isdigit() for character in slug)
+        return len(path.strip("/").split("/")) == 3
+    return len(path.strip("/").split("/")) == 2 and bool(re.search(r"-\d+$", slug))
 
 
 def normalize_url(href: str) -> str:
@@ -34,16 +53,20 @@ def article_id_from_url(url: str) -> str:
 
 
 def category_slug_from_url(url: str) -> str | None:
-    path = urlparse(url).path.rstrip("/")
+    parsed = urlparse(url)
+    if parsed.netloc.lower() not in {"bbc.com", "www.bbc.com", "bbc.co.uk", "www.bbc.co.uk"}:
+        return None
+    path = parsed.path.rstrip("/")
+    if path in _SECTION_SLUGS:
+        return _SECTION_SLUGS[path]
     parts = [part for part in path.split("/") if part]
-    if len(parts) != 2 or parts[0] != "news":
+    if len(parts) not in {2, 3} or parts[0] != "news":
         return None
-    slug = parts[1]
-    if slug in _CATEGORY_EXCLUDE:
+    if any(part in _CATEGORY_EXCLUDE for part in parts[1:]):
         return None
-    if not slug.replace("_", "").replace("-", "").isalpha():
+    if not all(part.replace("_", "").replace("-", "").isalpha() for part in parts[1:]):
         return None
-    return slug
+    return "/".join(parts[1:])
 
 
 def label_from_slug(slug: str) -> str:

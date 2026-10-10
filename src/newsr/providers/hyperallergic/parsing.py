@@ -57,7 +57,7 @@ def parse_section_html(html: str, category: str) -> list[SectionCandidate]:
     seen: set[str] = set()
     candidates: list[SectionCandidate] = []
     for wrapper in _card_wrappers(soup):
-        article_url = _article_url_from_wrapper(wrapper)
+        article_url = _article_url_from_wrapper(wrapper, category)
         if article_url is None:
             continue
         article_id = article_id_from_url(article_url)
@@ -103,8 +103,8 @@ def _card_wrappers(soup: BeautifulSoup) -> list[Tag]:
     return [node for node in soup.select("article.gh-card") if isinstance(node, Tag)]
 
 
-def _article_url_from_wrapper(wrapper: Tag) -> str | None:
-    if _should_skip_wrapper(wrapper):
+def _article_url_from_wrapper(wrapper: Tag, category: str) -> str | None:
+    if _should_skip_wrapper(wrapper, category):
         return None
     link = wrapper.select_one("a.gh-card-link[href]")
     if not isinstance(link, Tag):
@@ -118,16 +118,22 @@ def _article_url_from_wrapper(wrapper: Tag) -> str | None:
     return normalized
 
 
-def _should_skip_wrapper(wrapper: Tag) -> bool:
+def _should_skip_wrapper(wrapper: Tag, category: str) -> bool:
     if _class_tokens(wrapper) & _WRAPPER_SKIP_CLASS_TOKENS:
         return True
     tag_label = wrapper.select_one(".gh-card-tag")
     if isinstance(tag_label, Tag):
         lowered_label = tag_label.get_text(" ", strip=True).casefold()
-        if lowered_label in {"sponsored", "opportunities", "community"}:
+        if lowered_label == "sponsored":
             return True
+        if category not in {"Community", "Opportunities", "Announcements"}:
+            if lowered_label in {"opportunities", "community"}:
+                return True
     text = wrapper.get_text(" ", strip=True).casefold()
-    return any(snippet in text for snippet in _REJECT_CARD_TEXT_SNIPPETS)
+    snippets = _REJECT_CARD_TEXT_SNIPPETS
+    if category in {"Community", "Opportunities", "Announcements"}:
+        snippets = ("sponsored", "newsletter")
+    return any(snippet in text for snippet in snippets)
 
 
 def _title_text(soup: BeautifulSoup) -> str | None:

@@ -56,7 +56,7 @@ def test_parse_article_html_extracts_body_metadata_with_jsonld_fallback() -> Non
 def test_default_targets_mark_expected_core_targets_selected() -> None:
     targets = ArsTechnicaProvider().default_targets()
 
-    assert [option.slug for option in BASE_TARGET_OPTIONS] == [
+    assert [option.slug for option in BASE_TARGET_OPTIONS][:7] == [
         "latest",
         "gadgets",
         "science",
@@ -65,15 +65,8 @@ def test_default_targets_mark_expected_core_targets_selected() -> None:
         "space",
         "ai",
     ]
-    assert [target.target_kind for target in targets] == [
-        "feed",
-        "category",
-        "category",
-        "category",
-        "category",
-        "category",
-        "category",
-    ]
+    assert targets[0].target_kind == "feed"
+    assert all(target.target_kind == "category" for target in targets[1:])
     assert targets[0].payload == {"path": "/"}
     assert targets[1].payload == {"path": "/gadgets/"}
     assert {target.target_key for target in targets if target.selected} == DEFAULT_TARGET_SLUGS

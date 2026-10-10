@@ -6,7 +6,8 @@ from urllib.parse import urljoin, urlparse, urlunparse
 
 EDSURGE_ROOT = "https://www.edsurge.com"
 _ALLOWED_HOSTS = {"edsurge.com", "www.edsurge.com"}
-_ARTICLE_PATH_RE = re.compile(r"^/news/\d{4}-\d{2}-\d{2}-[^/]+$")
+_ARTICLE_PATH_RE = re.compile(r"^/news/(?:\d{4}-\d{2}-\d{2}-[^/]+|[a-z0-9]+(?:-[a-z0-9]+)+)$")
+_SECTION_PATHS = {"/news/k-12", "/news/higher-ed"}
 
 
 def normalize_url(href: str) -> str:
@@ -29,7 +30,7 @@ def is_article_url(url: str) -> bool:
     parsed = urlparse(normalize_url(url))
     if parsed.netloc.lower() not in _ALLOWED_HOSTS:
         return False
-    return bool(_ARTICLE_PATH_RE.fullmatch(parsed.path))
+    return parsed.path not in _SECTION_PATHS and bool(_ARTICLE_PATH_RE.fullmatch(parsed.path))
 
 
 def article_id_from_url(url: str) -> str:

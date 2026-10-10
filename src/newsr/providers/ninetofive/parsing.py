@@ -256,6 +256,8 @@ def _class_tokens(node: Tag) -> set[str]:
         value = str(class_name).strip().lower()
         if not value:
             continue
+        if value.startswith(("ninetofive_guides-", "ninetofive_featured-", "category-", "tag-", "term-")):
+            continue
         tokens.add(value)
         tokens.update(part for part in re.split(r"[-_]", value) if part)
     return tokens

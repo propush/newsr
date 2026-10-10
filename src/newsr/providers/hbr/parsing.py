@@ -69,12 +69,15 @@ def parse_section_html(html: str, category: str) -> list[SectionCandidate]:
     soup = BeautifulSoup(html, "html.parser")
     seen: set[str] = set()
     candidates: list[SectionCandidate] = []
+    article_urls: list[str] = []
     for item in soup.select("stream-item[data-url]"):
         if not isinstance(item, Tag):
             continue
         article_url = _article_url_from_item(item)
-        if article_url is None:
-            continue
+        if article_url is not None:
+            article_urls.append(article_url)
+    article_urls.extend(_next_section_urls(soup))
+    for article_url in article_urls:
         article_id = article_id_from_url(article_url)
         if article_id in seen:
             continue
@@ -89,6 +92,31 @@ def parse_section_html(html: str, category: str) -> list[SectionCandidate]:
             )
         )
     return candidates
+
+
+def _next_section_urls(soup: BeautifulSoup) -> list[str]:
+    state: object = _next_page_props(soup)
+    for key in ("staticState", "controllers", "resultList", "state", "results"):
+        if not isinstance(state, dict):
+            return []
+        state = state.get(key)
+    if not isinstance(state, list):
+        return []
+    urls: list[str] = []
+    for result in state:
+        if not isinstance(result, dict):
+            continue
+        raw = result.get("raw")
+        if not isinstance(raw, dict):
+            continue
+        content_type = str(raw.get("hbr_content_type", "")).strip().casefold()
+        href = raw.get("hbr_site_url")
+        if content_type not in _ALLOWED_CONTENT_TYPES or not isinstance(href, str) or not href.strip():
+            continue
+        url = normalize_url(href)
+        if is_article_url(url):
+            urls.append(url)
+    return urls
 
 
 def parse_article_html(html: str, candidate: SectionCandidate) -> ArticleContent:
@@ -225,7 +253,7 @@ def _canonical_url(
     return None
 
 
-def _next_article_payload(soup: BeautifulSoup) -> dict[str, object]:
+def _next_page_props(soup: BeautifulSoup) -> dict[str, object]:
     script = soup.find("script", attrs={"id": "__NEXT_DATA__", "type": "application/json"})
     if not isinstance(script, Tag):
         return {}
@@ -236,12 +264,19 @@ def _next_article_payload(soup: BeautifulSoup) -> dict[str, object]:
         payload = json.loads(raw)
     except json.JSONDecodeError:
         return {}
+    if not isinstance(payload, dict):
+        return {}
     props = payload.get("props")
     if not isinstance(props, dict):
         return {}
     page_props = props.get("pageProps")
     if not isinstance(page_props, dict):
         return {}
+    return page_props
+
+
+def _next_article_payload(soup: BeautifulSoup) -> dict[str, object]:
+    page_props = _next_page_props(soup)
     article = page_props.get("article")
     if not isinstance(article, dict):
         return {}

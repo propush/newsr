@@ -59,7 +59,7 @@ def test_parse_article_html_extracts_body_metadata() -> None:
 def test_default_targets_match_curated_toms_hardware_catalog() -> None:
     targets = TomsHardwareProvider().default_targets()
 
-    assert [option.slug for option in BASE_TARGET_OPTIONS] == [
+    assert [option.slug for option in BASE_TARGET_OPTIONS][:8] == [
         "pc-components",
         "cpus",
         "gpus",
@@ -69,15 +69,15 @@ def test_default_targets_match_curated_toms_hardware_catalog() -> None:
         "software",
         "artificial-intelligence",
     ]
-    assert [target.payload for target in targets] == [
-        {"path": "/pc-components"},
-        {"path": "/pc-components/cpus"},
-        {"path": "/pc-components/gpus"},
-        {"path": "/pc-components/storage"},
+    assert [target.payload for target in targets][:8] == [
+        {"path": "/pc-components/news"},
+        {"path": "/pc-components/cpus/news"},
+        {"path": "/pc-components/gpus/news"},
+        {"path": "/pc-components/storage/news"},
         {"path": "/laptops/news"},
-        {"path": "/desktops"},
-        {"path": "/software"},
-        {"path": "/tech-industry/artificial-intelligence"},
+        {"path": "/desktops/news"},
+        {"path": "/software/news"},
+        {"path": "/tech-industry/artificial-intelligence/news"},
     ]
     assert {target.target_key for target in targets if target.selected} == DEFAULT_TARGET_SLUGS
 

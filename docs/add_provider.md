@@ -55,7 +55,7 @@ Implement a class that satisfies `NewsProvider`:
 
 Expected semantics:
 
-- `default_targets()` returns the initial target catalog used during bootstrap.
+- `default_targets()` returns the built-in target catalog synchronized during startup and the selections used when initializing a provider. Use stable target keys so label and destination updates preserve user selections; new targets remain unselected on existing installations.
 - `discover_targets()` returns the full replacement catalog for that provider. It may perform live discovery or return a static built-in catalog.
 - `fetch_candidates()` returns provider-scoped candidate ids and only candidates relevant to the supplied target.
 - `fetch_article()` returns the full article content and preserves provider identity.

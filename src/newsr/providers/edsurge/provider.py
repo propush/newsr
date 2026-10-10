@@ -82,6 +82,6 @@ class EdSurgeProvider:
 
 
 DEFAULT_TARGET_SLUGS = {
-    "k12",
+    "latest",
     "higher-ed",
 }

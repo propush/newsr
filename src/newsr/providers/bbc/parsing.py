@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -59,13 +60,16 @@ def parse_article_html(html: str, candidate: SectionCandidate) -> ArticleContent
 def parse_category_catalog_html(html: str) -> list[CategoryOption]:
     soup = BeautifulSoup(html, "html.parser")
     categories_by_slug: dict[str, CategoryOption] = {}
-    for link in soup.select("a[href]"):
+    for link in soup.select("nav a[href]") or soup.select("a[href]"):
         href = str(link.get("href", "")).strip()
         slug = category_slug_from_url(normalize_url(href))
         if slug is None or slug in categories_by_slug:
             continue
         label = _normalize_label(link.get_text(" ", strip=True)) or label_from_slug(slug)
-        categories_by_slug[slug] = CategoryOption(slug=slug, label=label)
+        path = urlparse(normalize_url(href)).path.rstrip("/")
+        categories_by_slug[slug] = CategoryOption(
+            slug=slug, label=label, path=path if path != f"/news/{slug}" else None
+        )
     return list(categories_by_slug.values())
 
 

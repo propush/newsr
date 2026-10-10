@@ -4175,7 +4175,7 @@ def test_ui_source_manager_loads_current_provider_and_targets(app_config, tmp_pa
                 ["[x]", "World"],
                 ["[x]", "Technology"],
                 ["[x]", "Business"],
-                ["[x]", "Entertainment And Arts"],
+                ["[x]", "Entertainment & Arts"],
             ]
             status_text = source_status_text(app)
             assert f"Loaded {len(app.storage.list_providers())} providers." in status_text
@@ -4382,7 +4382,7 @@ def test_ui_source_manager_switches_from_long_target_list_to_shorter_one(app_con
                 ["[x]", "World"],
                 ["[x]", "Technology"],
                 ["[x]", "Business"],
-                ["[x]", "Entertainment And Arts"],
+                ["[x]", "Entertainment & Arts"],
             ]
 
     asyncio.run(runner())

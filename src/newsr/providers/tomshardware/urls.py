@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from urllib.parse import urljoin, urlparse, urlunparse
 
+from .catalog import BASE_TARGET_OPTIONS
 
 TOMSHARDWARE_ROOT = "https://www.tomshardware.com"
 _ALLOWED_HOSTS = {"tomshardware.com", "www.tomshardware.com"}
@@ -12,16 +13,15 @@ _BLOCKED_PREFIXES = (
     "/pro",
     "/tag/",
 )
-_TARGET_PATHS = {
-    "/pc-components",
-    "/pc-components/cpus",
-    "/pc-components/gpus",
-    "/pc-components/storage",
-    "/laptops/news",
-    "/desktops",
-    "/software",
-    "/tech-industry/artificial-intelligence",
+_TARGET_PATHS = {"/news"} | {
+    path
+    for option in BASE_TARGET_OPTIONS
+    for path in (option.path, option.path.removesuffix("/news"))
 }
+_ARTICLE_PREFIXES = (
+    "/pc-components/", "/laptops/", "/desktops/", "/software/",
+    "/tech-industry/", "/networking/", "/monitors/", "/peripherals/", "/3d-printing/",
+)
 
 
 def normalize_url(href: str) -> str:
@@ -52,17 +52,15 @@ def is_article_url(url: str) -> bool:
     if path.startswith("/reviews/"):
         slug = path.rsplit("/", 1)[-1]
         return slug.endswith(".html") and "best-" not in slug
-    if (
-        path.startswith("/pc-components/")
-        or path.startswith("/laptops/")
-        or path.startswith("/desktops/")
-        or path.startswith("/software/")
-        or path.startswith("/tech-industry/artificial-intelligence/")
-    ):
+    if path.startswith("/news/"):
+        return path.endswith(".html") and len(path.strip("/").split("/")) == 2
+    if path.startswith(_ARTICLE_PREFIXES):
         segments = [segment for segment in path.strip("/").split("/") if segment]
         if len(segments) < 2:
             return False
         blocked = {"best-picks", "deals", "gallery", "galleries"}
+        if segments[-1] in {"news", "reviews"}:
+            return False
         return not any(segment in blocked for segment in segments)
     return False
 

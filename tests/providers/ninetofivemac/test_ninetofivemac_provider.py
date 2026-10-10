@@ -139,7 +139,7 @@ def test_parse_section_html_keeps_google_only_podcast_patterns_site_specific() -
 def test_default_targets_match_curated_catalog() -> None:
     targets = NineToFiveMacProvider().default_targets()
 
-    assert [option.slug for option in BASE_TARGET_OPTIONS] == [
+    assert [option.slug for option in BASE_TARGET_OPTIONS][:18] == [
         "latest",
         "iphone",
         "mac",

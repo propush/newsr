@@ -254,16 +254,18 @@ class ProviderStore:
     def replace_provider_targets(self, provider_id: str, targets: list[ProviderTarget]) -> None:
         now = datetime.now(UTC).isoformat()
         with self._db.transaction():
-            self._db.connection.execute(
-                "DELETE FROM provider_targets WHERE provider_id = ?",
-                (provider_id,),
-            )
             for target in targets:
                 self._db.connection.execute(
                     """
                     INSERT INTO provider_targets (
                         provider_id, target_key, target_kind, label, payload_json, discovered_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(provider_id, target_key) DO UPDATE SET
+                        target_kind = excluded.target_kind,
+                        label = excluded.label,
+                        payload_json = excluded.payload_json,
+                        discovered_at = excluded.discovered_at,
+                        updated_at = excluded.updated_at
                     """,
                     (
                         provider_id,
@@ -277,14 +279,14 @@ class ProviderStore:
                 )
             if not targets:
                 self._db.connection.execute(
-                    "DELETE FROM provider_target_selections WHERE provider_id = ?",
+                    "DELETE FROM provider_targets WHERE provider_id = ?",
                     (provider_id,),
                 )
                 return
             placeholders = ", ".join("?" for _ in targets)
             self._db.connection.execute(
                 f"""
-                DELETE FROM provider_target_selections
+                DELETE FROM provider_targets
                 WHERE provider_id = ? AND target_key NOT IN ({placeholders})
                 """,
                 (provider_id, *(target.target_key for target in targets)),

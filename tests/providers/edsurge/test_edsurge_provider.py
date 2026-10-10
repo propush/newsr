@@ -58,15 +58,15 @@ def test_parse_article_html_extracts_body_metadata() -> None:
 def test_default_targets_match_curated_edsurge_catalog() -> None:
     targets = EdSurgeProvider().default_targets()
 
-    assert [option.slug for option in BASE_TARGET_OPTIONS] == [
-        "k12",
+    assert [option.slug for option in BASE_TARGET_OPTIONS][:3] == [
+        "latest",
         "higher-ed",
         "artificial-intelligence",
     ]
-    assert [target.payload for target in targets] == [
-        {"path": "/news/k-12"},
-        {"path": "/news/higher-ed"},
-        {"path": "/news/topics/artificial-intelligence"},
+    assert [target.payload for target in targets][:3] == [
+        {"path": "/"},
+        {"path": "/coverage-areas/higher-education"},
+        {"path": "/coverage-areas/artificial-intelligence"},
     ]
     assert {target.target_key for target in targets if target.selected} == DEFAULT_TARGET_SLUGS
 

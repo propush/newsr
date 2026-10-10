@@ -29,7 +29,8 @@ class BBCNewsProvider:
         self, target: ProviderTarget, limit: int, cancellation: RefreshCancellation | None = None
     ) -> list[SectionCandidate]:
         category = target.payload.get("slug", target.target_key)
-        html = self._read_url(f"{BBC_ROOT}/news/{category}", cancellation)
+        path = target.payload.get("path", f"/news/{category}")
+        html = self._read_url(f"{BBC_ROOT}{path}", cancellation)
         candidates = parse_section_html(html, category)
         return [
             SectionCandidate(
@@ -74,7 +75,7 @@ class BBCNewsProvider:
             target_key=option.slug,
             target_kind="category",
             label=option.label,
-            payload={"slug": option.slug},
+            payload={"slug": option.slug, "path": option.path or f"/news/{option.slug}"},
             selected=selected,
         )
 

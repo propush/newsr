@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 
 from bs4 import BeautifulSoup, Tag
@@ -55,7 +56,10 @@ def parse_section_html(html: str, category: str) -> list[SectionCandidate]:
     soup = BeautifulSoup(html, "html.parser")
     seen: set[str] = set()
     candidates: list[SectionCandidate] = []
-    for card in soup.select("a.js-feed-item[href], a.headline-plain[href]"):
+    for card in soup.select(
+        "a.js-feed-item[href], a.headline-plain[href], "
+        "a[href^='/news/'], a[href*='edsurge.com/news/']"
+    ):
         if not isinstance(card, Tag):
             continue
         article_url = _article_url_from_card(card)
@@ -112,6 +116,9 @@ def _article_url_from_card(card: Tag) -> str | None:
 
 def _should_skip_card(card: Tag) -> bool:
     if _class_tokens(card) & _SKIP_CLASS_TOKENS:
+        return True
+    wrapper = card.find_parent("div", class_="relative")
+    if isinstance(wrapper, Tag) and wrapper.select_one('a[href$="/edsurge-podcast"]'):
         return True
     text = card.get_text(" ", strip=True).casefold()
     return any(snippet in text for snippet in _REJECT_CARD_TEXT_SNIPPETS)
@@ -175,7 +182,16 @@ def _clean_author(value: str | None) -> str | None:
 
 def _published_at(soup: BeautifulSoup) -> datetime | None:
     raw = _meta_content(soup, "property", "article:published_time")
-    return _published_at_from_value(raw)
+    if raw:
+        return _published_at_from_value(raw)
+    for node in soup.select("main p"):
+        text = node.get_text(" ", strip=True)
+        if re.fullmatch(r"[A-Z][a-z]+ \d{1,2}, \d{4}", text):
+            try:
+                return datetime.strptime(text, "%B %d, %Y")
+            except ValueError:
+                continue
+    return None
 
 
 def _published_at_from_value(value: str | None) -> datetime | None:
@@ -234,6 +250,7 @@ def _body_container(soup: BeautifulSoup) -> Tag | None:
         ".article-full .article-content",
         ".article-content",
         ".article-body",
+        "main .grid-cols-9 > .col-span-9 > .relative",
         "article",
     ):
         node = soup.select_one(selector)

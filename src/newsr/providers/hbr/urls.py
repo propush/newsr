@@ -24,7 +24,10 @@ def normalize_url(href: str) -> str:
     absolute_url = urljoin(HBR_ROOT, href.strip())
     parsed = urlparse(absolute_url)
     path = normalize_target_path(parsed.path or "/")
-    return urlunparse(("https", "hbr.org", path, "", "", ""))
+    host = parsed.netloc.lower()
+    if host in _ALLOWED_HOSTS:
+        host = "hbr.org"
+    return urlunparse(("https", host, path, "", "", ""))
 
 
 def is_article_url(url: str) -> bool:
