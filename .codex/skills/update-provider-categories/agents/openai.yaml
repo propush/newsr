@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update Provider Categories"
+  short_description: "Audit and update NewsR provider categories"
+  default_prompt: "Use $update-provider-categories to check all NewsR providers against their live categories and update the code, tests, and documentation."

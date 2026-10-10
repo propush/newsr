@@ -17,6 +17,8 @@ Last audited: **2026-10-10**. The built-in catalog contains **19 providers and 3
 
 The verification notes below distinguish direct HTML checks from indexed first-party evidence and blocked endpoints. Static catalogs represent this audit snapshot; BBC also supports live navigation discovery.
 
+For an on-demand live audit and code update, use the repository skill [`$update-provider-categories`](../.codex/skills/update-provider-categories/SKILL.md). It covers all built-in providers by default, accepts a named provider subset, and supports an audit-only report.
+
 ## Built-in Providers
 
 ### BBC News
