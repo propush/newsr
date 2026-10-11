@@ -176,6 +176,7 @@ For a typical provider, expect these touch points.
 - `src/newsr/providers/<provider_id>/parsing.py`
 - `src/newsr/providers/<provider_id>/urls.py`
 - optional `src/newsr/providers/<provider_id>/catalog.py`
+- `tests/providers/<provider_id>/__init__.py` (empty; test directories are packages)
 - `tests/providers/<provider_id>/test_provider.py`
 - `tests/fixtures/<provider_id>_*.html`
 

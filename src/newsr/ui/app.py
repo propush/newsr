@@ -4,7 +4,7 @@ from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.app import ScreenStackError
-from textual.binding import Binding, BindingsMap
+from textual.binding import BindingsMap
 from textual.command import CommandPalette
 from textual.css.query import NoMatches
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -21,6 +21,8 @@ from ..providers.search.duckduckgo import DuckDuckGoSearchClient
 from ..providers.topic import TopicWatchProvider
 from ..storage.facade import NewsStorage
 from ..ui_text import UILocalizer
+from .app_bindings import build_app_bindings
+from .app_styles import APP_CSS
 from .clock import ConfiguredHeader
 from .controllers.article_qa import ArticleQAController
 from .controllers.article_categorization import ArticleCategorizationController
@@ -50,99 +52,7 @@ from .themes import BRIEF_ARTICLE_REFERENCE_COLOR, OLD_FIDO_THEME
 
 
 class NewsReaderApp(App[None]):
-    CSS = """
-    Screen {
-        background: $background;
-        color: $foreground;
-    }
-    #chrome {
-        height: 1fr;
-    }
-    #article-header {
-        border: heavy $primary;
-        background: $background;
-        color: $primary;
-        padding: 0 1;
-        margin: 0;
-        border-title-align: left;
-    }
-    #article-frame {
-        height: 1fr;
-        border: heavy $primary;
-        background: $background;
-    }
-    #provider-home-table {
-        height: 1fr;
-        background: $background;
-        color: $foreground;
-        overflow-y: scroll;
-        overflow-x: auto;
-        scrollbar-size-vertical: 1;
-        scrollbar-size-horizontal: 1;
-        scrollbar-background: $panel;
-        scrollbar-background-hover: $panel;
-        scrollbar-background-active: $panel;
-        scrollbar-color: $accent;
-        scrollbar-color-hover: $primary;
-        scrollbar-color-active: $primary;
-        scrollbar-gutter: stable;
-        scrollbar-visibility: visible;
-    }
-    #provider-home-empty {
-        height: 1fr;
-        content-align: center middle;
-        color: $secondary;
-        background: $background;
-    }
-    #article-pane {
-        height: 1fr;
-        overflow-y: scroll;
-        scrollbar-size-vertical: 1;
-        scrollbar-background: $panel;
-        scrollbar-background-hover: $panel;
-        scrollbar-background-active: $panel;
-        scrollbar-color: $accent;
-        scrollbar-color-hover: $primary;
-        scrollbar-color-active: $primary;
-        scrollbar-gutter: stable;
-        scrollbar-visibility: visible;
-    }
-    #article-body {
-        padding: 0 2 1 2;
-        color: $foreground;
-    }
-    #article-url {
-        dock: bottom;
-        height: 1;
-        padding: 0 1;
-        color: $secondary;
-        background: $panel;
-    }
-    #status {
-        width: 1fr;
-        color: $success;
-        padding: 0;
-    }
-    #status-bar {
-        height: 1;
-        padding: 0 1;
-    }
-    #status-indicator {
-        width: 3;
-        margin-right: 1;
-        color: $accent;
-        display: none;
-    }
-    #help-text {
-        background: $surface;
-        color: $foreground;
-        border: solid $secondary;
-        padding: 1 2;
-        width: 60;
-        height: auto;
-        margin: 4 8;
-    }
-    """
+    CSS = APP_CSS
 
     BINDINGS = []
 
@@ -205,40 +115,13 @@ class NewsReaderApp(App[None]):
             finally:
                 self._restoring_theme = False
 
-    def _build_bindings(self, *, provider_home_open: bool = False) -> list[Binding | tuple[str, str, str]]:
-        return [
-            Binding("ctrl+c,super+c,ctrl+shift+c", "copy_selection", show=False, priority=True),
-            Binding("left", "previous_article", self.ui.text("app.binding.previous"), show=False),
-            Binding("right", "next_article", self.ui.text("app.binding.next"), show=False),
-            Binding("up", "scroll_up", self.ui.text("app.binding.up"), show=False),
-            Binding("down", "scroll_down", self.ui.text("app.binding.down"), show=False),
-            Binding("pageup", "page_up", self.ui.text("app.binding.pgup"), show=False),
-            Binding("pagedown", "page_down", self.ui.text("app.binding.pgdn"), show=False),
-            Binding("b", "brief_or_page_up", self.ui.text("app.binding.brief"), show=provider_home_open),
-            ("k", "classify_article_categories", self.ui.text("app.binding.classify")),
-            Binding("space", "space_down", self.ui.text("app.binding.space"), show=False),
-            ("s", "cycle_view_mode", self.ui.text("app.binding.mode")),
-            ("m", "show_or_refresh_more_info", self.ui.text("app.binding.more_info")),
-            Binding("?", "show_article_qa", self.ui.text("app.binding.ask")),
-            ("l", "show_quick_nav", self.ui.text("app.binding.list")),
-            ("c", "show_source_manager", self.ui.text("app.binding.sources")),
-            ("e", "export_current", self.ui.text("app.binding.export")),
-            ("o", "open_article", self.ui.text("app.binding.open")),
-            ("w", "watch_topic", self.ui.text("app.binding.watch_topic")),
-            ("d", "download_articles", self.ui.text("app.binding.download")),
-            ("h", "show_help", self.ui.text("app.binding.help")),
-            Binding("ctrl+p", "command_palette", show=False),
-            Binding("escape", "return_to_provider_home", self.ui.text("app.binding.providers"), show=False),
-            ("q", "quit_reader", self.ui.text("app.binding.quit")),
-        ]
-
     def _set_provider_home_footer_bindings(self, *, provider_home_open: bool) -> None:
         palette_bindings = [
             binding
             for _key, binding in self._bindings
             if binding.system
         ]
-        self._bindings = BindingsMap(self._build_bindings(provider_home_open=provider_home_open))
+        self._bindings = BindingsMap(build_app_bindings(self.ui, provider_home_open=provider_home_open))
         for binding in palette_bindings:
             self._bindings._add_binding(binding)
 

@@ -63,7 +63,7 @@ After the design is confirmed, follow `docs/add_provider.md` exactly:
 The expected deliverable usually includes:
 
 - provider package files under `src/newsr/providers/<provider_id>/`
-- fixture-backed tests under `tests/providers/<provider_id>/`
+- fixture-backed tests under `tests/providers/<provider_id>/`, with an empty `__init__.py` because test directories are packages
 - HTML fixtures under `tests/fixtures/`
 - any registry/bootstrap adjustments
 - docs updates under `docs/` when the documented workflow or architecture changes
