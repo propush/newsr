@@ -464,3 +464,20 @@ def test_ui_playlist_screen_keeps_selection_when_an_item_finishes(app_config, tm
             app._playlist.clear()
 
     asyncio.run(runner())
+
+
+def test_playlist_builds_default_engine_with_app_llm_client(app_config, tmp_path, monkeypatch) -> None:
+    calls: list[tuple[object, object]] = []
+    engine = FakeTTSEngine()
+
+    def fake_build(config, *, llm=None):  # type: ignore[no-untyped-def]
+        calls.append((config, llm))
+        return engine
+
+    monkeypatch.setattr("newsr.ui.controllers.playlist.build_tts_engine", fake_build)
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3", audio_output_factory=FakeAudioOutput)
+    disable_startup_refresh(app)
+
+    assert app._playlist._engine_instance() is engine
+    assert app._playlist._engine_instance() is engine
+    assert calls == [(app_config.tts, app.llm_client)]

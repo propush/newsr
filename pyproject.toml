@@ -18,6 +18,15 @@ dependencies = [
 dev = [
   "pytest>=8.4.0",
 ]
+silero = [
+  "num2words>=0.5.14",
+  "numpy>=2.0",
+  "pymorphy3>=2.0",
+  "pymorphy3-dicts-ru>=2.4",
+  "scipy>=1.13",
+  "torch>=2.5",
+  "transformers>=4.45",
+]
 
 [project.scripts]
 newsr = "newsr.app:main"

@@ -280,6 +280,20 @@ class OpenAILLMClient:
         )
         return self._chat(self.summary_model, prompt, content, cancellation)
 
+    def transliterate_terms(
+        self,
+        terms: Sequence[str],
+        cancellation: RefreshCancellation | None = None,
+    ) -> dict[str, str]:
+        prompt = (
+            "You help a Russian speech synthesizer that reads Cyrillic only. "
+            "For each English word or name below, one per line, write how a Russian news presenter pronounces it, "
+            "in lowercase Cyrillic letters, using the established Russian spelling when one exists. "
+            "Return only a JSON object that maps each input line to its pronunciation, with no commentary."
+        )
+        raw = self._chat(self.translation_model, prompt, "\n".join(terms), cancellation)
+        return _parse_string_mapping(raw)
+
     def _ensure_connection(
         self,
         timeout: float,
@@ -433,6 +447,19 @@ class OpenAILLMClient:
             f"Question {index}: {question}\nAnswer {index}: {answer}"
             for index, (question, answer) in enumerate(chat_history, start=1)
         )
+
+
+def _parse_string_mapping(raw: str) -> dict[str, str]:
+    start, end = raw.find("{"), raw.rfind("}")
+    if start == -1 or end <= start:
+        return {}
+    try:
+        parsed = json.loads(raw[start:end + 1])
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    return {str(key): value.strip() for key, value in parsed.items() if isinstance(value, str) and value.strip()}
 
 
 def _extract_error_message(raw: object) -> str:

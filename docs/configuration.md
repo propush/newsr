@@ -77,6 +77,13 @@ tts:
   # system:
   #   voices:
   #     ru: Milena
+  # silero:
+  #   models_dir: cache/silero
+  #   voices:
+  #     ru: xenia
+  #     en: en_0
+  #   lexicon:
+  #     Etched: +этчед
 ```
 
 ## Field Reference
@@ -120,13 +127,14 @@ tts:
 
 Text-to-speech settings for the article playlist. The whole section is optional; every field has a loader default.
 
-- `engine`: speech engine. Allowed values: `openai`, `elevenlabs`, `edge`, `piper`, `system`. Loader default: `edge`.
+- `engine`: speech engine. Allowed values: `openai`, `elevenlabs`, `edge`, `piper`, `system`, `silero`. Loader default: `edge`.
   - `openai`: any OpenAI-compatible `POST {url}/audio/speech` endpoint. This covers OpenAI itself and local servers that expose the same API, such as Kokoro-FastAPI, Speaches, or LocalAI.
   - `elevenlabs`: the ElevenLabs text-to-speech API.
   - `edge`: Microsoft Edge online neural voices through the `edge-tts` package. It needs no API key.
   - `piper`: local Piper neural voices that run inside NewsR on the CPU.
   - `system`: operating-system voices, using `say` on macOS and `espeak-ng` (or `espeak`) on other platforms.
-- `speed`: speech speed multiplier from `0.5` to `2.0`. Loader default: `1.0`. ElevenLabs accepts `0.7` to `1.2`, and NewsR clamps the value to that range for it.
+  - `silero`: local Silero voices for Russian and English that run inside NewsR on the CPU. It needs the optional dependencies: `pip install -e ".[silero]"` in the NewsR virtualenv. See [Silero Engine](#silero-engine).
+- `speed`: speech speed multiplier from `0.5` to `2.0`. Loader default: `1.0`. ElevenLabs accepts `0.7` to `1.2`, and NewsR clamps the value to that range for it. Silero has five speed steps, and NewsR uses the nearest one: x-slow below `0.77`, slow below `0.92`, normal below `1.1`, fast below `1.35`, and x-fast from `1.35`.
 - `original_language`: language code assumed for Latin-script text in `original` reader mode. Loader default: `en`.
 - `request_retries`: number of retries after the first transient failure (network errors, HTTP 429 and 5xx) for the `openai` and `elevenlabs` engines. Must be zero or greater. Loader default: `2`.
 - `openai.url`: base URL of the OpenAI-compatible API. Trailing `/` is stripped on load. Loader default: `https://api.openai.com/v1`.
@@ -137,6 +145,8 @@ Text-to-speech settings for the article playlist. The whole section is optional;
 - `elevenlabs.model`: ElevenLabs model id. Loader default: `eleven_multilingual_v2`.
 - `elevenlabs.api_key`: API key. Required when `engine` is `elevenlabs`.
 - `piper.models_dir`: directory for downloaded Piper voices and the Piper voice index. Loader default: `cache/piper`.
+- `silero.models_dir`: directory for downloaded Silero models, the RUNorm transliteration model, and the transliteration cache. Loader default: `cache/silero`.
+- `silero.lexicon`: optional mapping from a word, name, or acronym to its Russian pronunciation in Cyrillic, with `+` before the stressed vowel (`Etched: +этчед`). Keys and values must be non-empty strings. Keys with Latin letters match English names inside Russian text, ignoring case, and may hold several words (`Jane Street`). Cyrillic keys replace whole Russian words; all-caps keys such as `США` match case-sensitively. Entries take precedence over the built-in pronunciations.
 - `<engine>.voices`: optional mapping from a language code (`en`, `ru`, `de`, ...) or `default` to a voice name of that engine. `elevenlabs.voices.default` is required when `engine` is `elevenlabs`.
 
 Each spoken article consists of an intro, the title, and the body. The intro names the provider and the article position, for example `BBC News. Article 4 of 10.` It uses the UI language. The title and body follow the reader mode of the scope the article was queued from:
@@ -151,6 +161,22 @@ Voice selection per language:
 - `edge`: `voices.<language>`; otherwise the first voice that Edge lists for the language, preferring the main regional locale such as `en-US` or `ru-RU`. If Edge returns no audio for an automatically chosen voice, NewsR retries with the next voice for that language. `voices.default`, then `en-US-EmmaMultilingualNeural`, covers languages without a voice.
 - `piper`: `voices.<language>`; otherwise the first `medium` quality voice for the language from the Piper voice index, preferring the main regional locale. `voices.default`, then `en_US-lessac-medium`, covers languages without a voice. Voice names follow the Piper format `<language>_<REGION>-<name>-<quality>`. NewsR downloads missing voices from the `rhasspy/piper-voices` repository into `models_dir` on first use.
 - `system`: `voices.<language>`; otherwise, on macOS, the first installed `say` voice for the language, preferring the main regional locale and skipping novelty voices. On other platforms the language code is passed to `espeak-ng` as the voice.
+- `silero`: `voices.ru`, then `xenia`, for Russian; `voices.en`, then `en_0`, for English. Russian voices are `aidar`, `baya`, `eugene`, `kseniya`, and `xenia`; English voices are `en_0` to `en_117`. Text without a language is spoken in Russian when it has more Cyrillic than Latin letters, otherwise in English. Other languages stop playback with an error.
+
+### Silero Engine
+
+Silero voices read letters only: digits, symbols, and, for the Russian voices, Latin letters are skipped. NewsR therefore rewrites every text before the Silero engine speaks it.
+
+Russian text:
+
+- Numbers, years, dates, times, ordinals, units (`млн`, `млрд`, `%`, `ГБ`, `Гбит/с`, `мАч`, and others), and currency amounts are written as Russian words in the grammatical case required by the surrounding words: `до 40%` becomes `до сорока процентов`, `28 сентября 2026 г.` becomes `двадцать восьмого сентября две тысячи двадцать шестого года`.
+- English names and brands are written in Cyrillic. NewsR looks them up in `silero.lexicon`, then in a built-in list of frequent tech names with stress marks, then transliterates them with the RUNorm model. Names that RUNorm can only spell letter by letter go to the configured LLM (`llm.model_translation`). Transliterations are cached in `transliterations.json` inside `silero.models_dir`, so each name sounds the same every time; edit or delete entries there to change them.
+- Version numbers inside names are read with `точка` (`Beta 6.1` becomes `бета шесть точка один`).
+- Latin and Cyrillic acronyms are spelled letter by letter and stressed on the last letter (`TSMC` becomes `ти-эс-эм-си`, `ФРС` becomes `эф-эр-эс`). Acronyms read as words, such as `NASA` and `НАТО`, are kept as words.
+
+English text: numbers, years, currency amounts, percentages, and units are written as English words, and acronyms are spelled with English letter names (`TSMC` becomes `tee-ess-em-see`).
+
+Without the optional dependencies, playback stops with an error that names the install command and the missing packages, and nothing is downloaded. Downloads happen on first use and go to `silero.models_dir`: the Russian model `v5_ru` (145 MB) from `models.silero.ai`, the English model `v3_en` (57 MB) when English text is spoken, and the RUNorm model (17 MB) from Hugging Face when an English name needs transliteration. The optional Python dependencies take about 210 MB to download and about 1 GB on disk on macOS, mostly PyTorch. On Linux, install the CPU-only PyTorch build first (`pip install torch --index-url https://download.pytorch.org/whl/cpu`), because the default Linux build also pulls in GPU libraries.
 
 ## Scheduling Notes
 
@@ -165,6 +191,7 @@ Voice selection per language:
 - `cache/newsr.sqlite3`: providers, targets, topic watches, article content, translations, summaries, cached `more_info`, reader state, options, the article playlist, and refresh bookkeeping.
 - `cache/newsr-tts.log`: text-to-speech log with engine, voice, request size, retry, download, and error metadata. Spoken text is not logged.
 - `cache/piper/`: downloaded Piper voices and the Piper voice index, when `tts.piper.models_dir` keeps its default.
+- `cache/silero/`: downloaded Silero models, the RUNorm transliteration model, and `transliterations.json`, when `tts.silero.models_dir` keeps its default.
 - `cache/tts/`: temporary files used while the `system` engine synthesizes speech.
 - `cache/newsr-llm.log`: LLM request log, transient transport retry metadata, brief-generation stage metadata, repair retry metadata, and non-provider network request metadata. Entries include request method, URL, status, retry attempt, brief stage, validation counts, and errors without logging response contents.
 - `exports/`: Markdown and PNG exports created by the export flow.

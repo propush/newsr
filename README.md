@@ -13,7 +13,7 @@ NewsR currently requires Python 3.12 or newer.
 - translated full articles, summaries, and original source text views
 - brief reviews that synthesize recent or unread articles into a scrollable Markdown report
 - "more info" and article Q&A overlays backed by DuckDuckGo search and the configured LLM
-- a read-aloud article playlist with OpenAI-compatible, ElevenLabs, Edge, Piper, and system-voice text-to-speech engines
+- a read-aloud article playlist with OpenAI-compatible, ElevenLabs, Edge, Piper, Silero, and system-voice text-to-speech engines
 - source management for enabling providers, editing schedules, refreshing catalogs, and choosing targets
 - export of the current view as Markdown or PNG
 - PNG and Markdown clipboard export support on supported platforms
@@ -90,6 +90,12 @@ For development work, you can still create and manage the virtualenv manually:
 python3 -m venv venv
 source ./venv/bin/activate
 pip install -e ".[dev]"
+```
+
+The Silero text-to-speech engine needs extra packages, mainly PyTorch. Install them only when you select `tts.engine: silero`:
+
+```bash
+./venv/bin/python -m pip install -e ".[silero]"
 ```
 
 ## Start The App
@@ -220,7 +226,7 @@ NewsR reads articles aloud from a playlist, like a podcast of your news.
 - Finished articles leave the playlist. The playlist is kept across restarts and starts paused.
 - `Shift+P` opens the playlist screen: `Enter` plays the highlighted article now, `X` / `Delete` removes it, `C` clears the playlist, `P` / `Space` plays or pauses, and `Esc` closes the screen.
 
-Speech is produced by the engine selected in the `tts` section of `newsr.yml`. The default `edge` engine uses free Microsoft Edge neural voices; `piper` and `system` work offline, and `openai` and `elevenlabs` use cloud or local speech APIs. Audio plays inside NewsR. See [Configuration](docs/configuration.md#tts) for engines, voices, and languages.
+Speech is produced by the engine selected in the `tts` section of `newsr.yml`. The default `edge` engine uses free Microsoft Edge neural voices; `piper`, `silero`, and `system` work offline, and `openai` and `elevenlabs` use cloud or local speech APIs. `silero` has native Russian voices and reads English names, numbers, and acronyms inside Russian text as a Russian news presenter would; it needs the optional `silero` packages. Audio plays inside NewsR. See [Configuration](docs/configuration.md#tts) for engines, voices, and languages.
 
 ## Overlays
 

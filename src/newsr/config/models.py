@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 DEFAULT_UI_CLOCK = "no_seconds"
 DEFAULT_TTS_ENGINE = "edge"
-TTS_ENGINES = ("openai", "elevenlabs", "edge", "piper", "system")
+TTS_ENGINES = ("openai", "elevenlabs", "edge", "piper", "system", "silero")
 
 
 @dataclass(slots=True)
@@ -90,6 +90,13 @@ class TTSSystemConfig:
 
 
 @dataclass(slots=True)
+class TTSSileroConfig:
+    models_dir: str = "cache/silero"
+    voices: dict[str, str] = field(default_factory=dict)
+    lexicon: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class TTSConfig:
     engine: str = DEFAULT_TTS_ENGINE
     speed: float = 1.0
@@ -100,6 +107,7 @@ class TTSConfig:
     edge: TTSEdgeConfig = field(default_factory=TTSEdgeConfig)
     piper: TTSPiperConfig = field(default_factory=TTSPiperConfig)
     system: TTSSystemConfig = field(default_factory=TTSSystemConfig)
+    silero: TTSSileroConfig = field(default_factory=TTSSileroConfig)
 
 
 @dataclass(slots=True)

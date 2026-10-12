@@ -28,7 +28,7 @@ class PlaylistController:
         app: NewsReaderApp,
         *,
         output_factory: OutputFactory = MiniaudioOutput,
-        engine_factory: EngineFactory = build_tts_engine,
+        engine_factory: EngineFactory | None = None,
     ) -> None:
         self._app = app
         self._output_factory = output_factory
@@ -342,7 +342,10 @@ class PlaylistController:
     def _engine_instance(self) -> TTSEngine:
         with self._engine_lock:
             if self._engine is None:
-                self._engine = self._engine_factory(self._app.config.tts)
+                if self._engine_factory is None:
+                    self._engine = build_tts_engine(self._app.config.tts, llm=self._app.llm_client)
+                else:
+                    self._engine = self._engine_factory(self._app.config.tts)
             return self._engine
 
     def _close_output_later(self) -> None:

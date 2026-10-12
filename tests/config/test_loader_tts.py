@@ -36,6 +36,9 @@ def test_load_config_uses_tts_defaults_when_section_is_missing(tmp_path: Path) -
     assert config.tts.elevenlabs.model == "eleven_multilingual_v2"
     assert config.tts.piper.models_dir == "cache/piper"
     assert config.tts.edge.voices == {}
+    assert config.tts.silero.models_dir == "cache/silero"
+    assert config.tts.silero.voices == {}
+    assert config.tts.silero.lexicon == {}
 
 
 def test_load_config_reads_every_tts_engine_block(tmp_path: Path) -> None:
@@ -72,6 +75,14 @@ tts:
   system:
     voices:
       ru: Milena
+  silero:
+    models_dir: /opt/silero
+    voices:
+      RU: baya
+      en: en_12
+    lexicon:
+      Issue: +ишью
+      США: сэ-шэ-+а
 """,
         )
     )
@@ -92,6 +103,9 @@ tts:
     assert tts.piper.models_dir == "/opt/piper"
     assert tts.piper.voices == {"en": "en_US-amy-medium"}
     assert tts.system.voices == {"ru": "Milena"}
+    assert tts.silero.models_dir == "/opt/silero"
+    assert tts.silero.voices == {"ru": "baya", "en": "en_12"}
+    assert tts.silero.lexicon == {"Issue": "+ишью", "США": "сэ-шэ-+а"}
 
 
 @pytest.mark.parametrize(
@@ -106,6 +120,9 @@ tts:
         ("tts:\n  edge:\n    voices: [a]\n", "tts.edge.voices must be a mapping"),
         ("tts:\n  edge:\n    voices:\n      ru: ''\n", "tts.edge.voices keys and values"),
         ("tts:\n  engine: elevenlabs\n", "tts.elevenlabs.api_key is required"),
+        ("tts:\n  silero:\n    models_dir: ' '\n", "tts.silero.models_dir must be non-empty"),
+        ("tts:\n  silero:\n    lexicon: [a]\n", "tts.silero.lexicon must be a mapping"),
+        ("tts:\n  silero:\n    lexicon:\n      Issue: ''\n", "tts.silero.lexicon keys and values"),
         (
             "tts:\n  engine: elevenlabs\n  elevenlabs:\n    api_key: key\n",
             "tts.elevenlabs.voices.default is required",

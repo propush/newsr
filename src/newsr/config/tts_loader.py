@@ -10,6 +10,7 @@ from .models import (
     TTSElevenLabsConfig,
     TTSOpenAIConfig,
     TTSPiperConfig,
+    TTSSileroConfig,
     TTSSystemConfig,
 )
 
@@ -39,6 +40,7 @@ def load_tts(raw: object) -> TTSConfig:
         edge=TTSEdgeConfig(voices=_load_voices(_mapping(raw.get("edge"), "tts.edge"), "tts.edge")),
         piper=_load_piper(_mapping(raw.get("piper"), "tts.piper")),
         system=TTSSystemConfig(voices=_load_voices(_mapping(raw.get("system"), "tts.system"), "tts.system")),
+        silero=_load_silero(_mapping(raw.get("silero"), "tts.silero")),
     )
     if engine == "elevenlabs":
         if not config.elevenlabs.api_key:
@@ -86,6 +88,17 @@ def _load_piper(raw: dict) -> TTSPiperConfig:
     if not models_dir:
         raise ValueError("tts.piper.models_dir must be non-empty")
     return TTSPiperConfig(models_dir=models_dir, voices=_load_voices(raw, "tts.piper"))
+
+
+def _load_silero(raw: dict) -> TTSSileroConfig:
+    models_dir = str(raw.get("models_dir", TTSSileroConfig().models_dir)).strip()
+    if not models_dir:
+        raise ValueError("tts.silero.models_dir must be non-empty")
+    return TTSSileroConfig(
+        models_dir=models_dir,
+        voices=_load_voices(raw, "tts.silero"),
+        lexicon=_load_string_map(raw.get("lexicon"), "tts.silero.lexicon"),
+    )
 
 
 def _load_voices(raw: dict, section: str) -> dict[str, str]:

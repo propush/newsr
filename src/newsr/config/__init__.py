@@ -19,6 +19,7 @@ from .models import (
     TTSElevenLabsConfig,
     TTSOpenAIConfig,
     TTSPiperConfig,
+    TTSSileroConfig,
     TTSSystemConfig,
     UIConfig,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "TTSElevenLabsConfig",
     "TTSOpenAIConfig",
     "TTSPiperConfig",
+    "TTSSileroConfig",
     "TTSSystemConfig",
     "UIConfig",
     "bootstrap_config",

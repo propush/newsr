@@ -26,6 +26,11 @@ class SynthesizedAudio:
     format: str
 
 
+class TransliterationLLM(Protocol):
+    def transliterate_terms(self, terms: list[str]) -> dict[str, str]:
+        ...
+
+
 class TTSEngine(Protocol):
     name: str
     max_chars: int

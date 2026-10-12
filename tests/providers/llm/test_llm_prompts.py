@@ -108,3 +108,27 @@ def test_llm_client_article_qa_prompts_include_supplied_current_datetime() -> No
     second_payload = json.loads(FakeHTTPConnection.requests[1]["body"].decode("utf-8"))
     assert f"Current local date and time: {current_datetime}." in first_payload["messages"][0]["content"]
     assert f"Current local date and time: {current_datetime}." in second_payload["messages"][0]["content"]
+
+
+def test_llm_client_transliterate_terms_parses_json_mapping() -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse(
+            {"choices": [{"message": {"content": '```json\n{"Elon Musk": " илон маск ", "Ultra": 3, "Boox": ""}\n```'}}]}
+        ),
+    ]
+    client = OpenAILLMClient(make_config())
+
+    result = client.transliterate_terms(["Elon Musk", "Ultra", "Boox"])
+
+    assert result == {"Elon Musk": "илон маск"}
+    payload = json.loads(FakeHTTPConnection.requests[0]["body"].decode("utf-8"))
+    assert payload["model"] == "translate"
+    assert "Cyrillic" in payload["messages"][0]["content"]
+    assert payload["messages"][1]["content"] == "Elon Musk\nUltra\nBoox"
+
+
+def test_llm_client_transliterate_terms_returns_empty_mapping_for_non_json_answer() -> None:
+    FakeHTTPConnection.plan = [FakeResponse({"choices": [{"message": {"content": "no idea"}}]})]
+    client = OpenAILLMClient(make_config())
+
+    assert client.transliterate_terms(["Etched"]) == {}
