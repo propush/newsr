@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rich.cells import cell_len
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.app import ScreenStackError
 from textual.binding import BindingsMap
@@ -39,6 +41,7 @@ from .controllers.clipboard import ClipboardController
 from .controllers.export import ExportController
 from .controllers.more_info import MoreInfoController
 from .controllers.navigation import NavigationController
+from .controllers.playlist import EngineFactory, OutputFactory, PlaylistController
 from .controllers.provider_home import ProviderHomeController
 from .controllers.refresh import RefreshController
 from .controllers.topic_watch import TopicWatchController
@@ -62,7 +65,15 @@ class NewsReaderApp(App[None]):
             BRIEF_ARTICLE_REFERENCE_COLOR: theme.accent or theme.primary,
         }
 
-    def __init__(self, config: AppConfig, storage_path: Path, config_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        config: AppConfig,
+        storage_path: Path,
+        config_path: Path | None = None,
+        *,
+        audio_output_factory: OutputFactory | None = None,
+        tts_engine_factory: EngineFactory | None = None,
+    ) -> None:
         super().__init__()
         self.ui = UILocalizer(config.ui.locale)
         palette_bindings = [
@@ -98,10 +109,18 @@ class NewsReaderApp(App[None]):
         self._navigation = NavigationController(self)
         self._export = ExportController(self)
         self._topic_watch = TopicWatchController(self)
+        playlist_options = {}
+        if audio_output_factory is not None:
+            playlist_options["output_factory"] = audio_output_factory
+        if tts_engine_factory is not None:
+            playlist_options["engine_factory"] = tts_engine_factory
+        self._playlist = PlaylistController(self, **playlist_options)
 
         self._provider_home.bootstrap()
         self.rebuild_provider_registry()
         self.storage.prune_expired(config.articles.store)
+        self._playlist.load()
+        self._rendered_playback_status: str | None = None
 
         self._shutdown_requested = False
         self._exit_cleanup_done = False
@@ -138,6 +157,7 @@ class NewsReaderApp(App[None]):
             with Horizontal(id="status-bar"):
                 yield LoadingIndicator(id="status-indicator")
                 yield Static(id="status")
+                yield Static(id="playback-status")
         yield Footer()
 
     async def on_mount(self) -> None:
@@ -326,6 +346,24 @@ class NewsReaderApp(App[None]):
             )
         )
 
+    def action_playlist_add_current(self) -> None:
+        self._playlist.add_current()
+
+    def action_playlist_add_rest(self) -> None:
+        self._playlist.add_rest_of_scope()
+
+    def action_toggle_playback(self) -> None:
+        self._playlist.toggle_play()
+
+    def action_show_playlist(self) -> None:
+        self._playlist.show_screen()
+
+    def action_playlist_skip(self) -> None:
+        self._playlist.skip()
+
+    def action_playlist_restart(self) -> None:
+        self._playlist.restart_item()
+
     def action_show_source_manager(self) -> None:
         self.push_screen(
             SourceSelectionScreen(
@@ -348,6 +386,7 @@ class NewsReaderApp(App[None]):
         self._article_qa.cancel()
         self._article_categories.cancel()
         self._brief.cancel()
+        self._playlist.cancel()
         self._cleanup_before_exit()
         self._persist_reader_state()
         self.exit()
@@ -415,6 +454,7 @@ class NewsReaderApp(App[None]):
             if callable(restore):
                 restore()
             return
+        self._navigation.apply_pending_advance()
         self._provider_home._notify_bindings_changed()
         if self.provider_home_open:
             try:
@@ -481,6 +521,15 @@ class NewsReaderApp(App[None]):
         self._provider_home.handle_deleted_provider(provider_id)
         self.rebuild_provider_registry()
 
+    def playlist_play_now(self, article_id: str) -> None:
+        self._playlist.play_now(article_id)
+
+    def playlist_remove(self, article_id: str) -> None:
+        self._playlist.remove(article_id)
+
+    def request_clear_playlist(self) -> None:
+        self._playlist.request_clear()
+
     def open_article_by_id(self, article_id: str) -> None:
         self._navigation.open_by_id(article_id)
 
@@ -530,6 +579,8 @@ class NewsReaderApp(App[None]):
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "copy_selection":
             return bool(self._clipboard_controller.selected_text())
+        if action in {"playlist_add_current", "playlist_add_rest"} and self._brief.article_open:
+            return False
         return self._provider_home.check_action(action)
 
     def action_copy_selection(self) -> None:
@@ -590,6 +641,7 @@ class NewsReaderApp(App[None]):
             article_pane = self.query_one("#article-pane", VerticalScroll)
             article_url_widget = self.query_one("#article-url", Static)
             status = self.query_one("#status", Static)
+            playback_status = self.query_one("#playback-status", Static)
             status_indicator = self.query_one("#status-indicator", LoadingIndicator)
             footer = self.query_one(Footer)
         except NoMatches:
@@ -651,7 +703,13 @@ class NewsReaderApp(App[None]):
             nav.schedule_scroll_restore()
         if status_indicator.display != self._refresh.status_busy:
             status_indicator.display = self._refresh.status_busy
-        status_text_value = visible_status_text(self.status_text, self.size.width, self._refresh.status_busy)
+        playback_text = self._playlist.status_text(max(10, self.size.width // 2))
+        if self._rendered_playback_status != playback_text:
+            playback_status.update(Text(playback_text))
+            playback_status.display = bool(playback_text)
+            self._rendered_playback_status = playback_text
+        status_width = self.size.width - (cell_len(playback_text) + 1 if playback_text else 0)
+        status_text_value = visible_status_text(self.status_text, status_width, self._refresh.status_busy)
         if nav._rendered_status_text != status_text_value:
             status.update(status_text_value)
             nav._rendered_status_text = status_text_value
@@ -664,6 +722,8 @@ class NewsReaderApp(App[None]):
         if self._exit_cleanup_done:
             return
         self._clipboard_controller.shutdown()
+        self._playlist.cancel()
+        self._navigation.apply_pending_advance(refresh=False)
         self.close_export_screen()
         self.close_open_link_confirm()
         self.close_article_qa()

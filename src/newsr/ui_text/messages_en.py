@@ -25,6 +25,12 @@ EN_MESSAGES: Final[dict[str, str]] = {
     "app.binding.help": "Help",
     "app.binding.providers": "Providers",
     "app.binding.quit": "Quit",
+    "app.binding.playlist_add": "Add to Playlist",
+    "app.binding.playlist_add_rest": "Add Rest to Playlist",
+    "app.binding.play_pause": "Play/Pause",
+    "app.binding.playlist": "Playlist",
+    "app.binding.playlist_skip": "Next in Playlist",
+    "app.binding.playlist_restart": "Restart Article",
     "clipboard.error": "Native clipboard unavailable: {error}. Terminal clipboard copy was also requested.",
     "app.empty.header": "No cached articles",
     "app.empty.body": "Press D to fetch articles.",
@@ -72,6 +78,11 @@ EN_MESSAGES: Final[dict[str, str]] = {
         "M: more info\n"
         "?: ask about article\n"
         "L: article list\n"
+        "A: add article to playlist\n"
+        "Shift+A: add this and following articles to playlist\n"
+        "P: play/pause playlist\n"
+        "Shift+P: show playlist\n"
+        "] / [: next playlist article / restart current article\n"
         "Esc: back to providers\n"
         "C: sources\n"
         "W: watch topic\n"
@@ -91,6 +102,9 @@ EN_MESSAGES: Final[dict[str, str]] = {
         "C: manage sources\n"
         "W: create watched topic\n"
         "D: force refresh all providers\n"
+        "P: play/pause playlist\n"
+        "Shift+P: show playlist\n"
+        "] / [: next playlist article / restart current article\n"
         "Ctrl+P: command palette / choose theme\n"
         "H: help\n"
         "Q: quit"
@@ -247,6 +261,30 @@ EN_MESSAGES: Final[dict[str, str]] = {
     "brief_jump.error.number": "Use digits only.",
     "brief_jump.error.range": "Choose a number from 1 to {max_number}.",
     "brief_jump.status.not_found": "brief article is no longer available",
+    "playlist.header": "Playlist: {count} articles, {state}",
+    "playlist.state.playing": "playing",
+    "playlist.state.paused": "paused",
+    "playlist.state.stopped": "stopped",
+    "playlist.empty": "The playlist is empty. Press A in the reader to add articles.",
+    "playlist.hint": "Up/Down: select   Enter: play now   X/Del: remove   C: clear   P/Space: play/pause   ]/[: next/restart   Esc: close",
+    "playlist.binding.close": "Close",
+    "playlist.binding.play_pause": "Play/Pause",
+    "playlist.binding.remove": "Remove",
+    "playlist.binding.clear": "Clear",
+    "playlist.clear.title": "Clear Playlist",
+    "playlist.clear.body": "Remove all {count} articles from the playlist?",
+    "playlist.clear.confirm": "Clear",
+    "playlist.clear.cancel": "Cancel",
+    "playlist.status.empty": "playlist is empty",
+    "playlist.status.added": "added {added} to playlist, {total} queued",
+    "playlist.status.finished": "playlist finished",
+    "playlist.status.playing": "▶ {title} · {provider} · {count} queued",
+    "playlist.status.paused": "‖ {title} · {provider} · {count} queued",
+    "playlist.status.buffering": "… {title} · {provider} · {count} queued",
+    "playlist.status.starting": "… starting playlist, {count} queued",
+    "playlist.status.queued": "■ playlist: {count} queued",
+    "playlist.status.error": "⚠ TTS: {error}",
+    "playlist.speech.intro": "{provider}. Article {current} of {total}.",
     "quick_nav.binding.close": "Close",
     "quick_nav.header": "Quick Navigation",
     "quick_nav.empty": "No translated articles available.",

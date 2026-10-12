@@ -245,3 +245,6 @@ def test_default_config_includes_show_all_enabled(tmp_path: Path) -> None:
     assert config.articles.timeout == 180
     assert config.articles.update_schedule == "0 * * * *"
     assert config.llm.brief_context == 100000
+    assert "tts:\n  engine: edge\n" in DEFAULT_CONFIG
+    assert config.tts.engine == "edge"
+    assert config.tts.original_language == "en"

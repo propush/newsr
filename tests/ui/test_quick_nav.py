@@ -370,3 +370,20 @@ def test_ui_quick_nav_table_shows_visible_scrollbar_styles(app_config, tmp_path,
             assert styles.scrollbar_gutter == "stable"
 
     asyncio.run(runner())
+
+
+def test_ui_quick_nav_renders_markup_characters_in_titles_literally(app_config, tmp_path, article_content) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.storage.upsert_article_source(article_content)
+    app.storage.update_translation(article_content.article_id, "Title [/bold] and [Video]", "Translated text", "done")
+
+    async def runner() -> None:
+        async with app.run_test(size=(120, 30)) as pilot:
+            await pilot.pause()
+            await pilot.press("l")
+            await pilot.pause()
+
+            assert quick_nav_rows(app)[0][2] == "Title [/bold] and [Video]"
+
+    asyncio.run(runner())

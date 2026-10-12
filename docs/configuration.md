@@ -13,6 +13,7 @@ Provider enablement, target selection, watched-topic definitions, and per-provid
 - The generated local default is `http://localhost:8081/v1` with model `local-translate`.
 - The generated cloud default is `https://api.openai.com/v1` with model `gpt-4.1-mini`.
 - Bootstrap suggests both UI language and translation language from the current system locale.
+- Bootstrap writes a `tts` section that selects the Edge TTS engine.
 
 ## Current Schema
 
@@ -47,6 +48,35 @@ ui:
 export:
   image:
     quality: fhd
+
+tts:
+  engine: edge
+  speed: 1.0
+  original_language: en
+  # request_retries: 2
+  # openai:
+  #   url: https://api.openai.com/v1
+  #   model: gpt-4o-mini-tts
+  #   api_key: sk-...
+  #   headers: {}
+  #   voices:
+  #     default: alloy
+  # elevenlabs:
+  #   url: https://api.elevenlabs.io/v1
+  #   model: eleven_multilingual_v2
+  #   api_key: ...
+  #   voices:
+  #     default: <voice id>
+  # edge:
+  #   voices:
+  #     ru: ru-RU-SvetlanaNeural
+  # piper:
+  #   models_dir: cache/piper
+  #   voices:
+  #     ru: ru_RU-irina-medium
+  # system:
+  #   voices:
+  #     ru: Milena
 ```
 
 ## Field Reference
@@ -86,6 +116,42 @@ export:
 - Bootstrap-generated configs currently write `fhd`.
 - If the field is omitted in an older or manually written config, the loader falls back to `hd`.
 
+### `tts`
+
+Text-to-speech settings for the article playlist. The whole section is optional; every field has a loader default.
+
+- `engine`: speech engine. Allowed values: `openai`, `elevenlabs`, `edge`, `piper`, `system`. Loader default: `edge`.
+  - `openai`: any OpenAI-compatible `POST {url}/audio/speech` endpoint. This covers OpenAI itself and local servers that expose the same API, such as Kokoro-FastAPI, Speaches, or LocalAI.
+  - `elevenlabs`: the ElevenLabs text-to-speech API.
+  - `edge`: Microsoft Edge online neural voices through the `edge-tts` package. It needs no API key.
+  - `piper`: local Piper neural voices that run inside NewsR on the CPU.
+  - `system`: operating-system voices, using `say` on macOS and `espeak-ng` (or `espeak`) on other platforms.
+- `speed`: speech speed multiplier from `0.5` to `2.0`. Loader default: `1.0`. ElevenLabs accepts `0.7` to `1.2`, and NewsR clamps the value to that range for it.
+- `original_language`: language code assumed for Latin-script text in `original` reader mode. Loader default: `en`.
+- `request_retries`: number of retries after the first transient failure (network errors, HTTP 429 and 5xx) for the `openai` and `elevenlabs` engines. Must be zero or greater. Loader default: `2`.
+- `openai.url`: base URL of the OpenAI-compatible API. Trailing `/` is stripped on load. Loader default: `https://api.openai.com/v1`.
+- `openai.model`: speech model name. Loader default: `gpt-4o-mini-tts`.
+- `openai.api_key`: optional bearer token.
+- `openai.headers`: optional mapping of additional HTTP headers. Keys and values must be non-empty strings.
+- `elevenlabs.url`: base URL of the ElevenLabs API. Loader default: `https://api.elevenlabs.io/v1`.
+- `elevenlabs.model`: ElevenLabs model id. Loader default: `eleven_multilingual_v2`.
+- `elevenlabs.api_key`: API key. Required when `engine` is `elevenlabs`.
+- `piper.models_dir`: directory for downloaded Piper voices and the Piper voice index. Loader default: `cache/piper`.
+- `<engine>.voices`: optional mapping from a language code (`en`, `ru`, `de`, ...) or `default` to a voice name of that engine. `elevenlabs.voices.default` is required when `engine` is `elevenlabs`.
+
+Each spoken article consists of an intro, the title, and the body. The intro names the provider and the article position, for example `BBC News. Article 4 of 10.` It uses the UI language. The title and body follow the reader mode of the scope the article was queued from:
+
+- `full` and `summary` text is spoken in `translation.target_language`. English and native language names, ISO codes such as `pt` or `pt-BR`, and names such as `Brazilian Portuguese` are recognized. For an unrecognized name, the language is detected from the script of the translated text.
+- `original` text is spoken in the language detected from its script. Cyrillic, Greek, Armenian, Georgian, Hebrew, Arabic, Indic, Thai, Lao, Khmer, Burmese, Ethiopic, Chinese, Japanese, and Korean scripts are recognized; Latin-script text uses `original_language`.
+
+Voice selection per language:
+
+- `openai`: `voices.<language>`, then `voices.default`, then `alloy`. OpenAI voices speak every supported language.
+- `elevenlabs`: `voices.<language>`, then `voices.default`. The multilingual models speak every supported language with one voice.
+- `edge`: `voices.<language>`; otherwise the first voice that Edge lists for the language, preferring the main regional locale such as `en-US` or `ru-RU`. If Edge returns no audio for an automatically chosen voice, NewsR retries with the next voice for that language. `voices.default`, then `en-US-EmmaMultilingualNeural`, covers languages without a voice.
+- `piper`: `voices.<language>`; otherwise the first `medium` quality voice for the language from the Piper voice index, preferring the main regional locale. `voices.default`, then `en_US-lessac-medium`, covers languages without a voice. Voice names follow the Piper format `<language>_<REGION>-<name>-<quality>`. NewsR downloads missing voices from the `rhasspy/piper-voices` repository into `models_dir` on first use.
+- `system`: `voices.<language>`; otherwise, on macOS, the first installed `say` voice for the language, preferring the main regional locale and skipping novelty voices. On other platforms the language code is passed to `espeak-ng` as the voice.
+
 ## Scheduling Notes
 
 - `articles.update_schedule` is the global default schedule.
@@ -96,6 +162,9 @@ export:
 ## Runtime Files
 
 - `newsr.yml`: global app configuration.
-- `cache/newsr.sqlite3`: providers, targets, topic watches, article content, translations, summaries, cached `more_info`, reader state, options, and refresh bookkeeping.
+- `cache/newsr.sqlite3`: providers, targets, topic watches, article content, translations, summaries, cached `more_info`, reader state, options, the article playlist, and refresh bookkeeping.
+- `cache/newsr-tts.log`: text-to-speech log with engine, voice, request size, retry, download, and error metadata. Spoken text is not logged.
+- `cache/piper/`: downloaded Piper voices and the Piper voice index, when `tts.piper.models_dir` keeps its default.
+- `cache/tts/`: temporary files used while the `system` engine synthesizes speech.
 - `cache/newsr-llm.log`: LLM request log, transient transport retry metadata, brief-generation stage metadata, repair retry metadata, and non-provider network request metadata. Entries include request method, URL, status, retry attempt, brief stage, validation counts, and errors without logging response contents.
 - `exports/`: Markdown and PNG exports created by the export flow.

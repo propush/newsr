@@ -71,7 +71,7 @@ bootstrap_dependencies() {
     needs_install=1
   fi
 
-  if ! "$VENV_PYTHON" -c "import bs4, newsr, PIL, textual, yaml" >/dev/null 2>&1; then
+  if ! "$VENV_PYTHON" -c "import bs4, edge_tts, miniaudio, newsr, piper, PIL, textual, yaml" >/dev/null 2>&1; then
     needs_install=1
   fi
 

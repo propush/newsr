@@ -308,6 +308,7 @@ def test_ui_provider_home_hides_reader_only_bindings_from_footer(app_config, tmp
             await pilot.pause()
             assert footer_bindings(app) == [
                 ("b", "Brief Review", "brief_or_page_up"),
+                ("P", "Playlist", "show_playlist"),
                 ("c", "Sources", "show_source_manager"),
                 ("w", "Watch Topic", "watch_topic"),
                 ("d", "Refresh", "download_articles"),

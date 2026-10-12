@@ -3,11 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..domain import AppOptions
+from ..domain import AppOptions, PlaylistItem
 from ..domain.reader import ReaderState
 from .article_store import ArticleStore
 from .connection import StorageConnection
 from .options_store import OptionsStore
+from .playlist_store import PlaylistStore
 from .provider_store import ProviderStore
 from .reader_state_store import ReaderStateStore
 from .schema import initialize_schema
@@ -22,6 +23,7 @@ class NewsStorage:
         self._options = OptionsStore(self._db)
         self._providers = ProviderStore(self._db)
         self._reader_state = ReaderStateStore(self._db)
+        self._playlist = PlaylistStore(self._db)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._articles, name)
@@ -40,6 +42,12 @@ class NewsStorage:
 
     def save_reader_state(self, scope_id: str, state: ReaderState) -> None:
         self._reader_state.save(scope_id, state)
+
+    def load_playlist(self) -> list[PlaylistItem]:
+        return self._playlist.load()
+
+    def save_playlist(self, items: list[PlaylistItem]) -> None:
+        self._playlist.save(items)
 
     def sync_providers(self, providers) -> None:
         self._providers.sync_providers(providers)

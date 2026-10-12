@@ -25,6 +25,12 @@ RU_MESSAGES: Final[dict[str, str]] = {
     "app.binding.help": "Справка",
     "app.binding.providers": "Провайдеры",
     "app.binding.quit": "Выход",
+    "app.binding.playlist_add": "В плейлист",
+    "app.binding.playlist_add_rest": "Остальные в плейлист",
+    "app.binding.play_pause": "Пуск/Пауза",
+    "app.binding.playlist": "Плейлист",
+    "app.binding.playlist_skip": "Следующая в плейлисте",
+    "app.binding.playlist_restart": "Сначала",
     "clipboard.error": "Системный буфер обмена недоступен: {error}. Копирование через терминал также запрошено.",
     "app.empty.header": "Нет статей в кеше",
     "app.empty.body": "Нажмите D, чтобы загрузить статьи.",
@@ -72,6 +78,11 @@ RU_MESSAGES: Final[dict[str, str]] = {
         "M: подробнее\n"
         "?: спросить о статье\n"
         "L: список статей\n"
+        "A: добавить статью в плейлист\n"
+        "Shift+A: добавить эту и следующие статьи в плейлист\n"
+        "P: пуск/пауза плейлиста\n"
+        "Shift+P: показать плейлист\n"
+        "] / [: следующая статья плейлиста / текущая сначала\n"
         "Esc: назад к провайдерам\n"
         "C: источники\n"
         "W: следить за темой\n"
@@ -91,6 +102,9 @@ RU_MESSAGES: Final[dict[str, str]] = {
         "C: управление источниками\n"
         "W: создать отслеживаемую тему\n"
         "D: принудительно обновить все провайдеры\n"
+        "P: пуск/пауза плейлиста\n"
+        "Shift+P: показать плейлист\n"
+        "] / [: следующая статья плейлиста / текущая сначала\n"
         "Ctrl+P: палитра команд / выбор темы\n"
         "H: справка\n"
         "Q: выход"
@@ -247,6 +261,30 @@ RU_MESSAGES: Final[dict[str, str]] = {
     "brief_jump.error.number": "Используйте только цифры.",
     "brief_jump.error.range": "Выберите номер от 1 до {max_number}.",
     "brief_jump.status.not_found": "статья из обзора больше недоступна",
+    "playlist.header": "Плейлист: статей {count}, {state}",
+    "playlist.state.playing": "воспроизведение",
+    "playlist.state.paused": "пауза",
+    "playlist.state.stopped": "остановлен",
+    "playlist.empty": "Плейлист пуст. Нажмите A при чтении, чтобы добавить статьи.",
+    "playlist.hint": "Up/Down: выбор   Enter: играть сейчас   X/Del: удалить   C: очистить   P/Space: пуск/пауза   ]/[: дальше/сначала   Esc: закрыть",
+    "playlist.binding.close": "Закрыть",
+    "playlist.binding.play_pause": "Пуск/Пауза",
+    "playlist.binding.remove": "Удалить",
+    "playlist.binding.clear": "Очистить",
+    "playlist.clear.title": "Очистить плейлист",
+    "playlist.clear.body": "Удалить из плейлиста все статьи ({count})?",
+    "playlist.clear.confirm": "Очистить",
+    "playlist.clear.cancel": "Отмена",
+    "playlist.status.empty": "плейлист пуст",
+    "playlist.status.added": "добавлено в плейлист: {added}, в очереди {total}",
+    "playlist.status.finished": "плейлист закончился",
+    "playlist.status.playing": "▶ {title} · {provider} · в очереди {count}",
+    "playlist.status.paused": "‖ {title} · {provider} · в очереди {count}",
+    "playlist.status.buffering": "… {title} · {provider} · в очереди {count}",
+    "playlist.status.starting": "… запуск плейлиста, в очереди {count}",
+    "playlist.status.queued": "■ плейлист: в очереди {count}",
+    "playlist.status.error": "⚠ TTS: {error}",
+    "playlist.speech.intro": "{provider}. Статья {current} из {total}.",
     "quick_nav.binding.close": "Закрыть",
     "quick_nav.header": "Быстрый переход",
     "quick_nav.empty": "Нет переведённых статей.",

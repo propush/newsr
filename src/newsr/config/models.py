@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 DEFAULT_UI_CLOCK = "no_seconds"
+DEFAULT_TTS_ENGINE = "edge"
+TTS_ENGINES = ("openai", "elevenlabs", "edge", "piper", "system")
 
 
 @dataclass(slots=True)
@@ -55,9 +57,56 @@ class ExportConfig:
 
 
 @dataclass(slots=True)
+class TTSOpenAIConfig:
+    url: str = "https://api.openai.com/v1"
+    model: str = "gpt-4o-mini-tts"
+    api_key: str | None = None
+    headers: dict[str, str] = field(default_factory=dict)
+    voices: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class TTSElevenLabsConfig:
+    url: str = "https://api.elevenlabs.io/v1"
+    model: str = "eleven_multilingual_v2"
+    api_key: str | None = None
+    voices: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class TTSEdgeConfig:
+    voices: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class TTSPiperConfig:
+    models_dir: str = "cache/piper"
+    voices: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class TTSSystemConfig:
+    voices: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class TTSConfig:
+    engine: str = DEFAULT_TTS_ENGINE
+    speed: float = 1.0
+    original_language: str = "en"
+    request_retries: int = 2
+    openai: TTSOpenAIConfig = field(default_factory=TTSOpenAIConfig)
+    elevenlabs: TTSElevenLabsConfig = field(default_factory=TTSElevenLabsConfig)
+    edge: TTSEdgeConfig = field(default_factory=TTSEdgeConfig)
+    piper: TTSPiperConfig = field(default_factory=TTSPiperConfig)
+    system: TTSSystemConfig = field(default_factory=TTSSystemConfig)
+
+
+@dataclass(slots=True)
 class AppConfig:
     articles: ArticlesConfig
     llm: LLMConfig
     translation: TranslationConfig
     ui: UIConfig
     export: ExportConfig
+    tts: TTSConfig = field(default_factory=TTSConfig)

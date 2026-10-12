@@ -19,7 +19,7 @@ from ..ui_text import (
     parse_ui_locale,
     resolve_ui_locale_name,
 )
-from .models import DEFAULT_UI_CLOCK
+from .models import DEFAULT_TTS_ENGINE, DEFAULT_UI_CLOCK
 
 DEFAULT_ARTICLES_FETCH = 5
 DEFAULT_ARTICLES_STORE = 10
@@ -232,6 +232,11 @@ def render_config(answers: BootstrapAnswers) -> str:
             "image": {
                 "quality": answers.export_image_quality,
             }
+        },
+        "tts": {
+            "engine": DEFAULT_TTS_ENGINE,
+            "speed": 1.0,
+            "original_language": "en",
         },
     }
     return yaml.safe_dump(raw_config, sort_keys=False, allow_unicode=True)

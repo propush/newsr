@@ -77,6 +77,12 @@ Screen {
     height: 1;
     padding: 0 1;
 }
+#playback-status {
+    width: auto;
+    color: $accent;
+    padding-left: 1;
+    display: none;
+}
 #status-indicator {
     width: 3;
     margin-right: 1;

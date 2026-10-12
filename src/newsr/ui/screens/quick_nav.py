@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.events import Resize
@@ -8,6 +9,15 @@ from textual.widgets import DataTable, Static
 
 from ...domain.articles import ArticleRecord
 from ...ui_text import UILocalizer
+from .article_rows import (
+    CATEGORY_COLUMN_WIDTH,
+    DATE_COLUMN_WIDTH,
+    PROVIDER_COLUMN_WIDTH,
+    format_short_article_date,
+    provider_label,
+    title_column_width,
+    trimmed_title,
+)
 
 
 class QuickNavScreen(ModalScreen[None]):
@@ -122,14 +132,13 @@ class QuickNavScreen(ModalScreen[None]):
             for article in self._all_articles
             if article.translated_title is not None and article.translated_title.strip()
         ]
-        title_width = self._title_column_width()
-        category_width = self._category_column_width()
+        title_width = title_column_width(self.size.width)
         table.clear(columns=True)
         table.add_column(" ", width=1, key="marker")
-        table.add_column(self._ui.text("quick_nav.table.date"), width=10, key="date")
+        table.add_column(self._ui.text("quick_nav.table.date"), width=DATE_COLUMN_WIDTH, key="date")
         table.add_column(self._ui.text("quick_nav.table.title"), width=title_width, key="title")
-        table.add_column(self._ui.text("quick_nav.table.provider"), width=self._provider_column_width(), key="provider")
-        table.add_column(self._ui.text("quick_nav.table.category"), width=category_width, key="category")
+        table.add_column(self._ui.text("quick_nav.table.provider"), width=PROVIDER_COLUMN_WIDTH, key="provider")
+        table.add_column(self._ui.text("quick_nav.table.category"), width=CATEGORY_COLUMN_WIDTH, key="category")
         if not self._visible_articles:
             table.display = False
             empty.display = True
@@ -144,10 +153,10 @@ class QuickNavScreen(ModalScreen[None]):
             marker = ">" if article.article_id == self._current_article_id else ""
             table.add_row(
                 marker,
-                self._format_short_article_date(article),
-                self._trimmed_title(article, title_width),
-                self._provider_label(article),
-                article.category,
+                format_short_article_date(article),
+                Text(trimmed_title(article, title_width)),
+                Text(provider_label(article, self._provider_display_names)),
+                Text(article.category),
                 key=article.article_id,
             )
 
@@ -166,37 +175,6 @@ class QuickNavScreen(ModalScreen[None]):
         if not self._visible_articles or not table.is_valid_row_index(table.cursor_row):
             return None
         return self._visible_articles[table.cursor_row].article_id
-
-    def _title_column_width(self) -> int:
-        return max(12, self.size.width - self._provider_column_width() - self._category_column_width() - 20)
-
-    @staticmethod
-    def _category_column_width() -> int:
-        return 16
-
-    @staticmethod
-    def _provider_column_width() -> int:
-        return 16
-
-    @staticmethod
-    def _format_short_article_date(article: ArticleRecord) -> str:
-        date = article.published_at or article.created_at
-        return date.astimezone().strftime("%Y-%m-%d")
-
-    @staticmethod
-    def _trimmed_title(article: ArticleRecord, width: int) -> str:
-        title = article.translated_title or ""
-        if len(title) <= width:
-            return title
-        if width <= 3:
-            return title[:width]
-        return f"{title[: width - 3]}..."
-
-    def _provider_label(self, article: ArticleRecord) -> str:
-        provider_id = article.provider_id.strip()
-        if not provider_id:
-            return ""
-        return self._provider_display_names.get(provider_id, provider_id)
 
     def _update_selection_status(self, selected_index: int) -> None:
         selection = self.query_one("#quick-nav-selection", Static)

@@ -292,6 +292,10 @@ class ProviderHomeController:
             "show_help",
             "quit_reader",
             "command_palette",
+            "toggle_playback",
+            "show_playlist",
+            "playlist_skip",
+            "playlist_restart",
         }
         hidden_in_provider_home = {
             "previous_article",
@@ -304,6 +308,8 @@ class ProviderHomeController:
             "export_current",
             "open_article",
             "return_to_provider_home",
+            "playlist_add_current",
+            "playlist_add_rest",
         }
         if action in provider_home_actions:
             return True

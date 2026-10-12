@@ -22,18 +22,22 @@ from newsr.storage import NewsStorage
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _isolate_llm_logger(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
-    """Prevent tests from writing to the real cache/newsr-llm.log file."""
-    logger = logging.getLogger("newsr.llm")
-    log_path = tmp_path_factory.mktemp("logs") / "newsr-llm.log"
-    handler = logging.FileHandler(log_path, encoding="utf-8")
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
-    )
-    logger.addHandler(handler)
+def _isolate_cache_loggers(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    """Prevent tests from writing to the real cache/newsr-llm.log and cache/newsr-tts.log files."""
+    log_dir = tmp_path_factory.mktemp("logs")
+    installed: list[tuple[logging.Logger, logging.Handler]] = []
+    for logger_name, filename in (("newsr.llm", "newsr-llm.log"), ("newsr.tts", "newsr-tts.log")):
+        logger = logging.getLogger(logger_name)
+        handler = logging.FileHandler(log_dir / filename, encoding="utf-8")
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+        )
+        logger.addHandler(handler)
+        installed.append((logger, handler))
     yield
-    logger.removeHandler(handler)
-    handler.close()
+    for logger, handler in installed:
+        logger.removeHandler(handler)
+        handler.close()
 
 
 @pytest.fixture

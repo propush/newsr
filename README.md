@@ -13,6 +13,7 @@ NewsR currently requires Python 3.12 or newer.
 - translated full articles, summaries, and original source text views
 - brief reviews that synthesize recent or unread articles into a scrollable Markdown report
 - "more info" and article Q&A overlays backed by DuckDuckGo search and the configured LLM
+- a read-aloud article playlist with OpenAI-compatible, ElevenLabs, Edge, Piper, and system-voice text-to-speech engines
 - source management for enabling providers, editing schedules, refreshing catalogs, and choosing targets
 - export of the current view as Markdown or PNG
 - PNG and Markdown clipboard export support on supported platforms
@@ -154,7 +155,7 @@ NewsR starts in a provider home view. This is the default home screen shown afte
 - `Up` / `Down` / `PgUp` / `PgDn` move through the list.
 - `Enter` opens the highlighted scope.
 - `B` opens brief review generation.
-- `C`, `W`, `D`, `H`, `Ctrl+P`, and `Q` stay available from this view.
+- `C`, `W`, `D`, `P`, `Shift+P`, `]`, `[`, `H`, `Ctrl+P`, and `Q` stay available from this view.
 
 ## Brief Review
 
@@ -192,6 +193,11 @@ Saving source changes updates SQLite-backed provider state immediately. The sche
 - `M`: open or refresh the "more info" panel for the current article
 - `?`: ask a follow-up question about the current article
 - `L`: open the article list
+- `A`: add the current article to the playlist
+- `Shift+A`: add the current article and every following article of the current scope to the playlist
+- `P`: play or pause the playlist
+- `Shift+P`: open the playlist
+- `]` / `[`: skip to the next playlist article / restart the current playlist article
 - `C`: open source management
 - `W`: create a watched topic from the current article
 - `E`: open export actions for the current view
@@ -203,11 +209,25 @@ Saving source changes updates SQLite-backed provider state immediately. The sche
 
 Press `Right` on the last article in the current scope to return to the provider home.
 
+## Listening
+
+NewsR reads articles aloud from a playlist, like a podcast of your news.
+
+- `A` queues the current article; `Shift+A` queues it together with every following article of the current scope. Articles already in the playlist are skipped.
+- `P` starts, pauses, and resumes playback. `]` skips to the next article and `[` restarts the current one.
+- Each article starts with the provider name, its position such as "Article 4 of 10", and the title, followed by the article body in the reader mode of its scope: translated full text, summary, or original text.
+- When an article starts playing, its scope's reading position moves forward to it, so the article counts as read and the provider-home unread counter drops. The open reader follows along.
+- Finished articles leave the playlist. The playlist is kept across restarts and starts paused.
+- `Shift+P` opens the playlist screen: `Enter` plays the highlighted article now, `X` / `Delete` removes it, `C` clears the playlist, `P` / `Space` plays or pauses, and `Esc` closes the screen.
+
+Speech is produced by the engine selected in the `tts` section of `newsr.yml`. The default `edge` engine uses free Microsoft Edge neural voices; `piper` and `system` work offline, and `openai` and `elevenlabs` use cloud or local speech APIs. Audio plays inside NewsR. See [Configuration](docs/configuration.md#tts) for engines, voices, and languages.
+
 ## Overlays
 
 - `M` opens a "more info" overlay that uses DuckDuckGo search results plus the configured LLM to add context beyond the current article.
 - `?` opens an article Q&A overlay where you can ask follow-up questions. NewsR also shows related public source links that you can open from the overlay.
 - `L` opens quick navigation across translated articles.
+- `Shift+P` opens the playlist.
 - `C` opens the source manager for enabling providers and selecting targets.
 - `E` opens the export screen, where you can use the buttons or `1` / `2` / `3` / `4` shortcuts for export actions.
 

@@ -7,6 +7,7 @@ import yaml
 
 from ..scheduling import DEFAULT_UPDATE_SCHEDULE, validate_cron_expression
 from ..ui_text import parse_ui_locale
+from .tts_loader import load_tts
 from .models import (
     AppConfig,
     ArticlesConfig,
@@ -28,6 +29,7 @@ def load_config(path: Path) -> AppConfig:
         translation=_load_translation(raw.get("translation", {})),
         ui=_load_ui(raw.get("ui", {})),
         export=_load_export(raw.get("export", {})),
+        tts=load_tts(raw.get("tts")),
     )
 
 

@@ -31,6 +31,7 @@ class NavigationController:
         self._rendered_status_text: str | None = None
         self._open_link_confirm_screen: OpenLinkConfirmScreen | None = None
         self._pending_open_link: tuple[str, str] | None = None
+        self._pending_advance_article_id: str | None = None
 
     # ------------------------------------------------------------------
     # Article state
@@ -336,6 +337,59 @@ class NavigationController:
             self._app.refresh_view()
             self.save_reader_state_now()
             return
+
+    def advance_to(self, article_id: str) -> None:
+        """Record playback progress in the active scope; the reader position never moves backward."""
+        index = self._index_of(article_id)
+        if index is None or index < self.current_index:
+            return
+        pending_index = self._pending_advance_index()
+        if pending_index is not None and pending_index > index:
+            index = pending_index
+        if self._overlay_open():
+            self._pending_advance_article_id = self.articles[index].article_id
+            return
+        self._pending_advance_article_id = None
+        self._advance_to_index(index, refresh=True)
+
+    def apply_pending_advance(self, *, refresh: bool = True) -> None:
+        index = self._pending_advance_index()
+        self._pending_advance_article_id = None
+        if index is None or index < self.current_index:
+            return
+        self._advance_to_index(index, refresh=refresh)
+
+    def _pending_advance_index(self) -> int | None:
+        article_id = self._pending_advance_article_id
+        return None if article_id is None else self._index_of(article_id)
+
+    def _advance_to_index(self, index: int, *, refresh: bool) -> None:
+        if index > self.current_index:
+            self.current_index = index
+            self._app.reader_state.scroll_offset = 0
+            if refresh and not self._app._brief.article_open:
+                self.reset_scroll()
+        reader_state = self._app.reader_state
+        reader_state.article_id = self.articles[index].article_id
+        if not refresh:
+            return
+        self._app.storage.save_reader_state(self._app._provider_home.active_scope_id, reader_state)
+        self._state_persisted = True
+        self._app.refresh_view()
+        if self._app.provider_home_open:
+            self._app._provider_home.refresh_rows()
+
+    def _index_of(self, article_id: str) -> int | None:
+        for index, article in enumerate(self.articles):
+            if article.article_id == article_id:
+                return index
+        return None
+
+    def _overlay_open(self) -> bool:
+        try:
+            return len(self._app.screen_stack) > 1
+        except ScreenStackError:
+            return False
 
     def reset_scroll(self) -> None:
         self._pending_scroll_restore = False

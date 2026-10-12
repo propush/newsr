@@ -80,6 +80,7 @@ def initialize_schema(db: StorageConnection) -> None:
         _initialize_known_article_ids_schema(db)
         legacy_theme_name = _migrate_reader_state_schema(db)
         _initialize_options_schema(db, legacy_theme_name)
+        _initialize_playlist_schema(db)
 
 
 def _initialize_provider_schema(db: StorageConnection) -> None:
@@ -223,4 +224,16 @@ def _initialize_options_schema(db: StorageConnection, legacy_theme_name: str | N
             legacy_theme_name,
             datetime.now(UTC).isoformat(),
         ),
+    )
+
+
+def _initialize_playlist_schema(db: StorageConnection) -> None:
+    db.connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS playlist (
+            position INTEGER PRIMARY KEY,
+            article_id TEXT NOT NULL,
+            scope_id TEXT NOT NULL
+        )
+        """
     )

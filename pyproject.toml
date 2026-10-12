@@ -6,7 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "beautifulsoup4>=4.13.0",
+  "edge-tts>=7.2",
+  "miniaudio>=1.71",
   "Pillow>=12.1.0",
+  "piper-tts>=1.8",
   "PyYAML>=6.0.2",
   "textual>=3.1.1",
 ]
