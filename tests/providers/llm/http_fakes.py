@@ -44,6 +44,7 @@ class FakeHTTPConnection:
         self.port = port
         self.timeout = timeout
         self.closed = False
+        self.sock = None
         self.__class__.instances.append(self)
 
     def request(

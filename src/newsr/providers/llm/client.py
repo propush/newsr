@@ -3,6 +3,7 @@ from __future__ import annotations
 import http.client
 import json
 import logging
+import select
 from datetime import datetime
 from itertools import count
 from threading import Lock
@@ -298,7 +299,7 @@ class OpenAILLMClient:
         self,
         timeout: float,
     ) -> http.client.HTTPConnection | http.client.HTTPSConnection:
-        if self._conn is None or self._conn_timeout != timeout:
+        if self._conn is None or self._conn_timeout != timeout or _connection_dropped(self._conn):
             self._reset_connection()
             connection_class = (
                 http.client.HTTPSConnection if self._scheme == "https" else http.client.HTTPConnection
@@ -447,6 +448,18 @@ class OpenAILLMClient:
             f"Question {index}: {question}\nAnswer {index}: {answer}"
             for index, (question, answer) in enumerate(chat_history, start=1)
         )
+
+
+def _connection_dropped(conn: http.client.HTTPConnection) -> bool:
+    """True when the server closed an idle keep-alive connection: an idle socket turns readable only on EOF or reset."""
+    sock = getattr(conn, "sock", None)
+    if sock is None:
+        return False
+    try:
+        readable, _, _ = select.select([sock], [], [], 0)
+    except (OSError, ValueError):
+        return True
+    return bool(readable)
 
 
 def _parse_string_mapping(raw: str) -> dict[str, str]:

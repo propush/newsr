@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import http.client
 import logging
+import socket
 
 import pytest
 
@@ -90,6 +91,53 @@ def test_llm_client_retries_transient_transport_failures() -> None:
     assert len(FakeHTTPConnection.requests) == 2
     assert len(FakeHTTPConnection.instances) == 2
     assert FakeHTTPConnection.instances[0].closed is True
+
+
+def test_llm_client_reopens_connection_the_server_closed_while_idle(caplog) -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "first"}}]}),
+        FakeResponse({"choices": [{"message": {"content": "second"}}]}),
+    ]
+    client = OpenAILLMClient(make_config(request_retries=1))
+    assert client.translate_title("One") == "first"
+    server_end, client_end = socket.socketpair()
+    FakeHTTPConnection.instances[0].sock = client_end
+    server_end.close()
+    logger = logging.getLogger("newsr.llm")
+    original_propagate = logger.propagate
+    logger.propagate = True
+    try:
+        with caplog.at_level(logging.INFO, logger="newsr.llm"):
+            result = client.translate_title("Two")
+    finally:
+        logger.propagate = original_propagate
+        client_end.close()
+
+    assert result == "second"
+    assert len(FakeHTTPConnection.requests) == 2
+    assert len(FakeHTTPConnection.instances) == 2
+    assert FakeHTTPConnection.instances[0].closed is True
+    assert not any("request_retry" in record.message for record in caplog.records)
+
+
+def test_llm_client_reuses_idle_connection_the_server_keeps_open() -> None:
+    FakeHTTPConnection.plan = [
+        FakeResponse({"choices": [{"message": {"content": "first"}}]}),
+        FakeResponse({"choices": [{"message": {"content": "second"}}]}),
+    ]
+    client = OpenAILLMClient(make_config())
+    assert client.translate_title("One") == "first"
+    server_end, client_end = socket.socketpair()
+    FakeHTTPConnection.instances[0].sock = client_end
+    try:
+        result = client.translate_title("Two")
+    finally:
+        server_end.close()
+        client_end.close()
+
+    assert result == "second"
+    assert len(FakeHTTPConnection.instances) == 1
+    assert FakeHTTPConnection.instances[0].closed is False
 
 
 def test_llm_client_retries_transient_response_read_failures() -> None:
