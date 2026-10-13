@@ -46,6 +46,10 @@ class AudioOutput(Protocol):
     def is_paused(self) -> bool:
         ...
 
+    @property
+    def elapsed_seconds(self) -> float:
+        """Return how much of the current clip has played."""
+
     def play(self, audio: SynthesizedAudio, cancellation: RefreshCancellation | None = None) -> bool:
         """Play a clip and block until it ends (True) or is stopped (False)."""
 
@@ -75,6 +79,14 @@ class MiniaudioOutput:
     @property
     def is_paused(self) -> bool:
         return self._paused
+
+    @property
+    def elapsed_seconds(self) -> float:
+        with self._lock:
+            if self._pcm is None:
+                return 0.0
+            position = self._position
+        return position / (_FRAME_BYTES * SAMPLE_RATE)
 
     def play(self, audio: SynthesizedAudio, cancellation: RefreshCancellation | None = None) -> bool:
         pcm = self._decode(audio)

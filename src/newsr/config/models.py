@@ -102,6 +102,7 @@ class TTSConfig:
     speed: float = 1.0
     original_language: str = "en"
     request_retries: int = 2
+    media_controls: bool = True
     openai: TTSOpenAIConfig = field(default_factory=TTSOpenAIConfig)
     elevenlabs: TTSElevenLabsConfig = field(default_factory=TTSElevenLabsConfig)
     edge: TTSEdgeConfig = field(default_factory=TTSEdgeConfig)

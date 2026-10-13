@@ -4,7 +4,7 @@ from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from typing import Any, Protocol
 
 from ..cancellation import RefreshCancellation, RefreshCancelled
@@ -15,6 +15,7 @@ from .script import SpeechSegment
 
 _POLL_SECONDS = 0.1
 _PREFETCH_SEGMENTS = 3
+SEGMENT_RESTART_SECONDS = 3.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,12 +66,20 @@ class PlaybackRunner:
         self._cancellation = RefreshCancellation()
         self._skip = Event()
         self._restart = Event()
+        self._seek = Event()
+        self._seek_lock = Lock()
+        self._seek_target: int | None = None
+        self._segment_index: int | None = None
         self._futures: dict[SegmentKey, Future[SynthesizedAudio]] = {}
         self._thread: Thread | None = None
 
     @property
     def is_cancelled(self) -> bool:
         return self._cancellation.is_cancelled
+
+    @property
+    def current_segment_index(self) -> int | None:
+        return self._segment_index
 
     def start(self) -> None:
         self._thread = Thread(target=self._run, name="newsr-tts-playback", daemon=True)
@@ -86,6 +95,19 @@ class PlaybackRunner:
 
     def restart_item(self) -> None:
         self._restart.set()
+        self._output.stop_clip()
+
+    def seek_segment(self, delta: int) -> None:
+        """Move by `delta` segments; moving back first restarts a segment that has played for a while."""
+        with self._seek_lock:
+            pending = self._seek_target
+            index = self._segment_index if pending is None else pending
+            if index is None or delta == 0:
+                return
+            if delta < 0 and pending is None and self._output.elapsed_seconds > SEGMENT_RESTART_SECONDS:
+                delta += 1
+            self._seek_target = max(0, index + delta)
+            self._seek.set()
         self._output.stop_clip()
 
     def stop(self) -> None:
@@ -120,25 +142,35 @@ class PlaybackRunner:
     def _play_item(self, item: PlannedItem, engine: TTSEngine, executor: ThreadPoolExecutor) -> str:
         self._skip.clear()
         self._restart.clear()
+        self._take_seek()
         self._retain({(segment.text, segment.language) for segment in item.segments})
-        for index, segment in enumerate(item.segments):
-            future = self._future_for(segment, engine, executor)
-            self._prefetch(item, index, engine, executor)
-            try:
-                audio = self._await(future)
-            except RefreshCancelled:
-                raise
-            except Exception as exc:
-                if self._interrupted():
+        index = 0
+        try:
+            while index < len(item.segments):
+                self._segment_index = index
+                future = self._future_for(item.segments[index], engine, executor)
+                self._prefetch(item, index, engine, executor)
+                try:
+                    audio = self._await(future)
+                except RefreshCancelled:
+                    raise
+                except Exception as exc:
+                    if not self._interrupted():
+                        self._safe_dispatch(self._host.playback_failed, self, item.article_id, str(exc))
+                        return "failed"
+                    audio = None
+                if audio is not None and not self._interrupted():
+                    completed = self._output.play(audio, self._cancellation)
+                    self._cancellation.raise_if_cancelled()
+                    if completed and not self._interrupted():
+                        index += 1
+                        continue
+                target = None if self._skip.is_set() or self._restart.is_set() else self._take_seek()
+                if target is None:
                     return self._interruption()
-                self._safe_dispatch(self._host.playback_failed, self, item.article_id, str(exc))
-                return "failed"
-            if audio is None or self._interrupted():
-                return self._interruption()
-            completed = self._output.play(audio, self._cancellation)
-            self._cancellation.raise_if_cancelled()
-            if not completed or self._interrupted():
-                return self._interruption()
+                index = target
+        finally:
+            self._segment_index = None
         return "completed"
 
     def _prefetch(self, item: PlannedItem, index: int, engine: TTSEngine, executor: ThreadPoolExecutor) -> None:
@@ -185,8 +217,15 @@ class PlaybackRunner:
             if key not in keys:
                 self._futures.pop(key).cancel()
 
+    def _take_seek(self) -> int | None:
+        with self._seek_lock:
+            target = self._seek_target
+            self._seek_target = None
+            self._seek.clear()
+        return target
+
     def _interrupted(self) -> bool:
-        return self._skip.is_set() or self._restart.is_set()
+        return self._skip.is_set() or self._restart.is_set() or self._seek.is_set()
 
     def _interruption(self) -> str:
         self._cancellation.raise_if_cancelled()

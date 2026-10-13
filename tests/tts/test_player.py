@@ -6,6 +6,7 @@ from newsr.tts.player import (
     LEADING_SILENCE_SECONDS,
     SAMPLE_RATE,
     TRAILING_SILENCE_SECONDS,
+    MiniaudioOutput,
     trim_silence,
 )
 
@@ -38,3 +39,17 @@ def test_trim_silence_keeps_short_padding_and_silent_clips() -> None:
 
     assert trim_silence(tight) == tight
     assert trim_silence(silent) == silent
+
+
+def test_miniaudio_output_reports_elapsed_time_of_the_current_clip_only() -> None:
+    output = MiniaudioOutput()
+    assert output.elapsed_seconds == 0.0
+
+    output._pcm = memoryview(stereo_pcm((2.0, 4000)))
+    stream = output._stream()
+    next(stream)
+    stream.send(SAMPLE_RATE // 2)
+    assert output.elapsed_seconds == 0.5
+
+    output.stop_clip()
+    assert output.elapsed_seconds == 0.0

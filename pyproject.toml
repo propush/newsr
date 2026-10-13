@@ -6,12 +6,18 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "beautifulsoup4>=4.13.0",
+  "dbus-fast>=4.0; sys_platform == 'linux'",
   "edge-tts>=7.2",
   "miniaudio>=1.71",
   "Pillow>=12.1.0",
   "piper-tts>=1.8",
+  "pyobjc-framework-Cocoa>=11.0; sys_platform == 'darwin'",
+  "pyobjc-framework-MediaPlayer>=11.0; sys_platform == 'darwin'",
   "PyYAML>=6.0.2",
   "textual>=3.1.1",
+  "winrt-Windows.Foundation>=3.0; sys_platform == 'win32'",
+  "winrt-Windows.Media>=3.0; sys_platform == 'win32'",
+  "winrt-Windows.Media.Playback>=3.0; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]

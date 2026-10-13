@@ -30,7 +30,9 @@ RU_MESSAGES: Final[dict[str, str]] = {
     "app.binding.play_pause": "Пуск/Пауза",
     "app.binding.playlist": "Плейлист",
     "app.binding.playlist_skip": "Следующая в плейлисте",
-    "app.binding.playlist_restart": "Сначала",
+    "app.binding.playlist_previous": "Предыдущая статья",
+    "app.binding.playlist_seek_forward": "Фрагмент вперёд",
+    "app.binding.playlist_seek_back": "Фрагмент назад",
     "clipboard.error": "Системный буфер обмена недоступен: {error}. Копирование через терминал также запрошено.",
     "app.empty.header": "Нет статей в кеше",
     "app.empty.body": "Нажмите D, чтобы загрузить статьи.",
@@ -82,7 +84,8 @@ RU_MESSAGES: Final[dict[str, str]] = {
         "Shift+A: добавить эту и следующие статьи в плейлист\n"
         "P: пуск/пауза плейлиста\n"
         "Shift+P: показать плейлист\n"
-        "] / [: следующая статья плейлиста / текущая сначала\n"
+        "] / [: следующая статья плейлиста / текущая сначала, в её начале — предыдущая\n"
+        ". / ,: плейлист на фрагмент вперёд / назад\n"
         "Esc: назад к провайдерам\n"
         "C: источники\n"
         "W: следить за темой\n"
@@ -104,7 +107,8 @@ RU_MESSAGES: Final[dict[str, str]] = {
         "D: принудительно обновить все провайдеры\n"
         "P: пуск/пауза плейлиста\n"
         "Shift+P: показать плейлист\n"
-        "] / [: следующая статья плейлиста / текущая сначала\n"
+        "] / [: следующая статья плейлиста / текущая сначала, в её начале — предыдущая\n"
+        ". / ,: плейлист на фрагмент вперёд / назад\n"
         "Ctrl+P: палитра команд / выбор темы\n"
         "H: справка\n"
         "Q: выход"
@@ -266,7 +270,7 @@ RU_MESSAGES: Final[dict[str, str]] = {
     "playlist.state.paused": "пауза",
     "playlist.state.stopped": "остановлен",
     "playlist.empty": "Плейлист пуст. Нажмите A при чтении, чтобы добавить статьи.",
-    "playlist.hint": "Up/Down: выбор   Enter: играть сейчас   X/Del: удалить   C: очистить   P/Space: пуск/пауза   ]/[: дальше/сначала   Esc: закрыть",
+    "playlist.hint": "Up/Down: выбор   Enter: играть сейчас   X/Del: удалить   C: очистить   P/Space: пуск/пауза   ]/[: дальше/назад   ./,: вперёд/назад   Esc: закрыть",
     "playlist.binding.close": "Закрыть",
     "playlist.binding.play_pause": "Пуск/Пауза",
     "playlist.binding.remove": "Удалить",

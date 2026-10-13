@@ -5,10 +5,26 @@ from threading import Lock
 from typing import TYPE_CHECKING
 
 from textual.app import ScreenStackError
+from textual.timer import Timer
 
 from ...domain import ArticleRecord, PlaylistItem, ReaderState, ViewMode
 from ...providers.tts import TTSEngine, build_tts_engine
-from ...tts import AudioOutput, MiniaudioOutput, PlannedItem, PlaybackRunner, body_language, build_item_script
+from ...providers.tts.base import LOGGER, configure_tts_logger
+from ...tts import (
+    AudioOutput,
+    MediaCommand,
+    MediaControls,
+    MiniaudioOutput,
+    NowPlaying,
+    NullMediaControls,
+    PlannedItem,
+    PlaybackRunner,
+    PlaybackStatus,
+    body_language,
+    build_item_script,
+    build_media_controls,
+)
+from ...tts.media_controls.base import ALBUM_TITLE
 from ..screens import ConfirmDialogScreen
 from ..screens.playlist import PlaylistRow, PlaylistScreen
 from .article_rendering import article_text, article_title, provider_display_names, truncate_cells
@@ -19,7 +35,9 @@ if TYPE_CHECKING:
 
 OutputFactory = Callable[[], AudioOutput]
 EngineFactory = Callable[["TTSConfig"], TTSEngine]
+MediaControlsFactory = Callable[[bool], MediaControls]
 _OUTPUT_CLOSE_DELAY_SECONDS = 0.5
+_HISTORY_LIMIT = 50
 
 
 class PlaylistController:
@@ -29,11 +47,14 @@ class PlaylistController:
         *,
         output_factory: OutputFactory = MiniaudioOutput,
         engine_factory: EngineFactory | None = None,
+        media_controls_factory: MediaControlsFactory = build_media_controls,
     ) -> None:
         self._app = app
         self._output_factory = output_factory
         self._engine_factory = engine_factory
+        self._media_controls_factory = media_controls_factory
         self._items: list[PlaylistItem] = []
+        self._history: list[PlaylistItem] = []
         self._runner: PlaybackRunner | None = None
         self._output: AudioOutput | None = None
         self._engine: TTSEngine | None = None
@@ -45,6 +66,9 @@ class PlaylistController:
         self._buffering = False
         self._error: str | None = None
         self._screen: PlaylistScreen | None = None
+        self._media: MediaControls | None = None
+        self._media_state: NowPlaying | None = None
+        self._media_timer: Timer | None = None
 
     # ------------------------------------------------------------------
     # State
@@ -125,6 +149,7 @@ class PlaylistController:
     def clear(self) -> None:
         self._stop_runner()
         self._items = []
+        self._history = []
         self._error = None
         self._save()
         self._close_output_later()
@@ -161,11 +186,25 @@ class PlaylistController:
             self._save()
             self._refresh()
 
-    def restart_item(self) -> None:
+    def previous(self) -> None:
+        """Restart the current article, or return to the previous one while its intro plays."""
+        runner = self._runner
+        if runner is None:
+            return
+        if runner.current_segment_index == 0 and self._history:
+            item = self._history.pop()
+            index = self._index_of(item.article_id)
+            if index is not None:
+                self._items.pop(index)
+            self._items.insert(0, item)
+            self._save()
+        self._resume_output()
+        runner.restart_item()
+        self._refresh()
+
+    def seek(self, delta: int) -> None:
         if self._runner is not None:
-            self._resume_output()
-            self._runner.restart_item()
-            self._refresh()
+            self._runner.seek_segment(delta)
 
     def cancel(self) -> None:
         self._stop_runner()
@@ -173,6 +212,31 @@ class PlaylistController:
         self._output = None
         if output is not None:
             output.close()
+        self._close_media()
+
+    # ------------------------------------------------------------------
+    # Operating-system media controls
+    # ------------------------------------------------------------------
+
+    def handle_media_command(self, command: MediaCommand) -> None:
+        if command is MediaCommand.TOGGLE:
+            self.toggle_play()
+        elif command is MediaCommand.PLAY:
+            if not self.is_playing:
+                self.toggle_play()
+        elif command in (MediaCommand.PAUSE, MediaCommand.STOP):
+            if self.is_playing:
+                self.toggle_play()
+        elif self._runner is None:
+            return
+        elif command is MediaCommand.NEXT:
+            self.skip()
+        elif command is MediaCommand.PREVIOUS:
+            self.previous()
+        elif command is MediaCommand.SEEK_FORWARD:
+            self.seek(1)
+        elif command is MediaCommand.SEEK_BACKWARD:
+            self.seek(-1)
 
     # ------------------------------------------------------------------
     # Playlist screen
@@ -256,7 +320,8 @@ class PlaylistController:
             return
         index = self._index_of(article_id)
         if index is not None:
-            self._items.pop(index)
+            self._history.append(self._items.pop(index))
+            del self._history[:-_HISTORY_LIMIT]
             self._save()
         self._current = None
         self._refresh()
@@ -315,6 +380,7 @@ class PlaylistController:
         if self._output is None:
             self._output = self._output_factory()
         self._output.resume()
+        self._ensure_media()
         runner = PlaybackRunner(
             host=self,
             engine_provider=self._engine_instance,
@@ -347,6 +413,73 @@ class PlaylistController:
                 else:
                     self._engine = self._engine_factory(self._app.config.tts)
             return self._engine
+
+    def _ensure_media(self) -> None:
+        if self._media is not None:
+            return
+        media = self._media_controls_factory(self._app.config.tts.media_controls)
+        media.start(lambda command: self._app.call_later(self.handle_media_command, command))
+        self._media = media
+
+    def _sync_media(self) -> None:
+        media = self._media
+        if media is None:
+            return
+        state = self._now_playing()
+        if state == self._media_state:
+            return
+        self._media_state = state
+        try:
+            media.update(state)
+        except Exception as exc:
+            self._media_failed(exc)
+            return
+        interval = media.pump_interval
+        if state is not None and interval is not None and self._media_timer is None:
+            self._media_timer = self._app.set_interval(interval, self._pump_media)
+        elif state is None:
+            self._stop_media_timer()
+
+    def _now_playing(self) -> NowPlaying | None:
+        if self._runner is None:
+            return None
+        return NowPlaying(
+            title=self._current_title or ALBUM_TITLE,
+            artist=self._current_provider,
+            status=PlaybackStatus.PAUSED if self._paused else PlaybackStatus.PLAYING,
+        )
+
+    def _pump_media(self) -> None:
+        media = self._media
+        if media is None:
+            return
+        try:
+            media.pump()
+        except Exception as exc:
+            self._media_failed(exc)
+
+    def _media_failed(self, exc: Exception) -> None:
+        _log_media_error("media_controls_failed", exc)
+        self._close_media()
+        self._media = NullMediaControls()
+
+    def _close_media(self) -> None:
+        self._stop_media_timer()
+        media = self._media
+        self._media = None
+        self._media_state = None
+        if media is None:
+            return
+        try:
+            media.close()
+        except Exception as exc:
+            _log_media_error("media_controls_close_failed", exc)
+
+    def _stop_media_timer(self) -> None:
+        timer = self._media_timer
+        self._media_timer = None
+        if timer is not None:
+            timer.stop()
 
     def _close_output_later(self) -> None:
         def close_if_idle() -> None:
@@ -453,6 +586,7 @@ class PlaylistController:
             except ScreenStackError:
                 pass
         self._app.refresh_view()
+        self._sync_media()
 
     def _screen_rows(self) -> list[PlaylistRow]:
         rows: list[PlaylistRow] = []
@@ -477,3 +611,8 @@ class PlaylistController:
         else:
             state = ui.text("playlist.state.playing")
         return ui.text("playlist.header", count=len(self._items), state=state)
+
+
+def _log_media_error(event: str, exc: Exception) -> None:
+    configure_tts_logger()
+    LOGGER.warning("%s error_type=%s error=%s", event, type(exc).__name__, exc)

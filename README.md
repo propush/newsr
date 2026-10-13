@@ -203,7 +203,8 @@ Saving source changes updates SQLite-backed provider state immediately. The sche
 - `Shift+A`: add the current article and every following article of the current scope to the playlist
 - `P`: play or pause the playlist
 - `Shift+P`: open the playlist
-- `]` / `[`: skip to the next playlist article / restart the current playlist article
+- `]` / `[`: skip to the next playlist article / restart the current playlist article, or return to the previous one while the article intro plays
+- `.` / `,`: move the playlist one passage forward / back
 - `C`: open source management
 - `W`: create a watched topic from the current article
 - `E`: open export actions for the current view
@@ -220,11 +221,13 @@ Press `Right` on the last article in the current scope to return to the provider
 NewsR reads articles aloud from a playlist, like a podcast of your news.
 
 - `A` queues the current article; `Shift+A` queues it together with every following article of the current scope. Articles already in the playlist are skipped.
-- `P` starts, pauses, and resumes playback. `]` skips to the next article and `[` restarts the current one.
+- `P` starts, pauses, and resumes playback. `]` skips to the next article. `[` restarts the current article, or returns to the previous one while the article intro plays.
+- `.` and `,` move one passage forward or back. Passages are the intro, the title, and groups of body sentences that start near 200 characters and grow up to the request size of the speech engine. `,` first restarts a passage that has played for more than three seconds.
+- Media keys, Bluetooth headset buttons, and the system Now Playing controls on macOS, Linux (MPRIS), and Windows control the playlist while it plays or is paused: play/pause, next and previous article, and seek forward or back one passage. See `tts.media_controls` in [Configuration](docs/configuration.md#tts).
 - Each article starts with the provider name, its position such as "Article 4 of 10", and the title, followed by the article body in the reader mode of its scope: translated full text, summary, or original text.
 - When an article starts playing, its scope's reading position moves forward to it, so the article counts as read and the provider-home unread counter drops. The open reader follows along.
 - Finished articles leave the playlist. The playlist is kept across restarts and starts paused.
-- `Shift+P` opens the playlist screen: `Enter` plays the highlighted article now, `X` / `Delete` removes it, `C` clears the playlist, `P` / `Space` plays or pauses, and `Esc` closes the screen.
+- `Shift+P` opens the playlist screen: `Enter` plays the highlighted article now, `X` / `Delete` removes it, `C` clears the playlist, `P` / `Space` plays or pauses, `]` / `[` and `.` / `,` move between articles and passages, and `Esc` closes the screen.
 
 Speech is produced by the engine selected in the `tts` section of `newsr.yml`. The default `edge` engine uses free Microsoft Edge neural voices; `piper`, `silero`, and `system` work offline, and `openai` and `elevenlabs` use cloud or local speech APIs. `silero` has native Russian voices and reads English names, numbers, and acronyms inside Russian text as a Russian news presenter would; it needs the optional `silero` packages. Audio plays inside NewsR. See [Configuration](docs/configuration.md#tts) for engines, voices, and languages.
 

@@ -177,3 +177,73 @@ def test_runner_reports_engine_construction_errors() -> None:
     runner.join(5)
 
     assert host.events == [("failed", (None, "engine unavailable"))]
+
+
+def test_runner_seek_forward_moves_to_the_next_segment_and_past_the_end_finishes_the_item() -> None:
+    host = FakeHost([planned("a", "A intro", "A title", "A body"), planned("b", "B intro")])
+    engine = FakeTTSEngine()
+    output = FakeAudioOutput(auto_finish=False)
+    runner = make_runner(host, engine, output)
+
+    runner.start()
+    wait_until(lambda: output.played == ["A intro"])
+    assert runner.current_segment_index == 0
+
+    runner.seek_segment(1)
+    wait_until(lambda: output.played == ["A intro", "A title"])
+    assert runner.current_segment_index == 1
+
+    runner.seek_segment(1)
+    runner.seek_segment(1)
+    wait_until(lambda: output.played[-1:] == ["B intro"])
+    assert output.played == ["A intro", "A title", "B intro"]
+    assert ("finished", "a") in host.events
+    runner.stop()
+    runner.join(5)
+
+
+def test_runner_seek_back_restarts_a_long_played_segment_and_otherwise_goes_to_the_previous_one() -> None:
+    host = FakeHost([planned("a", "A intro", "A title", "A body")])
+    engine = FakeTTSEngine()
+    output = FakeAudioOutput(auto_finish=False)
+    runner = make_runner(host, engine, output)
+
+    runner.start()
+    wait_until(lambda: output.played == ["A intro"])
+    output.release(2)
+    wait_until(lambda: output.played == ["A intro", "A title", "A body"])
+
+    output.elapsed = 10.0
+    runner.seek_segment(-1)
+    wait_until(lambda: len(output.played) == 4)
+    assert output.played[-1] == "A body"
+
+    output.elapsed = 1.0
+    runner.seek_segment(-1)
+    wait_until(lambda: len(output.played) == 5)
+    assert output.played[-1] == "A title"
+
+    runner.seek_segment(-1)
+    runner.seek_segment(-1)
+    wait_until(lambda: len(output.played) == 6)
+    assert output.played[-1] == "A intro"
+    assert [text for text, _language in engine.calls] == ["A intro", "A title", "A body"]
+    assert ("finished", "a") not in host.events
+    runner.stop()
+    runner.join(5)
+
+
+def test_runner_ignores_seek_between_items() -> None:
+    host = FakeHost([planned("a", "A intro")])
+    output = FakeAudioOutput(auto_finish=False)
+    runner = make_runner(host, FakeTTSEngine(), output)
+
+    assert runner.current_segment_index is None
+    runner.seek_segment(1)
+    runner.start()
+    wait_until(lambda: output.played == ["A intro"])
+    output.release()
+    runner.join(5)
+
+    assert output.played == ["A intro"]
+    assert ("done", None) in host.events

@@ -237,6 +237,7 @@ def render_config(answers: BootstrapAnswers) -> str:
             "engine": DEFAULT_TTS_ENGINE,
             "speed": 1.0,
             "original_language": "en",
+            "media_controls": True,
         },
     }
     return yaml.safe_dump(raw_config, sort_keys=False, allow_unicode=True)

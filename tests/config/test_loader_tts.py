@@ -31,6 +31,7 @@ def test_load_config_uses_tts_defaults_when_section_is_missing(tmp_path: Path) -
     assert config.tts.speed == 1.0
     assert config.tts.original_language == "en"
     assert config.tts.request_retries == 2
+    assert config.tts.media_controls is True
     assert config.tts.openai.url == "https://api.openai.com/v1"
     assert config.tts.openai.model == "gpt-4o-mini-tts"
     assert config.tts.elevenlabs.model == "eleven_multilingual_v2"
@@ -132,3 +133,14 @@ tts:
 def test_load_config_rejects_invalid_tts_values(tmp_path: Path, tts_section: str, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         load_config(write_config(tmp_path, tts_section))
+
+
+def test_load_config_reads_tts_media_controls_switch(tmp_path: Path) -> None:
+    config = load_config(write_config(tmp_path, "\ntts:\n  media_controls: false\n"))
+
+    assert config.tts.media_controls is False
+
+
+def test_load_config_rejects_non_boolean_tts_media_controls(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="tts.media_controls must be true or false"):
+        load_config(write_config(tmp_path, "\ntts:\n  media_controls: sometimes\n"))

@@ -295,7 +295,9 @@ class ProviderHomeController:
             "toggle_playback",
             "show_playlist",
             "playlist_skip",
-            "playlist_restart",
+            "playlist_previous",
+            "playlist_seek_forward",
+            "playlist_seek_back",
         }
         hidden_in_provider_home = {
             "previous_article",

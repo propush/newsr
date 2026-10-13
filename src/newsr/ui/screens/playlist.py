@@ -102,7 +102,9 @@ class PlaylistScreen(ModalScreen[None]):
             Binding("x,delete,backspace", "remove_selected", self._ui.text("playlist.binding.remove")),
             Binding("c", "clear_playlist", self._ui.text("playlist.binding.clear")),
             Binding("right_square_bracket", "skip", show=False),
-            Binding("left_square_bracket", "restart", show=False),
+            Binding("left_square_bracket", "previous", show=False),
+            Binding("full_stop", "seek_forward", show=False),
+            Binding("comma", "seek_back", show=False),
         ]
 
     def compose(self) -> ComposeResult:
@@ -169,8 +171,14 @@ class PlaylistScreen(ModalScreen[None]):
     def action_skip(self) -> None:
         self.app.action_playlist_skip()
 
-    def action_restart(self) -> None:
-        self.app.action_playlist_restart()
+    def action_previous(self) -> None:
+        self.app.action_playlist_previous()
+
+    def action_seek_forward(self) -> None:
+        self.app.action_playlist_seek_forward()
+
+    def action_seek_back(self) -> None:
+        self.app.action_playlist_seek_back()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if not self._rows or event.cursor_row >= len(self._rows):

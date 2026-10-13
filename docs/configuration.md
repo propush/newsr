@@ -53,6 +53,7 @@ tts:
   engine: edge
   speed: 1.0
   original_language: en
+  media_controls: true
   # request_retries: 2
   # openai:
   #   url: https://api.openai.com/v1
@@ -137,6 +138,7 @@ Text-to-speech settings for the article playlist. The whole section is optional;
 - `speed`: speech speed multiplier from `0.5` to `2.0`. Loader default: `1.0`. ElevenLabs accepts `0.7` to `1.2`, and NewsR clamps the value to that range for it. Silero has five speed steps, and NewsR uses the nearest one: x-slow below `0.77`, slow below `0.92`, normal below `1.1`, fast below `1.35`, and x-fast from `1.35`.
 - `original_language`: language code assumed for Latin-script text in `original` reader mode. Loader default: `en`.
 - `request_retries`: number of retries after the first transient failure (network errors, HTTP 429 and 5xx) for the `openai` and `elevenlabs` engines. Must be zero or greater. Loader default: `2`.
+- `media_controls`: `true` or `false`. While the playlist plays or is paused, NewsR registers with the operating system as the current media player: it shows the article title and provider in the system Now Playing controls and follows media keys, Bluetooth headset buttons, and on-screen media controls. Play and pause toggle playback, next moves to the next article, previous restarts the current article or returns to the previous one while the article intro plays, and seek or skip commands move one passage forward or back. NewsR releases the media controls when the playlist stops, so other players get the keys again. macOS uses the Now Playing center (PyObjC `MediaPlayer`) and shows the session under the app that started NewsR, such as the terminal, because the Python interpreter has no app identity of its own; without that app, macOS still routes media keys to NewsR but leaves it out of the Now Playing panel. Linux uses MPRIS on the D-Bus session bus (`dbus-fast`), and Windows uses the System Media Transport Controls (`winrt`). `pip install -e .` installs only the package of the current platform. Without that package or a D-Bus session bus, playback works without system media controls and the reason goes to `cache/newsr-tts.log`. Loader default: `true`.
 - `openai.url`: base URL of the OpenAI-compatible API. Trailing `/` is stripped on load. Loader default: `https://api.openai.com/v1`.
 - `openai.model`: speech model name. Loader default: `gpt-4o-mini-tts`.
 - `openai.api_key`: optional bearer token.

@@ -41,7 +41,7 @@ from .controllers.clipboard import ClipboardController
 from .controllers.export import ExportController
 from .controllers.more_info import MoreInfoController
 from .controllers.navigation import NavigationController
-from .controllers.playlist import EngineFactory, OutputFactory, PlaylistController
+from .controllers.playlist import EngineFactory, MediaControlsFactory, OutputFactory, PlaylistController
 from .controllers.provider_home import ProviderHomeController
 from .controllers.refresh import RefreshController
 from .controllers.topic_watch import TopicWatchController
@@ -73,6 +73,7 @@ class NewsReaderApp(App[None]):
         *,
         audio_output_factory: OutputFactory | None = None,
         tts_engine_factory: EngineFactory | None = None,
+        media_controls_factory: MediaControlsFactory | None = None,
     ) -> None:
         super().__init__()
         self.ui = UILocalizer(config.ui.locale)
@@ -114,6 +115,8 @@ class NewsReaderApp(App[None]):
             playlist_options["output_factory"] = audio_output_factory
         if tts_engine_factory is not None:
             playlist_options["engine_factory"] = tts_engine_factory
+        if media_controls_factory is not None:
+            playlist_options["media_controls_factory"] = media_controls_factory
         self._playlist = PlaylistController(self, **playlist_options)
 
         self._provider_home.bootstrap()
@@ -361,8 +364,14 @@ class NewsReaderApp(App[None]):
     def action_playlist_skip(self) -> None:
         self._playlist.skip()
 
-    def action_playlist_restart(self) -> None:
-        self._playlist.restart_item()
+    def action_playlist_previous(self) -> None:
+        self._playlist.previous()
+
+    def action_playlist_seek_forward(self) -> None:
+        self._playlist.seek(1)
+
+    def action_playlist_seek_back(self) -> None:
+        self._playlist.seek(-1)
 
     def action_show_source_manager(self) -> None:
         self.push_screen(

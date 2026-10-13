@@ -36,6 +36,7 @@ class FakeAudioOutput:
         self.played: list[str] = []
         self.paused = False
         self.closed = False
+        self.elapsed = 0.0
         self._released = Semaphore(0)
         self._stopped = Event()
         self._lock = Lock()
@@ -43,6 +44,10 @@ class FakeAudioOutput:
     @property
     def is_paused(self) -> bool:
         return self.paused
+
+    @property
+    def elapsed_seconds(self) -> float:
+        return self.elapsed
 
     def play(self, audio: SynthesizedAudio, cancellation: RefreshCancellation | None = None) -> bool:
         with self._lock:

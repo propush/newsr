@@ -30,7 +30,9 @@ EN_MESSAGES: Final[dict[str, str]] = {
     "app.binding.play_pause": "Play/Pause",
     "app.binding.playlist": "Playlist",
     "app.binding.playlist_skip": "Next in Playlist",
-    "app.binding.playlist_restart": "Restart Article",
+    "app.binding.playlist_previous": "Previous Article",
+    "app.binding.playlist_seek_forward": "Forward One Passage",
+    "app.binding.playlist_seek_back": "Back One Passage",
     "clipboard.error": "Native clipboard unavailable: {error}. Terminal clipboard copy was also requested.",
     "app.empty.header": "No cached articles",
     "app.empty.body": "Press D to fetch articles.",
@@ -82,7 +84,8 @@ EN_MESSAGES: Final[dict[str, str]] = {
         "Shift+A: add this and following articles to playlist\n"
         "P: play/pause playlist\n"
         "Shift+P: show playlist\n"
-        "] / [: next playlist article / restart current article\n"
+        "] / [: next playlist article / restart current article, at its start the previous one\n"
+        ". / ,: playlist forward / back one passage\n"
         "Esc: back to providers\n"
         "C: sources\n"
         "W: watch topic\n"
@@ -104,7 +107,8 @@ EN_MESSAGES: Final[dict[str, str]] = {
         "D: force refresh all providers\n"
         "P: play/pause playlist\n"
         "Shift+P: show playlist\n"
-        "] / [: next playlist article / restart current article\n"
+        "] / [: next playlist article / restart current article, at its start the previous one\n"
+        ". / ,: playlist forward / back one passage\n"
         "Ctrl+P: command palette / choose theme\n"
         "H: help\n"
         "Q: quit"
@@ -266,7 +270,7 @@ EN_MESSAGES: Final[dict[str, str]] = {
     "playlist.state.paused": "paused",
     "playlist.state.stopped": "stopped",
     "playlist.empty": "The playlist is empty. Press A in the reader to add articles.",
-    "playlist.hint": "Up/Down: select   Enter: play now   X/Del: remove   C: clear   P/Space: play/pause   ]/[: next/restart   Esc: close",
+    "playlist.hint": "Up/Down: select   Enter: play now   X/Del: remove   C: clear   P/Space: play/pause   ]/[: next/previous   ./,: forward/back   Esc: close",
     "playlist.binding.close": "Close",
     "playlist.binding.play_pause": "Play/Pause",
     "playlist.binding.remove": "Remove",

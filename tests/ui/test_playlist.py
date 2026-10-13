@@ -197,7 +197,7 @@ def test_ui_playlist_enter_plays_selected_item_now(app_config, tmp_path) -> None
     asyncio.run(runner())
 
 
-def test_ui_playlist_skip_and_restart_keys(app_config, tmp_path) -> None:
+def test_ui_playlist_next_and_previous_keys(app_config, tmp_path) -> None:
     app, output, _engine = build_app(app_config, tmp_path, output=FakeAudioOutput(auto_finish=False))
     article_ids = seed_articles(app, 2)
 
@@ -216,6 +216,11 @@ def test_ui_playlist_skip_and_restart_keys(app_config, tmp_path) -> None:
             await wait_for(pilot, lambda: output.played[-1:] == ["BBC News. Article 2 of 2."])
             assert [item.article_id for item in app._playlist.items] == [article_ids[1]]
             assert app.current_article is not None
+            assert app.current_article.article_id == article_ids[1]
+
+            await pilot.press("left_square_bracket")
+            await wait_for(pilot, lambda: output.played[-1:] == ["BBC News. Article 1 of 2."])
+            assert [item.article_id for item in app._playlist.items] == article_ids
             assert app.current_article.article_id == article_ids[1]
             app._playlist.clear()
 

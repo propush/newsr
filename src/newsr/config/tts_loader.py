@@ -30,11 +30,13 @@ def load_tts(raw: object) -> TTSConfig:
     request_retries = _load_int(raw.get("request_retries", 2), "tts.request_retries")
     if request_retries < 0:
         raise ValueError("tts.request_retries must be non-negative")
+    media_controls = _load_bool(raw.get("media_controls", True), "tts.media_controls")
     config = TTSConfig(
         engine=engine,
         speed=speed,
         original_language=original_language,
         request_retries=request_retries,
+        media_controls=media_controls,
         openai=_load_openai(_mapping(raw.get("openai"), "tts.openai")),
         elevenlabs=_load_elevenlabs(_mapping(raw.get("elevenlabs"), "tts.elevenlabs")),
         edge=TTSEdgeConfig(voices=_load_voices(_mapping(raw.get("edge"), "tts.edge"), "tts.edge")),
@@ -121,6 +123,12 @@ def _load_int(value: Any, field_name: str) -> int:
         return int(value)
     except (TypeError, ValueError):
         raise ValueError(f"{field_name} must be an integer") from None
+
+
+def _load_bool(value: Any, field_name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    raise ValueError(f"{field_name} must be true or false")
 
 
 def _mapping(value: object, field_name: str) -> dict:

@@ -15,6 +15,7 @@ from newsr.config import (
     LLMConfig,
     ProviderSortConfig,
     TranslationConfig,
+    TTSConfig,
     UIConfig,
 )
 from newsr.domain import ArticleContent, ProviderRecord, ProviderTarget
@@ -57,6 +58,7 @@ def app_config() -> AppConfig:
             provider_sort=ProviderSortConfig(primary="unread", direction="desc"),
         ),
         export=ExportConfig(image=ExportImageConfig(quality="hd")),
+        tts=TTSConfig(media_controls=False),
     )
 
 
