@@ -19,6 +19,7 @@ RU_MESSAGES: Final[dict[str, str]] = {
     "app.binding.sources": "Источники",
     "app.binding.export": "Экспорт",
     "app.binding.open": "Открыть",
+    "app.binding.search_check": "Проверка DuckDuckGo",
     "app.binding.watch_topic": "Тема",
     "app.binding.download": "Обновить",
     "app.binding.brief": "Краткий обзор",
@@ -58,6 +59,10 @@ RU_MESSAGES: Final[dict[str, str]] = {
     "app.status.browser_open_failed": "не удалось открыть браузер: {error}",
     "app.status.browser_opened": "статья открыта в браузере",
     "app.status.browser_not_confirmed": "браузер не подтвердил запрос на открытие",
+    "search_check.title": "Проверка DuckDuckGo",
+    "search_check.notice": "DuckDuckGo просит пройти проверку в браузере. Нажмите Ctrl+O, чтобы открыть её в браузере, затем повторите поиск.",
+    "search_check.status.none": "нет ожидающей проверки DuckDuckGo",
+    "search_check.status.opened": "проверка DuckDuckGo открыта в браузере",
     "app.status.no_article_to_export": "нет статьи для экспорта",
     "app.status.checking_llm": "проверка доступности llm...",
     "app.status.exiting": "Выход...",
@@ -91,6 +96,7 @@ RU_MESSAGES: Final[dict[str, str]] = {
         "W: следить за темой\n"
         "E: экспорт текущего вида\n"
         "O: открыть статью в браузере\n"
+        "Ctrl+O: открыть ожидающую проверку DuckDuckGo в браузере\n"
         "D: принудительно обновить текущего провайдера\n"
         "Ctrl+P: палитра команд / выбор темы\n"
         "H: справка\n"
@@ -109,6 +115,7 @@ RU_MESSAGES: Final[dict[str, str]] = {
         "Shift+P: показать плейлист\n"
         "] / [: следующая статья плейлиста / текущая сначала, в её начале — предыдущая\n"
         ". / ,: плейлист на фрагмент вперёд / назад\n"
+        "Ctrl+O: открыть ожидающую проверку DuckDuckGo в браузере\n"
         "Ctrl+P: палитра команд / выбор темы\n"
         "H: справка\n"
         "Q: выход"

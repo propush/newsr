@@ -4,28 +4,16 @@ import asyncio
 from datetime import UTC, datetime
 from threading import Event
 
-from textual.widgets import LoadingIndicator, Markdown, Static
+from textual.widgets import LoadingIndicator, Static
 
 from newsr.cancellation import RefreshCancellation
 from newsr.domain import ArticleContent, ViewMode
 from newsr.providers.search import SearchResult
-from newsr.ui import MoreInfoScreen, NewsReaderApp
+from newsr.ui import NewsReaderApp
 
-from tests.ui.support.fakes import FakeSearchClient
+from tests.ui.support.fakes import FakeMoreInfoLLM, FakeSearchClient
 from tests.ui.support.reader import body_source
-
-
-def more_info_screen(app: NewsReaderApp) -> MoreInfoScreen | None:
-    for screen in reversed(app.screen_stack):
-        if isinstance(screen, MoreInfoScreen):
-            return screen
-    return None
-
-
-def more_info_body(app: NewsReaderApp) -> str:
-    screen = more_info_screen(app)
-    assert screen is not None
-    return screen.query_one("#more-info-body", Markdown).source
+from tests.ui.support.screens import more_info_body, more_info_screen
 
 
 def more_info_pane(app: NewsReaderApp):
@@ -38,37 +26,6 @@ def more_info_loading_indicator(app: NewsReaderApp) -> LoadingIndicator:
     screen = more_info_screen(app)
     assert screen is not None
     return screen.query_one("#more-info-loading", LoadingIndicator)
-
-
-class FakeMoreInfoLLM:
-    def __init__(self, *, query: str = "example query", responses: list[str] | None = None) -> None:
-        self.query = query
-        self.responses = responses or ["More info result"]
-        self.query_calls: list[tuple[str, str]] = []
-        self.synthesis_calls: list[tuple[str, str, list[SearchResult]]] = []
-
-    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
-        return None
-
-    def build_search_query(
-        self,
-        article_title: str,
-        article_text: str,
-        cancellation: RefreshCancellation | None = None,
-    ) -> str:
-        self.query_calls.append((article_title, article_text))
-        return self.query
-
-    def synthesize_more_info(
-        self,
-        article_title: str,
-        article_text: str,
-        search_results: list[SearchResult],
-        cancellation: RefreshCancellation | None = None,
-    ) -> str:
-        self.synthesis_calls.append((article_title, article_text, search_results))
-        index = min(len(self.synthesis_calls) - 1, len(self.responses) - 1)
-        return self.responses[index]
 
 
 class BlockingQueryLLM:

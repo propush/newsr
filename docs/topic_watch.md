@@ -27,7 +27,7 @@ Watched-topic providers appear in provider home alongside enabled HTTP providers
 
 Watched topics are fetched through the topic provider:
 
-1. Run a DuckDuckGo web search using the saved topic query.
+1. Run a DuckDuckGo web search using the saved topic query. Watched-topic searches share the app's DuckDuckGo request pacing. While DuckDuckGo search cools down after an anti-bot challenge, the refresh reports the watched topic as failed without sending a request; see [Architecture](architecture.md).
 2. Turn normalized result URLs into stable article ids of the form `web:<normalized_url>`.
 3. Download the linked page and extract readable article text.
 4. Filter articles whose parsed publication time is older than the `articles.store` retention window. Articles exactly on the cutoff and pages without a parseable publication time remain eligible.

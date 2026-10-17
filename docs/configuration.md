@@ -103,7 +103,7 @@ tts:
 - `model_summary`: required model used for summaries, brief reviews, watched-topic extraction, search-query generation, `More Info`, and article Q&A.
 - `api_key`: optional bearer token.
 - `headers`: optional mapping of additional HTTP headers. Keys and values must be non-empty strings.
-- `request_retries`: number of retries after the first transient transport failure for LLM requests and DuckDuckGo searches created by the app. HTTP error responses and DuckDuckGo challenge pages are not retried. Must be zero or greater. Loader default: `2`.
+- `request_retries`: number of retries after the first transient transport failure for LLM requests and DuckDuckGo searches created by the app. HTTP error responses are not retried. DuckDuckGo anti-bot challenge pages follow the search recovery described in [Architecture](architecture.md). Must be zero or greater. Loader default: `2`.
 - `brief_context`: maximum estimated token budget for each brief-generation LLM request, counting input plus requested output. Must be a positive integer. Loader default: `100000`.
 
 ### `translation`

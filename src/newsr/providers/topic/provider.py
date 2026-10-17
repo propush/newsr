@@ -49,6 +49,7 @@ class TopicWatchProvider:
             limit=limit * 2,
             cancellation=cancellation,
             log_request=False,
+            background=True,
         ):
             normalized_url = normalize_result_url(result.url)
             if not normalized_url or normalized_url in seen_urls:

@@ -36,7 +36,7 @@ def isolate_ui_tests_from_live_services(monkeypatch: pytest.MonkeyPatch) -> None
         return None
 
     def fail_search(
-        self: DuckDuckGoSearchClient, query, limit=5, cancellation=None
+        self: DuckDuckGoSearchClient, query, limit=5, cancellation=None, **kwargs
     ) -> list:  # type: ignore[no-untyped-def]
         raise AssertionError("UI tests must not call live DuckDuckGo search")
 

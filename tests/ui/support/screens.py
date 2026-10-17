@@ -9,6 +9,7 @@ from newsr.ui import (
     BriefScreen,
     ConfirmDialogScreen,
     ExportScreen,
+    MoreInfoScreen,
     NewsReaderApp,
     OpenLinkConfirmScreen,
 )
@@ -84,3 +85,16 @@ def export_screen(app: NewsReaderApp) -> ExportScreen | None:
         if isinstance(screen, ExportScreen):
             return screen
     return None
+
+
+def more_info_screen(app: NewsReaderApp) -> MoreInfoScreen | None:
+    for screen in reversed(app.screen_stack):
+        if isinstance(screen, MoreInfoScreen):
+            return screen
+    return None
+
+
+def more_info_body(app: NewsReaderApp) -> str:
+    screen = more_info_screen(app)
+    assert screen is not None
+    return screen.query_one("#more-info-body", Markdown).source

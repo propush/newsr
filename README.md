@@ -161,7 +161,7 @@ NewsR starts in a provider home view. This is the default home screen shown afte
 - `Up` / `Down` / `PgUp` / `PgDn` move through the list.
 - `Enter` opens the highlighted scope.
 - `B` opens brief review generation.
-- `C`, `W`, `D`, `P`, `Shift+P`, `]`, `[`, `H`, `Ctrl+P`, and `Q` stay available from this view.
+- `C`, `W`, `D`, `P`, `Shift+P`, `]`, `[`, `H`, `Ctrl+O`, `Ctrl+P`, and `Q` stay available from this view.
 
 ## Brief Review
 
@@ -209,6 +209,7 @@ Saving source changes updates SQLite-backed provider state immediately. The sche
 - `W`: create a watched topic from the current article
 - `E`: open export actions for the current view
 - `O`: open the current article in the system browser
+- `Ctrl+O`: open the pending DuckDuckGo browser check after DuckDuckGo blocked a search
 - `D`: force-refresh the current provider, or all real providers when the current scope is `[ALL]`
 - `Ctrl+P`: open the command palette and switch themes
 - `H`: show the in-app help screen
@@ -235,6 +236,7 @@ Speech is produced by the engine selected in the `tts` section of `newsr.yml`. T
 
 - `M` opens a "more info" overlay that uses DuckDuckGo search results plus the configured LLM to add context beyond the current article.
 - `?` opens an article Q&A overlay where you can ask follow-up questions. NewsR also shows related public source links that you can open from the overlay.
+- When DuckDuckGo answers a search with an anti-bot check, NewsR shows a warning notification and keeps working. Press `Ctrl+O` on any screen to open the check in the system browser, then repeat the search.
 - `L` opens quick navigation across translated articles.
 - `Shift+P` opens the playlist.
 - `C` opens the source manager for enabling providers and selecting targets.

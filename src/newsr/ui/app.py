@@ -44,6 +44,7 @@ from .controllers.navigation import NavigationController
 from .controllers.playlist import EngineFactory, MediaControlsFactory, OutputFactory, PlaylistController
 from .controllers.provider_home import ProviderHomeController
 from .controllers.refresh import RefreshController
+from .controllers.search_check import SearchCheckController
 from .controllers.topic_watch import TopicWatchController
 from .provider_home_table import ProviderHomeTable
 from .screens import (
@@ -92,7 +93,8 @@ class NewsReaderApp(App[None]):
         self.storage.initialize()
         self.builtin_providers = build_provider_registry()
         self.search_client = DuckDuckGoSearchClient(
-            request_retries=config.llm.request_retries
+            request_retries=config.llm.request_retries,
+            on_challenge=self._offer_search_check_from_thread,
         )
         self.llm_client = OpenAILLMClient(config)
         self.providers = dict(self.builtin_providers)
@@ -110,6 +112,7 @@ class NewsReaderApp(App[None]):
         self._navigation = NavigationController(self)
         self._export = ExportController(self)
         self._topic_watch = TopicWatchController(self)
+        self._search_check = SearchCheckController(self)
         playlist_options = {}
         if audio_output_factory is not None:
             playlist_options["output_factory"] = audio_output_factory
@@ -318,6 +321,16 @@ class NewsReaderApp(App[None]):
 
     def action_open_article(self) -> None:
         self._navigation.open_article()
+
+    def action_open_search_check(self) -> None:
+        self._search_check.open_pending()
+
+    def offer_search_check(self, url: str) -> None:
+        self._search_check.offer(url)
+
+    def _offer_search_check_from_thread(self, url: str) -> None:
+        if self.is_mounted:
+            self.call_from_thread(self.offer_search_check, url)
 
     def action_show_help(self) -> None:
         help_key = "help.body.provider_home" if self.provider_home_open else "help.body.reader"

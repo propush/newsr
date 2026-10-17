@@ -36,6 +36,7 @@ def build_app_bindings(
         ("c", "show_source_manager", ui.text("app.binding.sources")),
         ("e", "export_current", ui.text("app.binding.export")),
         ("o", "open_article", ui.text("app.binding.open")),
+        Binding("ctrl+o", "open_search_check", ui.text("app.binding.search_check"), show=False, priority=True),
         ("w", "watch_topic", ui.text("app.binding.watch_topic")),
         ("d", "download_articles", ui.text("app.binding.download")),
         ("h", "show_help", ui.text("app.binding.help")),

@@ -1,39 +1,50 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from pathlib import Path
 import logging
-from urllib.error import HTTPError, URLError
+import time
+from typing import Iterator
 
+from curl_cffi.requests.exceptions import ConnectionError as CurlConnectionError
 import pytest
 
 from newsr.cancellation import RefreshCancellation, RefreshCancelled
-from newsr.providers.search import DuckDuckGoSearchClient, parse_search_results
-from newsr.providers.search.duckduckgo import SearchUnavailableError
+from newsr.providers.search import (
+    DUCKDUCKGO_HTML_ROOT,
+    DUCKDUCKGO_LITE_ROOT,
+    DuckDuckGoSearchClient,
+    SearchChallengeError,
+    SearchCooldownError,
+    SearchResponse,
+    SearchThrottle,
+    SearchUnavailableError,
+    parse_search_results,
+)
+from tests.providers.search.fakes import (
+    CHALLENGE_HTML,
+    LITE_RESULTS_HTML,
+    RESULTS_HTML,
+    FakeSearchTransport,
+    instant_throttle,
+    make_client,
+)
 
 
-class FakeHTTPResponse:
-    def __init__(self, body: str, *, status: int = 200) -> None:
-        self.status = status
-        self._body = body.encode("utf-8")
+@contextmanager
+def captured_search_logs(caplog: pytest.LogCaptureFixture, level: int = logging.INFO) -> Iterator[None]:
+    logger = logging.getLogger("newsr.llm")
+    original_propagate = logger.propagate
+    logger.propagate = True
+    try:
+        with caplog.at_level(level, logger="newsr.llm"):
+            yield
+    finally:
+        logger.propagate = original_propagate
 
-    def __enter__(self) -> FakeHTTPResponse:
-        return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
-        return None
-
-    def read(self, size: int = -1) -> bytes:
-        if size < 0:
-            data = self._body
-            self._body = b""
-            return data
-        if not self._body:
-            return b""
-        data = self._body[:size]
-        self._body = self._body[size:]
-        return data
-
-    def close(self) -> None:
-        return None
+def log_text(caplog: pytest.LogCaptureFixture) -> str:
+    return "\n".join(record.message for record in caplog.records)
 
 
 def test_parse_search_results_extracts_title_url_and_snippet() -> None:
@@ -151,203 +162,310 @@ def test_parse_search_results_escapes_non_latin_characters_in_target_url() -> No
     ]
 
 
-def test_search_logs_request_metadata_without_logging_response_body(monkeypatch, caplog) -> None:
-    html = """
-    <html>
-      <body>
-        <div class="result">
-          <h2 class="result__title">
-            <a class="result__a" href="https://example.com/story">Example Story</a>
-          </h2>
-          <div class="result__snippet">Useful background context.</div>
-        </div>
-      </body>
-    </html>
-    """
 
-    monkeypatch.setattr(
-        "newsr.providers.search.duckduckgo.open_request",
-        lambda req, cancellation=None, timeout=30: FakeHTTPResponse(html, status=200),
-    )
-    logger = logging.getLogger("newsr.llm")
-    original_propagate = logger.propagate
-    logger.propagate = True
-    try:
-        with caplog.at_level(logging.INFO, logger="newsr.llm"):
-            results = DuckDuckGoSearchClient().search("example query")
-    finally:
-        logger.propagate = original_propagate
+def test_parse_search_results_reads_current_html_endpoint_markup() -> None:
+    html = Path("tests/fixtures/duckduckgo_html_results.html").read_text(encoding="utf-8")
+
+    results = parse_search_results(html)
+
+    assert [(result.title, result.url) for result in results] == [
+        ("Textual", "https://textual.textualize.io/"),
+        (
+            "GitHub - Textualize/textual: The lean application framework for Python ...",
+            "https://github.com/Textualize/textual",
+        ),
+        ("Python Textual: Build Beautiful UIs in the Terminal", "https://realpython.com/python-textual/"),
+    ]
+    assert results[0].snippet.startswith("Textual is a TUI framework for Python , inspired by")
+
+
+def test_search_posts_html_form_with_browser_navigation_headers() -> None:
+    transport = FakeSearchTransport(SearchResponse(status=200, text=RESULTS_HTML))
+
+    results = make_client(transport).search("example query")
+
+    assert [result.title for result in results] == ["Example Story"]
+    assert transport.posts == [
+        {
+            "url": DUCKDUCKGO_HTML_ROOT,
+            "form": {"q": "example query", "b": "", "kl": ""},
+            "headers": {
+                "Origin": "https://html.duckduckgo.com",
+                "Referer": "https://html.duckduckgo.com/",
+            },
+            "cancellation": None,
+            "timeout": 30,
+        }
+    ]
+    assert transport.resets == 0
+
+
+def test_search_logs_request_metadata_without_logging_response_body(caplog) -> None:
+    transport = FakeSearchTransport(SearchResponse(status=200, text=RESULTS_HTML))
+
+    with captured_search_logs(caplog):
+        results = make_client(transport).search("example query")
 
     assert len(results) == 1
     assert any(
         "network_request_done" in record.message
-        and "method=GET" in record.message
-        and "url=https://html.duckduckgo.com/html/?q=example+query" in record.message
+        and "method=POST" in record.message
+        and "url=https://html.duckduckgo.com/html/" in record.message
+        and "endpoint=html" in record.message
+        and "query=example+query" in record.message
         and "status=200" in record.message
         for record in caplog.records
     )
-    log_text = "\n".join(record.message for record in caplog.records)
-    assert "Example Story" not in log_text
-    assert "Useful background context." not in log_text
-    assert "<html>" not in log_text
+    text = log_text(caplog)
+    assert "Example Story" not in text
+    assert "Useful background context." not in text
+    assert "<html>" not in text
 
 
 @pytest.mark.parametrize("log_request", [True, False])
-def test_search_retries_transient_transport_failures(
-    monkeypatch, caplog, log_request: bool
-) -> None:
-    html = """
-    <div class="result">
-      <a class="result__a" href="https://example.com/story">Example Story</a>
-      <div class="result__snippet">Useful background context.</div>
-    </div>
-    """
-    attempts = 0
+def test_search_retries_transient_transport_failures(caplog, log_request: bool) -> None:
+    transport = FakeSearchTransport(
+        CurlConnectionError("temporary reset"),
+        SearchResponse(status=200, text=RESULTS_HTML),
+    )
 
-    def open_with_one_failure(req, cancellation=None, timeout=30):
-        nonlocal attempts
-        attempts += 1
-        if attempts == 1:
-            raise URLError(ConnectionResetError("temporary reset"))
-        return FakeHTTPResponse(html)
+    with captured_search_logs(caplog, logging.WARNING):
+        results = make_client(transport, request_retries=1).search(
+            "example query", log_request=log_request
+        )
 
-    monkeypatch.setattr("newsr.providers.search.duckduckgo.open_request", open_with_one_failure)
-    logger = logging.getLogger("newsr.llm")
-    original_propagate = logger.propagate
-    logger.propagate = True
-    try:
-        with caplog.at_level(logging.WARNING, logger="newsr.llm"):
-            results = DuckDuckGoSearchClient(request_retries=1).search(
-                "example query", log_request=log_request
-            )
-    finally:
-        logger.propagate = original_propagate
-
-    assert attempts == 2
+    assert len(transport.posts) == 2
     assert [result.title for result in results] == ["Example Story"]
     retry_records = [record for record in caplog.records if "network_request_retry" in record.message]
     assert bool(retry_records) is log_request
 
 
-def test_search_raises_after_transient_retry_budget_is_exhausted(monkeypatch) -> None:
-    attempts = 0
+def test_search_raises_after_transient_retry_budget_is_exhausted() -> None:
+    transport = FakeSearchTransport(
+        ConnectionResetError("persistent reset"),
+        ConnectionResetError("persistent reset"),
+    )
 
-    def fail(req, cancellation=None, timeout=30):
-        nonlocal attempts
-        attempts += 1
-        raise URLError(ConnectionResetError("persistent reset"))
+    with pytest.raises(ConnectionResetError, match="persistent reset"):
+        make_client(transport, request_retries=1).search("example query")
 
-    monkeypatch.setattr("newsr.providers.search.duckduckgo.open_request", fail)
-
-    with pytest.raises(URLError, match="persistent reset"):
-        DuckDuckGoSearchClient(request_retries=1).search("example query")
-
-    assert attempts == 2
+    assert len(transport.posts) == 2
 
 
-def test_search_cancellation_prevents_transport_retry(monkeypatch) -> None:
+def test_search_cancellation_prevents_transport_retry() -> None:
     cancellation = RefreshCancellation()
-    attempts = 0
 
-    def fail_and_cancel(req, cancellation=None, timeout=30):
-        nonlocal attempts
-        attempts += 1
-        assert cancellation is not None
+    def fail_and_cancel(active_cancellation: RefreshCancellation | None) -> SearchResponse:
+        assert active_cancellation is cancellation
         cancellation.cancel()
-        raise URLError(ConnectionResetError("temporary reset"))
+        raise ConnectionResetError("temporary reset")
 
-    monkeypatch.setattr("newsr.providers.search.duckduckgo.open_request", fail_and_cancel)
+    transport = FakeSearchTransport(fail_and_cancel, SearchResponse(status=200, text=RESULTS_HTML))
 
     with pytest.raises(RefreshCancelled):
-        DuckDuckGoSearchClient(request_retries=2).search(
-            "example query", cancellation=cancellation
-        )
+        make_client(transport, request_retries=2).search("example query", cancellation=cancellation)
 
-    assert attempts == 1
+    assert len(transport.posts) == 1
 
 
 def test_search_rejects_negative_retry_count() -> None:
     with pytest.raises(ValueError, match="request_retries"):
-        DuckDuckGoSearchClient(request_retries=-1)
+        DuckDuckGoSearchClient(request_retries=-1, transport=FakeSearchTransport())
 
 
-def test_search_raises_when_duckduckgo_returns_challenge_page(monkeypatch, caplog) -> None:
-    html = """
-    <html>
-      <body>
-        <form id="challenge-form">
-          <div class="anomaly-modal__title">Unfortunately, bots use DuckDuckGo too.</div>
-        </form>
-      </body>
-    </html>
-    """
-
-    monkeypatch.setattr(
-        "newsr.providers.search.duckduckgo.open_request",
-        lambda req, cancellation=None, timeout=30: FakeHTTPResponse(html, status=202),
+def test_search_reports_http_error_status_without_retry_or_body_logging(caplog) -> None:
+    transport = FakeSearchTransport(
+        SearchResponse(status=503, text="<html>service unavailable</html>"),
+        SearchResponse(status=200, text=RESULTS_HTML),
     )
-    logger = logging.getLogger("newsr.llm")
-    original_propagate = logger.propagate
-    logger.propagate = True
-    try:
-        with caplog.at_level(logging.INFO, logger="newsr.llm"):
-            with pytest.raises(SearchUnavailableError, match="anti-bot challenge"):
-                DuckDuckGoSearchClient().search("example query")
-    finally:
-        logger.propagate = original_propagate
 
+    with captured_search_logs(caplog, logging.WARNING):
+        with pytest.raises(SearchUnavailableError, match="HTTP 503"):
+            make_client(transport).search("error query")
+
+    assert len(transport.posts) == 1
+    assert any(
+        "network_request_failed" in record.message
+        and "method=POST" in record.message
+        and "query=error+query" in record.message
+        and "status=503" in record.message
+        for record in caplog.records
+    )
+    assert "<html>" not in log_text(caplog)
+
+
+def test_search_falls_back_to_lite_endpoint_with_fresh_session_after_challenge() -> None:
+    throttle = instant_throttle()
+    transport = FakeSearchTransport(
+        SearchResponse(status=202, text=CHALLENGE_HTML),
+        SearchResponse(status=200, text=LITE_RESULTS_HTML),
+    )
+    challenges: list[str] = []
+
+    results = make_client(transport, throttle=throttle, on_challenge=challenges.append).search(
+        "example query"
+    )
+
+    assert [(result.title, result.url, result.snippet) for result in results] == [
+        ("Lite Story", "https://example.com/lite", "Lite snippet.")
+    ]
+    assert transport.resets == 1
+    assert [post["url"] for post in transport.posts] == [DUCKDUCKGO_HTML_ROOT, DUCKDUCKGO_LITE_ROOT]
+    assert transport.posts[1]["form"] == {"q": "example query", "kl": ""}
+    assert transport.posts[1]["headers"] == {
+        "Origin": "https://lite.duckduckgo.com",
+        "Referer": "https://lite.duckduckgo.com/",
+    }
+    assert challenges == []
+    assert throttle.cooldown_remaining() == 0
+
+
+def test_search_paces_lite_fallback_request() -> None:
+    waits: list[float] = []
+    throttle = SearchThrottle(
+        min_interval=2.0,
+        jitter=0,
+        clock=lambda: 100.0,
+        wait=lambda delay, cancellation: waits.append(delay),
+    )
+    transport = FakeSearchTransport(
+        SearchResponse(status=202, text=CHALLENGE_HTML),
+        SearchResponse(status=200, text=LITE_RESULTS_HTML),
+    )
+
+    make_client(transport, throttle=throttle).search("example query")
+
+    assert waits == [2.0]
+
+
+def test_search_raises_challenge_error_and_starts_cooldown_when_both_endpoints_challenge(caplog) -> None:
+    throttle = instant_throttle()
+    transport = FakeSearchTransport(
+        SearchResponse(status=202, text=CHALLENGE_HTML),
+        SearchResponse(status=202, text=CHALLENGE_HTML),
+    )
+    challenges: list[str] = []
+
+    with captured_search_logs(caplog):
+        with pytest.raises(SearchChallengeError, match="anti-bot challenge") as exc_info:
+            make_client(transport, throttle=throttle, on_challenge=challenges.append).search(
+                "example query"
+            )
+
+    browser_url = "https://duckduckgo.com/?q=example+query"
+    assert exc_info.value.browser_url == browser_url
+    assert challenges == [browser_url]
+    assert throttle.cooldown_remaining() > 0
     assert any(
         "network_request_done" in record.message
-        and "url=https://html.duckduckgo.com/html/?q=example+query" in record.message
+        and "endpoint=html" in record.message
         and "status=202" in record.message
         for record in caplog.records
     )
 
 
-def test_search_raises_when_duckduckgo_returns_challenge_body_with_200(monkeypatch) -> None:
-    html = """
-    <html>
-      <body>
-        <div class="anomaly-modal__description">Please complete the following challenge.</div>
-      </body>
-    </html>
-    """
-
-    monkeypatch.setattr(
-        "newsr.providers.search.duckduckgo.open_request",
-        lambda req, cancellation=None, timeout=30: FakeHTTPResponse(html, status=200),
+def test_search_treats_challenge_body_with_200_as_challenge() -> None:
+    transport = FakeSearchTransport(
+        SearchResponse(status=200, text=CHALLENGE_HTML),
+        SearchResponse(status=200, text=CHALLENGE_HTML),
     )
 
-    with pytest.raises(SearchUnavailableError, match="HTTP 200"):
-        DuckDuckGoSearchClient().search("example query")
+    with pytest.raises(SearchChallengeError, match="HTTP 200"):
+        make_client(transport).search("example query")
 
 
-def test_search_logs_http_errors_without_logging_error_body(monkeypatch, caplog) -> None:
-    attempts = 0
+def test_search_logs_challenge_and_cooldown_when_request_logging_is_disabled(caplog) -> None:
+    transport = FakeSearchTransport(
+        SearchResponse(status=202, text=CHALLENGE_HTML),
+        SearchResponse(status=202, text=CHALLENGE_HTML),
+    )
 
-    def fail(req, cancellation=None, timeout=30):
-        nonlocal attempts
-        attempts += 1
-        raise HTTPError(req.full_url, 503, "service unavailable", hdrs=None, fp=None)
+    with captured_search_logs(caplog):
+        with pytest.raises(SearchChallengeError):
+            make_client(transport).search("example query", log_request=False)
 
-    monkeypatch.setattr("newsr.providers.search.duckduckgo.open_request", fail)
-    logger = logging.getLogger("newsr.llm")
-    original_propagate = logger.propagate
-    logger.propagate = True
-    try:
-        with caplog.at_level(logging.WARNING, logger="newsr.llm"):
-            with pytest.raises(HTTPError):
-                DuckDuckGoSearchClient().search("error query")
-    finally:
-        logger.propagate = original_propagate
+    text = log_text(caplog)
+    assert "search_challenge" in text
+    assert "endpoint=lite" in text
+    assert "search_cooldown_started" in text
+    assert "network_request_done" not in text
 
-    assert any(
-        "network_request_failed" in record.message
-        and "method=GET" in record.message
-        and "url=https://html.duckduckgo.com/html/?q=error+query" in record.message
-        and "status=503" in record.message
+
+def test_background_search_during_cooldown_skips_network_and_challenge_callback(caplog) -> None:
+    throttle = instant_throttle()
+    throttle.record_challenge()
+    transport = FakeSearchTransport()
+    challenges: list[str] = []
+
+    with captured_search_logs(caplog, logging.WARNING):
+        with pytest.raises(SearchCooldownError, match="retry in"):
+            make_client(transport, throttle=throttle, on_challenge=challenges.append).search(
+                "topic query", log_request=False, background=True
+            )
+
+    assert transport.posts == []
+    assert challenges == []
+    assert "search_cooldown_skip" in log_text(caplog)
+
+
+def test_interactive_search_during_cooldown_runs_and_success_clears_cooldown() -> None:
+    throttle = instant_throttle()
+    throttle.record_challenge()
+    transport = FakeSearchTransport(SearchResponse(status=200, text=RESULTS_HTML))
+
+    results = make_client(transport, throttle=throttle).search("example query")
+
+    assert [result.title for result in results] == ["Example Story"]
+    assert throttle.cooldown_remaining() == 0
+
+
+def test_interactive_search_during_cooldown_skips_lite_fallback_when_challenged() -> None:
+    throttle = instant_throttle()
+    throttle.record_challenge()
+    transport = FakeSearchTransport(SearchResponse(status=202, text=CHALLENGE_HTML))
+    challenges: list[str] = []
+
+    with pytest.raises(SearchChallengeError):
+        make_client(transport, throttle=throttle, on_challenge=challenges.append).search("example query")
+
+    assert [post["url"] for post in transport.posts] == [DUCKDUCKGO_HTML_ROOT]
+    assert transport.resets == 1
+    assert challenges == ["https://duckduckgo.com/?q=example+query"]
+
+
+def test_logged_request_duration_excludes_pacing_wait(caplog) -> None:
+    throttle = SearchThrottle(
+        min_interval=30.0,
+        jitter=0,
+        wait=lambda delay, cancellation: time.sleep(0.3),
+    )
+    transport = FakeSearchTransport(
+        SearchResponse(status=200, text=RESULTS_HTML),
+        SearchResponse(status=200, text=RESULTS_HTML),
+    )
+    client = make_client(transport, throttle=throttle)
+
+    with captured_search_logs(caplog):
+        client.search("first query")
+        client.search("second query")
+
+    durations = [
+        float(record.message.rsplit("duration_s=", 1)[1])
         for record in caplog.records
+        if "network_request_done" in record.message
+    ]
+    assert len(durations) == 2
+    assert all(duration < 0.3 for duration in durations)
+
+
+def test_challenge_callback_failure_does_not_hide_challenge_error() -> None:
+    transport = FakeSearchTransport(
+        SearchResponse(status=202, text=CHALLENGE_HTML),
+        SearchResponse(status=202, text=CHALLENGE_HTML),
     )
-    assert attempts == 1
-    log_text = "\n".join(record.message for record in caplog.records)
-    assert "<html>" not in log_text
+
+    def fail(url: str) -> None:
+        raise RuntimeError("app is closing")
+
+    with pytest.raises(SearchChallengeError):
+        make_client(transport, on_challenge=fail).search("example query")

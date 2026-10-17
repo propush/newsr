@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "beautifulsoup4>=4.13.0",
+  "curl_cffi>=0.16",
   "dbus-fast>=4.0; sys_platform == 'linux'",
   "edge-tts>=7.2",
   "miniaudio>=1.71",

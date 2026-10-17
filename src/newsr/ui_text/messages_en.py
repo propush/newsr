@@ -19,6 +19,7 @@ EN_MESSAGES: Final[dict[str, str]] = {
     "app.binding.sources": "Sources",
     "app.binding.export": "Export",
     "app.binding.open": "Open",
+    "app.binding.search_check": "Open DuckDuckGo Check",
     "app.binding.watch_topic": "Watch Topic",
     "app.binding.download": "Refresh",
     "app.binding.brief": "Brief Review",
@@ -58,6 +59,10 @@ EN_MESSAGES: Final[dict[str, str]] = {
     "app.status.browser_open_failed": "failed to open browser: {error}",
     "app.status.browser_opened": "opened article in browser",
     "app.status.browser_not_confirmed": "browser did not confirm open request",
+    "search_check.title": "DuckDuckGo check",
+    "search_check.notice": "DuckDuckGo asks for a browser check. Press Ctrl+O to open it in your browser, then retry the search.",
+    "search_check.status.none": "no pending DuckDuckGo check",
+    "search_check.status.opened": "opened DuckDuckGo check in browser",
     "app.status.no_article_to_export": "no article to export",
     "app.status.checking_llm": "checking llm responsiveness...",
     "app.status.exiting": "Exiting...",
@@ -91,6 +96,7 @@ EN_MESSAGES: Final[dict[str, str]] = {
         "W: watch topic\n"
         "E: export current view\n"
         "O: open article in browser\n"
+        "Ctrl+O: open pending DuckDuckGo browser check\n"
         "D: force refresh current provider\n"
         "Ctrl+P: command palette / choose theme\n"
         "H: help\n"
@@ -109,6 +115,7 @@ EN_MESSAGES: Final[dict[str, str]] = {
         "Shift+P: show playlist\n"
         "] / [: next playlist article / restart current article, at its start the previous one\n"
         ". / ,: playlist forward / back one passage\n"
+        "Ctrl+O: open pending DuckDuckGo browser check\n"
         "Ctrl+P: command palette / choose theme\n"
         "H: help\n"
         "Q: quit"

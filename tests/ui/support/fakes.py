@@ -18,6 +18,37 @@ class FakeSearchClient:
         return self.results[:limit]
 
 
+class FakeMoreInfoLLM:
+    def __init__(self, *, query: str = "example query", responses: list[str] | None = None) -> None:
+        self.query = query
+        self.responses = responses or ["More info result"]
+        self.query_calls: list[tuple[str, str]] = []
+        self.synthesis_calls: list[tuple[str, str, list[SearchResult]]] = []
+
+    def check_responsive(self, cancellation: RefreshCancellation | None = None) -> None:
+        return None
+
+    def build_search_query(
+        self,
+        article_title: str,
+        article_text: str,
+        cancellation: RefreshCancellation | None = None,
+    ) -> str:
+        self.query_calls.append((article_title, article_text))
+        return self.query
+
+    def synthesize_more_info(
+        self,
+        article_title: str,
+        article_text: str,
+        search_results: list[SearchResult],
+        cancellation: RefreshCancellation | None = None,
+    ) -> str:
+        self.synthesis_calls.append((article_title, article_text, search_results))
+        index = min(len(self.synthesis_calls) - 1, len(self.responses) - 1)
+        return self.responses[index]
+
+
 class FakeArticleQALLM:
     def __init__(self, *, query: str = "latest context", answers: list[str] | None = None) -> None:
         self.query = query
