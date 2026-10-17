@@ -236,16 +236,28 @@ def _clean_author(value: str | None) -> str | None:
 
 
 def _published_at(soup: BeautifulSoup) -> datetime | None:
-    published_raw = _meta_content(soup, "property", "article:published_time")
-    if published_raw:
-        return datetime.fromisoformat(published_raw.replace("Z", "+00:00"))
+    for attr, value in (
+        ("property", "article:published_time"),
+        ("name", "sailthru.date"),
+        ("name", "date"),
+    ):
+        published_raw = _meta_content(soup, attr, value)
+        if not published_raw:
+            continue
+        try:
+            return datetime.fromisoformat(published_raw.replace("Z", "+00:00"))
+        except ValueError:
+            continue
     time_node = soup.select_one("time[datetime]")
     if not isinstance(time_node, Tag):
         return None
     raw = str(time_node.get("datetime", "")).strip()
     if not raw:
         return None
-    return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def _canonical_url(soup: BeautifulSoup) -> str | None:

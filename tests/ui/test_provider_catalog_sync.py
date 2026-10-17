@@ -16,6 +16,8 @@ def test_startup_updates_catalogs_without_resetting_user_state(app_config, tmp_p
         ProviderRecord("ninetofivegoogle", "9to5Google", True, update_schedule="0 8 * * *"),
         ProviderRecord("bbc", "BBC News", False),
         ProviderRecord("edsurge", "EdSurge", False),
+        ProviderRecord("arstechnica", "Ars Technica", True),
+        ProviderRecord("infoq", "InfoQ", True),
     ])
     storage.replace_provider_targets("ninetofivegoogle", [
         ProviderTarget("ninetofivegoogle", "workspace", "category", "Workspace", {"path": "/guides/workspace/"}),
@@ -33,6 +35,15 @@ def test_startup_updates_catalogs_without_resetting_user_state(app_config, tmp_p
         ProviderTarget("edsurge", "higher-ed", "category", "Higher Ed", {"path": "/news/higher-ed"}),
     ])
     storage.set_selected_targets("edsurge", [])
+    storage.replace_provider_targets("arstechnica", [
+        ProviderTarget("arstechnica", "gadgets", "category", "Gadgets", {"path": "/gadgets/"}),
+        ProviderTarget("arstechnica", "tech-policy", "category", "Tech Policy", {"path": "/tech-policy/"}),
+    ])
+    storage.set_selected_targets("arstechnica", ["gadgets", "tech-policy"])
+    storage.replace_provider_targets("infoq", [
+        ProviderTarget("infoq", "case-study", "topic", "Case Studies", {"path": "/Case_Study/"}),
+    ])
+    storage.set_selected_targets("infoq", ["case-study"])
     topic = storage.create_topic_provider(display_name="A watched topic", topic_query="example", update_schedule=None)
     watched_targets = storage.list_provider_targets(topic.provider_id)
     storage.close()
@@ -48,6 +59,8 @@ def test_startup_updates_catalogs_without_resetting_user_state(app_config, tmp_p
                 assert google["workspace"].payload["path"] == "/guides/google-workspace/"
                 assert google["workspace"].selected is True
                 assert google["gemini"].selected is False
+                assert google["gmail"].selected is False
+                assert google["pixel-watch"].selected is False
                 assert "retired" not in google
                 bbc = {target.target_key: target for target in app.storage.list_provider_targets("bbc")}
                 assert bbc["custom-section"].discovered_at == discovered_at
@@ -59,6 +72,12 @@ def test_startup_updates_catalogs_without_resetting_user_state(app_config, tmp_p
                 assert "k12" not in edsurge
                 assert edsurge["higher-ed"].payload["path"] == "/coverage-areas/higher-education"
                 assert app.storage.list_selected_targets("edsurge") == []
+                ars = {target.target_key: target for target in app.storage.list_provider_targets("arstechnica")}
+                assert ars["gadgets"].label == "Tech"
+                assert ars["tech-policy"].label == "Policy"
+                assert {target.target_key for target in app.storage.list_selected_targets("arstechnica")} == {"gadgets", "tech-policy"}
+                infoq = app.storage.list_selected_targets("infoq")
+                assert [(target.target_key, target.payload["path"]) for target in infoq] == [("case-study", "/case_study/")]
                 assert app.storage.list_provider_targets(topic.provider_id) == watched_targets
                 assert app.storage.get_provider("ninetofivegoogle").enabled is True
                 assert app.storage.get_provider("ninetofivegoogle").update_schedule == "0 8 * * *"

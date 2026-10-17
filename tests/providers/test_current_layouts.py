@@ -14,7 +14,7 @@ from newsr.providers.ninetofivegoogle import parsing as google
 from newsr.providers.tomshardware import parsing as tomshardware
 
 
-def test_bbc_navigation_discovers_regions_and_top_level_sections() -> None:
+def test_bbc_navigation_discovers_sections_and_listing_ignores_global_promotions() -> None:
     html = Path("tests/fixtures/bbc_navigation_current.html").read_text()
     categories = bbc.parse_category_catalog_html(html)
 

@@ -42,4 +42,13 @@ BASE_TARGET_OPTIONS = [
     TargetOption("programming", "Programming", "/software/programming/news"),
     TargetOption("applications", "Applications", "/software/applications/news"),
     TargetOption("browsers", "Web Browsers", "/software/browsers/news"),
+    TargetOption("routers", "Routers", "/networking/routers/news"),
+    TargetOption("pc-building", "PC Building", "/desktops/pc-building/news"),
+    TargetOption("gaming-laptops", "Gaming Laptops", "/laptops/gaming-laptops/news"),
+    TargetOption("ultrabooks", "Ultrabooks", "/laptops/ultrabooks-ultraportables/news"),
+    TargetOption("gaming-pcs", "Gaming PCs", "/desktops/gaming-pcs/news"),
+    TargetOption("gaming-monitors", "Gaming Monitors", "/monitors/gaming-monitors/news"),
+    TargetOption("keyboards", "Keyboards", "/peripherals/keyboards/news"),
+    TargetOption("mice", "Mice", "/peripherals/mice/news"),
+    TargetOption("headphones", "Headphones", "/peripherals/headphones-headsets/news"),
 ]

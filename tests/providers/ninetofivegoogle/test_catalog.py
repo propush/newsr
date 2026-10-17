@@ -31,7 +31,7 @@ class TestBaseTargetOptions:
         assert len(BASE_TARGET_OPTIONS) > 0
 
     def test_base_target_options_count(self):
-        assert len(BASE_TARGET_OPTIONS) == 21
+        assert len(BASE_TARGET_OPTIONS) == 35
 
     def test_base_target_options_latest(self):
         latest = BASE_TARGET_OPTIONS[0]

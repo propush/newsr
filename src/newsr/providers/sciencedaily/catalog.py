@@ -23,5 +23,7 @@ BASE_TARGET_OPTIONS = [
     TargetOption("science_society", "Science & Society", "/news/science_society/"),
     TargetOption("business_industry", "Business & Industry", "/news/business_industry/"),
     TargetOption("education_learning", "Education & Learning", "/news/education_learning/"),
-    TargetOption("strange_offbeat", "Top News", "/news/strange_offbeat/"),
+    TargetOption("strange_offbeat", "Strange & Offbeat", "/news/strange_offbeat/"),
+    TargetOption("latest", "Latest", "/news/"),
+    TargetOption("top-science", "Top Science News", "/news/top/science/"),
 ]

@@ -13,10 +13,10 @@ class TargetOption:
 
 BASE_TARGET_OPTIONS = [
     TargetOption("latest", "Latest", "/", "feed"),
-    TargetOption("gadgets", "Gadgets", "/gadgets/", "category"),
+    TargetOption("gadgets", "Tech", "/gadgets/", "category"),
     TargetOption("science", "Science", "/science/", "category"),
     TargetOption("security", "Security", "/security/", "category"),
-    TargetOption("tech-policy", "Tech Policy", "/tech-policy/", "category"),
+    TargetOption("tech-policy", "Policy", "/tech-policy/", "category"),
     TargetOption("space", "Space", "/space/", "category"),
     TargetOption("ai", "AI", "/ai/", "category"),
     TargetOption("gaming", "Gaming", "/gaming/", "category"),

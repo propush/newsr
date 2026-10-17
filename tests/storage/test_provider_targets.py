@@ -50,3 +50,14 @@ def test_empty_catalog_removes_targets_and_their_selection_rows(storage) -> None
 
     assert storage.list_provider_targets("bbc") == []
     assert storage.list_selected_targets("bbc") == []
+
+
+def test_retiring_a_target_preserves_its_stored_articles(storage, article_content) -> None:
+    storage.upsert_article_source(article_content)
+    original = storage.get_article(article_content.article_id)
+    technology = next(target for target in storage.list_provider_targets("bbc") if target.target_key == "technology")
+
+    storage.replace_provider_targets("bbc", [technology])
+
+    assert [target.target_key for target in storage.list_selected_targets("bbc")] == ["technology"]
+    assert storage.get_article(article_content.article_id) == original

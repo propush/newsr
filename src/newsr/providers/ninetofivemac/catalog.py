@@ -40,4 +40,5 @@ BASE_TARGET_OPTIONS = [
     TargetOption("apple-one", "Apple One", "/guides/apple-one/"),
     TargetOption("apple-fitness", "Apple Fitness+", "/guides/apple-fitness/"),
     TargetOption("ai", "AI", "/guides/ai/"),
+    TargetOption("homepod", "HomePod", "/guides/homepod/"),
 ]

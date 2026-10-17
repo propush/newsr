@@ -7,14 +7,18 @@ from bs4 import BeautifulSoup
 
 from ...domain.articles import ArticleContent, SectionCandidate
 from .categories import CategoryOption
+from .metadata import article_metadata, author_names
 from .urls import article_id_from_url, category_slug_from_url, is_article_url, label_from_slug, normalize_url
 
 
 def parse_section_html(html: str, category: str) -> list[SectionCandidate]:
     soup = BeautifulSoup(html, "html.parser")
+    main = soup.select_one("main")
+    if main is None:
+        return []
     seen: set[str] = set()
     candidates: list[SectionCandidate] = []
-    for link in soup.select("a[href]"):
+    for link in main.select("a[href]"):
         href = str(link.get("href", "")).strip()
         if not href:
             continue
@@ -40,9 +44,13 @@ def parse_section_html(html: str, category: str) -> list[SectionCandidate]:
 def parse_article_html(html: str, candidate: SectionCandidate) -> ArticleContent:
     soup = BeautifulSoup(html, "html.parser")
     title = _first_text(soup, ["h1", 'meta[property="og:title"]'])
-    author = _meta_content(soup, "name", "byl")
-    published_raw = _meta_content(soup, "property", "article:published_time")
-    published_at = datetime.fromisoformat(published_raw.replace("Z", "+00:00")) if published_raw else None
+    metadata = article_metadata(soup)
+    author = (
+        _meta_content(soup, "name", "byl")
+        or author_names(metadata)
+        or _meta_content(soup, "name", "cXenseParse:author")
+    )
+    published_at = _published_at(soup, metadata)
     body = _extract_body(soup)
     return ArticleContent(
         article_id=candidate.article_id,
@@ -55,6 +63,20 @@ def parse_article_html(html: str, candidate: SectionCandidate) -> ArticleContent
         published_at=published_at,
         body=body,
     )
+
+
+def _published_at(soup: BeautifulSoup, metadata: dict[str, object]) -> datetime | None:
+    for value in (
+        _meta_content(soup, "property", "article:published_time"),
+        metadata.get("datePublished"),
+    ):
+        if not isinstance(value, str) or not value.strip():
+            continue
+        try:
+            return datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            continue
+    return None
 
 
 def parse_category_catalog_html(html: str) -> list[CategoryOption]:

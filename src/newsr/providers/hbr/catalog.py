@@ -17,7 +17,7 @@ BASE_TARGET_OPTIONS = [
     TargetOption("managing-people", "Managing People", "/topic/subject/managing-people"),
     TargetOption("managing-yourself", "Managing Yourself", "/topic/subject/managing-yourself"),
     TargetOption("gender", "Gender", "/topic/subject/gender"),
-    TargetOption("work-life-balance", "Work-life Balance", "/topic/subject/work-life-balance"),
+    TargetOption("work-life-balance", "Work-life Balance", "/topic/subject/work_life-balance"),
     TargetOption(
         "technology-and-analytics",
         "Technology and Analytics",
