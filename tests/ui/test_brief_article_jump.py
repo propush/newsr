@@ -13,7 +13,7 @@ from newsr.ui import BriefArticleJumpScreen, NewsReaderApp
 from tests.ui.support.app_state import disable_startup_refresh, seed_provider_article
 from tests.ui.support.fakes import FakeBriefLLM, FakeExportService
 from tests.ui.support.provider_home import provider_home_row_index, provider_home_rows
-from tests.ui.support.reader import body_source, header_text
+from tests.ui.support.reader import article_pane, body_source, header_text
 from tests.ui.support.screens import (
     brief_reader_body,
     brief_reader_pane,
@@ -413,5 +413,130 @@ def test_ui_brief_reader_restores_scroll_after_article_jump(app_config, tmp_path
                     break
             else:
                 raise AssertionError("brief reader scroll offset was not restored")
+
+    asyncio.run(runner())
+
+
+async def _open_brief_reader(pilot, app: NewsReaderApp) -> None:  # type: ignore[no-untyped-def]
+    await pilot.press("b")
+    await pilot.pause()
+    screen = brief_screen(app)
+    assert screen is not None
+    screen.period = BriefPeriod.ALL_UNREAD
+    screen.mark_read = False
+    app.generate_brief()
+    for _ in range(20):
+        await pilot.pause()
+        if brief_reader_screen(app) is not None:
+            return
+    raise AssertionError("brief reader was not opened")
+
+
+async def _open_brief_article(pilot, app: NewsReaderApp, number: int) -> None:  # type: ignore[no-untyped-def]
+    await pilot.press(str(number))
+    await pilot.pause()
+    await pilot.press("enter")
+    await pilot.pause()
+    assert brief_reader_screen(app) is None
+    assert app._brief.article_open is True
+
+
+async def _scroll_article_pane_to_end(pilot, app: NewsReaderApp) -> int:  # type: ignore[no-untyped-def]
+    pane = article_pane(app)
+    for _ in range(30):
+        await pilot.pause()
+        pane.scroll_end(animate=False)
+        await pilot.pause()
+        if pane.scroll_y > 0:
+            return int(pane.scroll_y)
+    raise AssertionError("article pane did not scroll")
+
+
+async def _assert_article_pane_at_top(pilot, app: NewsReaderApp) -> None:  # type: ignore[no-untyped-def]
+    for _ in range(5):
+        await pilot.pause()
+        assert article_pane(app).scroll_y == 0
+        assert app.active_reader_state.scroll_offset == 0
+
+
+@pytest.mark.provider_home
+def test_ui_brief_article_jump_opens_each_article_at_top(app_config, tmp_path) -> None:
+    long_body = "\n\n".join(f"Paragraph {index}" for index in range(120))
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.llm_client = FakeBriefLLM("# Brief\n\nFirst report item [1]\n\nSecond report item [2]")  # type: ignore[assignment]
+    for minute in (1, 2):
+        seed_provider_article(
+            app,
+            provider_id="bbc",
+            provider_article_id=f"brief-jump-top-{minute}",
+            title=f"Brief jump top {minute}",
+            body=long_body,
+            minute=minute,
+        )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await _open_brief_reader(pilot, app)
+
+            await _open_brief_article(pilot, app, 1)
+            assert "Article # 1 of 2" in header_text(app)
+            assert await _scroll_article_pane_to_end(pilot, app) > 0
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert brief_reader_screen(app) is not None
+
+            await _open_brief_article(pilot, app, 2)
+            assert "Article # 2 of 2" in header_text(app)
+            await _assert_article_pane_at_top(pilot, app)
+            assert await _scroll_article_pane_to_end(pilot, app) > 0
+
+            await pilot.press("escape")
+            await pilot.pause()
+            await _open_brief_article(pilot, app, 1)
+            assert "Article # 1 of 2" in header_text(app)
+            await _assert_article_pane_at_top(pilot, app)
+
+    asyncio.run(runner())
+
+
+@pytest.mark.provider_home
+def test_ui_brief_article_scroll_is_not_saved_to_provider_state(app_config, tmp_path) -> None:
+    app = NewsReaderApp(app_config, tmp_path / "newsr.sqlite3")
+    disable_startup_refresh(app)
+    app.llm_client = FakeBriefLLM("# Brief\n\nReport item [1]")  # type: ignore[assignment]
+    seed_provider_article(
+        app,
+        provider_id="bbc",
+        provider_article_id="brief-scroll-not-saved",
+        title="Brief scroll not saved",
+        body="\n\n".join(f"Paragraph {index}" for index in range(120)),
+        minute=1,
+    )
+
+    async def runner() -> None:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await _open_brief_reader(pilot, app)
+            await _open_brief_article(pilot, app, 1)
+            assert await _scroll_article_pane_to_end(pilot, app) > 0
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert brief_reader_screen(app) is not None
+            assert article_pane(app).scroll_y == 0
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert brief_reader_screen(app) is None
+            assert app.provider_home_open is True
+
+            app.open_scope("[ALL]")
+            await pilot.pause()
+            assert app.storage.load_reader_state("[ALL]").scroll_offset == 0
+            assert app.storage.load_reader_state("bbc").scroll_offset == 0
+            assert app.reader_state.scroll_offset == 0
 
     asyncio.run(runner())

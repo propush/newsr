@@ -4,6 +4,7 @@ from threading import Thread
 from typing import TYPE_CHECKING
 
 from textual.app import ScreenStackError
+from textual.css.query import NoMatches
 
 from ...brief import BriefArticle, BriefOptions, BriefProgress, BriefResult, BriefService
 from ...cancellation import RefreshCancellation, RefreshCancelled
@@ -147,6 +148,7 @@ class BriefController:
             view_mode=provider_state.view_mode,
             scroll_offset=0,
         )
+        self._reset_article_scroll()
         self._app._set_provider_home_footer_bindings(provider_home_open=False)
         self._app._provider_home._notify_bindings_changed()
         self._app._navigation.invalidate_render_cache()
@@ -292,9 +294,17 @@ class BriefController:
             pass
 
     def _close_article_view(self) -> None:
+        if self._active_article is not None:
+            self._reset_article_scroll()
         self._active_article = None
         self._active_article_number = None
         self._active_reader_state = None
+
+    def _reset_article_scroll(self) -> None:
+        try:
+            self._app._navigation.reset_scroll()
+        except (NoMatches, ScreenStackError):
+            pass
 
     def _brief_article_by_number(self, number: int) -> BriefArticle | None:
         for article in self._articles:
