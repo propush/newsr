@@ -99,7 +99,9 @@ class OpenAILLMClient:
             f"Summarize the article '{article_title}' in {self.target_language}. "
             f"Current local date and time: {current_datetime_prompt_value()}. "
             "Return a concise, readable summary with the main facts only. "
-            "Use short paragraphs and occasional bullet points only when helpful."
+            "Use short paragraphs and occasional bullet points only when helpful. "
+            "Write numbers, units, and formulas as plain text, never as LaTeX or other math markup "
+            "such as $...$, ^, _, or \\frac; write powers in words, for example 'ten to the 20th power'."
         )
         return self._chat(self.summary_model, prompt, translated_text, cancellation)
 

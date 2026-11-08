@@ -225,6 +225,7 @@ class RefreshController:
         self._app.load_articles(auto_select_first=auto_select_first)
         if self._app.provider_home_open:
             self._app._provider_home.refresh_rows()
+        self._app._playlist.article_updated(article_id)
         if auto_select_first and self._app.articles:
             self._auto_select_first_ready_article = False
 

@@ -1,4 +1,4 @@
-"""Cached English-to-Cyrillic transliteration: RUNorm first, the LLM for words RUNorm can only spell."""
+"""Cached English-to-Cyrillic transliteration: RUNorm first, then, ahead of synthesis, the LLM for words RUNorm can only spell."""
 
 from __future__ import annotations
 
@@ -10,9 +10,12 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from threading import Lock
 
+from ...cancellation import RefreshCancellation, RefreshCancelled
+
 LOGGER = logging.getLogger("newsr.tts")
 RUNORM_MODEL = "RUNorm/RUNorm-kirillizator"
 CACHE_FILE_NAME = "transliterations.json"
+LLM_BATCH_TERMS = 40
 
 # Letter names RUNorm produces when it spells a word instead of transliterating it.
 _SPELLED_LETTERS = frozenset({
@@ -21,7 +24,7 @@ _SPELLED_LETTERS = frozenset({
 })
 
 Kirillize = Callable[[str], str]
-LLMTransliterate = Callable[[list[str]], Mapping[str, str]]
+LLMTransliterate = Callable[[list[str], RefreshCancellation | None], Mapping[str, str]]
 
 
 def looks_spelled(output: str) -> bool:
@@ -71,6 +74,12 @@ def load_runorm(cache_dir: Path) -> Kirillize:
 
 
 class TermTransliterator:
+    """Transliterates English terms for Russian speech.
+
+    Calling the transliterator uses the cache and RUNorm only, so speech synthesis never waits for the LLM.
+    `prepare` also asks the LLM for terms RUNorm can only spell; the playlist runs it when articles are queued.
+    """
+
     def __init__(
         self,
         models_dir: Path,
@@ -85,62 +94,109 @@ class TermTransliterator:
         self._runorm: Kirillize | None = None
         self._runorm_failed = False
         self._cache: dict[str, str] | None = None
-        # Terms neither model could transliterate; they are spelled for the rest of the session.
+        # Terms RUNorm could only spell; `prepare` still sends them to the LLM.
+        self._spelled: set[str] = set()
+        # Terms the LLM could not transliterate either; they are spelled for the rest of the session.
         self._unresolved: set[str] = set()
+        # Guards the cache, the term sets, and the cache file; held only briefly.
         self._lock = Lock()
+        # Guards RUNorm loading and inference; never held together with `_lock`.
+        self._model_lock = Lock()
 
     def __call__(self, terms: list[str]) -> dict[str, str]:
+        self._runorm_pass(self._untried(terms))
+        return self._cached(terms)
+
+    def prepare(self, terms: list[str], cancellation: RefreshCancellation | None = None) -> dict[str, str]:
+        self._runorm_pass(self._untried(terms), cancellation)
+        llm = self._llm
+        if llm is not None:
+            with self._lock:
+                spelled = [term for term in dict.fromkeys(terms) if term in self._spelled]
+            for start in range(0, len(spelled), LLM_BATCH_TERMS):
+                self._ask_llm(llm, spelled[start:start + LLM_BATCH_TERMS], cancellation)
+        return self._cached(terms)
+
+    def _untried(self, terms: list[str]) -> list[str]:
         with self._lock:
             cache = self._load_cache()
-            missing = [term for term in terms if term not in cache and term not in self._unresolved]
-            if missing:
-                found = self._transliterate(missing)
-                self._unresolved.update(term for term in missing if term not in found)
-                if found:
-                    cache.update(found)
-                    self._save_cache(cache)
+            return [
+                term
+                for term in dict.fromkeys(terms)
+                if term not in cache and term not in self._spelled and term not in self._unresolved
+            ]
+
+    def _cached(self, terms: list[str]) -> dict[str, str]:
+        with self._lock:
+            cache = self._load_cache()
             return {term: cache[term] for term in terms if term in cache}
 
-    def _transliterate(self, terms: list[str]) -> dict[str, str]:
-        result: dict[str, str] = {}
+    def _runorm_pass(self, terms: list[str], cancellation: RefreshCancellation | None = None) -> None:
+        found: dict[str, str] = {}
         spelled: list[str] = []
-        kirillize = self._kirillize()
         for term in terms:
-            output = kirillize(term) if kirillize else ""
-            if not looks_spelled(output):
-                result[term] = output
-                continue
-            words = term.split()
-            if kirillize and len(words) > 1:
-                outputs = [kirillize(word) for word in words]
-                if not any(looks_spelled(word_output) for word_output in outputs):
-                    result[term] = " ".join(outputs)
-                    continue
-            spelled.append(term)
-        if spelled and self._llm is not None:
-            result.update(self._ask_llm(spelled))
-        return result
+            if cancellation is not None:
+                cancellation.raise_if_cancelled()
+            output = self._runorm_transliteration(term)
+            if output is None:
+                spelled.append(term)
+            else:
+                found[term] = output
+        if not found and not spelled:
+            return
+        with self._lock:
+            self._spelled.update(spelled)
+            if found:
+                cache = self._load_cache()
+                cache.update(found)
+                self._save_cache(cache)
 
-    def _kirillize(self) -> Kirillize | None:
-        if self._runorm is None and not self._runorm_failed:
-            try:
-                self._runorm = self._runorm_loader(self._models_dir / "runorm")
-            except Exception as exc:
-                self._runorm_failed = True
-                LOGGER.warning("transliteration_model_failed error_type=%s error=%s", type(exc).__name__, exc)
-        return self._runorm
+    def _runorm_transliteration(self, term: str) -> str | None:
+        output = self._kirillize(term)
+        if output is None:
+            return None
+        if not looks_spelled(output):
+            return output
+        words = term.split()
+        if len(words) > 1:
+            outputs = [self._kirillize(word) or "" for word in words]
+            if not any(looks_spelled(word_output) for word_output in outputs):
+                return " ".join(outputs)
+        return None
 
-    def _ask_llm(self, terms: list[str]) -> dict[str, str]:
+    def _kirillize(self, text: str) -> str | None:
+        with self._model_lock:
+            if self._runorm is None and not self._runorm_failed:
+                try:
+                    self._runorm = self._runorm_loader(self._models_dir / "runorm")
+                except Exception as exc:
+                    self._runorm_failed = True
+                    LOGGER.warning("transliteration_model_failed error_type=%s error=%s", type(exc).__name__, exc)
+            if self._runorm is None:
+                return None
+            return self._runorm(text)
+
+    def _ask_llm(self, llm: LLMTransliterate, terms: list[str], cancellation: RefreshCancellation | None) -> None:
         try:
-            answer = self._llm(terms)
+            answer = llm(terms, cancellation)
+        except RefreshCancelled:
+            raise
         except Exception as exc:
+            # Nothing is marked, so the next preparation asks again.
             LOGGER.warning("transliteration_llm_failed terms=%s error_type=%s error=%s", len(terms), type(exc).__name__, exc)
-            return {}
-        return {
+            return
+        found = {
             term: str(answer[term]).strip().lower()
             for term in terms
             if answer.get(term) and not looks_spelled(str(answer[term]))
         }
+        with self._lock:
+            self._spelled.difference_update(terms)
+            self._unresolved.update(term for term in terms if term not in found)
+            if found:
+                cache = self._load_cache()
+                cache.update(found)
+                self._save_cache(cache)
 
     def _load_cache(self) -> dict[str, str]:
         if self._cache is None:

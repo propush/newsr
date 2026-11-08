@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from threading import Lock
+from dataclasses import replace
+from threading import Event, Lock
 from time import sleep
 
 from newsr.domain import ViewMode
@@ -247,3 +248,63 @@ def test_runner_ignores_seek_between_items() -> None:
 
     assert output.played == ["A intro"]
     assert ("done", None) in host.events
+
+
+def test_runner_waits_for_preparation_before_speaking_an_item() -> None:
+    prepared = Event()
+    host = FakeHost([replace(planned("a", "A intro", "A body"), prepared=prepared)])
+    engine = FakeTTSEngine()
+    output = FakeAudioOutput()
+    runner = make_runner(host, engine, output)
+
+    runner.start()
+    wait_until(lambda: ("buffering", True) in host.events)
+    assert engine.calls == []
+
+    prepared.set()
+    runner.join(5)
+    assert output.played == ["A intro", "A body"]
+    assert host.events.index(("buffering", False)) < host.events.index(("finished", "a"))
+
+
+def test_runner_skip_and_stop_end_the_wait_for_preparation() -> None:
+    host = FakeHost([replace(planned("a", "A intro"), prepared=Event()), planned("b", "B intro")])
+    engine = FakeTTSEngine()
+    output = FakeAudioOutput(auto_finish=False)
+    runner = make_runner(host, engine, output)
+
+    runner.start()
+    wait_until(lambda: ("buffering", True) in host.events)
+    runner.skip()
+    wait_until(lambda: output.played == ["B intro"])
+    assert ("finished", "a") in host.events
+    assert [text for text, _language in engine.calls] == ["B intro"]
+    runner.stop()
+    runner.join(5)
+
+    waiting = FakeHost([replace(planned("c", "C intro"), prepared=Event())])
+    stopped = make_runner(waiting, engine, FakeAudioOutput())
+    stopped.start()
+    wait_until(lambda: ("buffering", True) in waiting.events)
+    stopped.stop()
+    stopped.join(5)
+    assert ("finished", "c") not in waiting.events
+    assert ("done", None) not in waiting.events
+
+
+def test_runner_does_not_prefetch_an_unprepared_next_item() -> None:
+    prepared = Event()
+    host = FakeHost([planned("a", "A intro"), replace(planned("b", "B intro", "B body"), prepared=prepared)])
+    engine = FakeTTSEngine()
+    output = FakeAudioOutput(auto_finish=False)
+    runner = make_runner(host, engine, output)
+
+    runner.start()
+    wait_until(lambda: output.played == ["A intro"])
+    assert [text for text, _language in engine.calls] == ["A intro"]
+
+    prepared.set()
+    output.release()
+    wait_until(lambda: output.played == ["A intro", "B intro"])
+    runner.stop()
+    runner.join(5)

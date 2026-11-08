@@ -5,11 +5,11 @@ import io
 import re
 import warnings
 import wave
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol
 from xml.sax.saxutils import escape
 
 from ...cancellation import RefreshCancellation, RefreshCancelled, cancellable_read
@@ -17,6 +17,9 @@ from ...config.models import TTSSileroConfig
 from ...tts.text import split_chunks
 from ..transport import build_request, newsr_headers, open_request
 from .base import LOGGER, SynthesizedAudio, TTSEngineError, configure_tts_logger
+
+if TYPE_CHECKING:
+    from ...tts.normalize import RussianSpeechNormalizer
 
 SAMPLE_RATE = 48000
 DOWNLOAD_TIMEOUT_SECONDS = 600
@@ -30,6 +33,7 @@ RATE_STEPS = ((0.77, "x-slow"), (0.92, "slow"), (1.1, None), (1.35, "fast"), (fl
 _CYRILLIC = re.compile(r"[А-Яа-яЁё]")
 _LATIN = re.compile(r"[A-Za-z]")
 _LETTER = re.compile(r"[^\W\d_]")
+_BLANKS = re.compile(r"[ \t]+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,13 +51,30 @@ MODELS = {
 Fetcher = Callable[[str, RefreshCancellation | None], bytes]
 ModelLoader = Callable[[Path], Any]
 Normalizer = Callable[[str], str]
-LLMTransliterate = Callable[[list[str]], Mapping[str, str]]
+LLMTransliterate = Callable[[list[str], RefreshCancellation | None], Mapping[str, str]]
+
+
+class Transliterator(Protocol):
+    def __call__(self, terms: list[str]) -> Mapping[str, str]:
+        ...
+
+    def prepare(self, terms: list[str], cancellation: RefreshCancellation | None = None) -> Mapping[str, str]:
+        ...
+
+
+TransliteratorFactory = Callable[[Path, LLMTransliterate | None], Transliterator]
 
 
 def _fetch(url: str, cancellation: RefreshCancellation | None) -> bytes:
     request = build_request(url, headers=newsr_headers())
     with open_request(request, cancellation, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
         return cancellable_read(response, cancellation)
+
+
+def _term_transliterator(models_dir: Path, llm: LLMTransliterate | None) -> Transliterator:
+    from ...tts.normalize import TermTransliterator
+
+    return TermTransliterator(models_dir, llm=llm)
 
 
 def _load_package(path: Path) -> Any:
@@ -89,6 +110,7 @@ class SileroTTSEngine:
         model_loader: ModelLoader = _load_package,
         normalizers: Mapping[str, Normalizer] | None = None,
         dependency_check: Callable[[], None] = check_dependencies,
+        transliterator_factory: TransliteratorFactory = _term_transliterator,
     ) -> None:
         self._config = config
         self._models_dir = Path(config.models_dir)
@@ -99,8 +121,15 @@ class SileroTTSEngine:
         self._normalizers: dict[str, Normalizer] = dict(normalizers or {})
         self._dependency_check = dependency_check
         self._dependencies_checked = False
+        self._transliterator_factory = transliterator_factory
         self._models: dict[str, Any] = {}
+        # Held for the whole synthesis; `prepare` never takes it, so preparation runs beside playback.
         self._lock = Lock()
+        # Guards the shared Russian normalizer and transliterator; synthesis takes it only inside `_lock`.
+        self._normalizer_lock = Lock()
+        self._russian: RussianSpeechNormalizer | None = None
+        self._transliterator: Transliterator | None = None
+        self._prepare_ready: bool | None = None
 
     def synthesize(
         self,
@@ -117,7 +146,7 @@ class SileroTTSEngine:
                 self._dependencies_checked = True
             model = self._model(language, cancellation)
             voice = self.voice_for(language, model)
-            prepared = self._normalizer(language)(text)
+            prepared = _speakable(self._normalizer(language)(text), getattr(model, "symbols", None))
             LOGGER.info(
                 "synthesis_start engine=silero voice=%s text_chars=%s prepared_chars=%s",
                 voice,
@@ -126,6 +155,45 @@ class SileroTTSEngine:
             )
             samples = self._render(model, voice, prepared, cancellation)
         return SynthesizedAudio(data=_wav_bytes(samples), format="wav")
+
+    def prepare(
+        self,
+        texts: Sequence[tuple[str, str | None]],
+        cancellation: RefreshCancellation | None = None,
+    ) -> None:
+        """Transliterate the English names of Russian texts ahead of time, asking the LLM where RUNorm cannot."""
+        configure_tts_logger()
+        russian = [text for text, language in texts if self._prepared_language(text, language) == "ru"]
+        if not russian or not self._can_prepare():
+            return
+        normalizer, transliterator = self._russian_normalizer()
+        terms: list[str] = []
+        for text in russian:
+            if cancellation is not None:
+                cancellation.raise_if_cancelled()
+            terms.extend(normalizer.terms(text))
+        unique = list(dict.fromkeys(terms))
+        if not unique:
+            return
+        LOGGER.info("prepare_start engine=silero texts=%s terms=%s", len(russian), len(unique))
+        transliterator.prepare(unique, cancellation)
+
+    def _prepared_language(self, text: str, language: str | None) -> str | None:
+        try:
+            return self.language_for(text, language)
+        except TTSEngineError:
+            return None
+
+    def _can_prepare(self) -> bool:
+        with self._normalizer_lock:
+            if self._prepare_ready is None:
+                try:
+                    self._dependency_check()
+                    self._prepare_ready = True
+                except TTSEngineError as exc:
+                    LOGGER.warning("prepare_skipped engine=silero error=%s", exc)
+                    self._prepare_ready = False
+            return self._prepare_ready
 
     @staticmethod
     def language_for(text: str, language: str | None) -> str:
@@ -164,17 +232,29 @@ class SileroTTSEngine:
         normalizer = self._normalizers.get(language)
         if normalizer is not None:
             return normalizer
-        try:
-            from ...tts.normalize import RussianSpeechNormalizer, TermTransliterator, normalize_english
-        except ImportError as exc:
-            raise TTSEngineError(INSTALL_HINT) from exc
         if language == "ru":
-            transliterator = TermTransliterator(self._models_dir, llm=self._llm_transliterate)
-            normalizer = RussianSpeechNormalizer(transliterator, self._config.lexicon).normalize
+            normalizer = self._russian_normalizer()[0].normalize
         else:
+            try:
+                from ...tts.normalize import normalize_english
+            except ImportError as exc:
+                raise TTSEngineError(INSTALL_HINT) from exc
             normalizer = normalize_english
         self._normalizers[language] = normalizer
         return normalizer
+
+    def _russian_normalizer(self) -> tuple[RussianSpeechNormalizer, Transliterator]:
+        with self._normalizer_lock:
+            if self._russian is None or self._transliterator is None:
+                try:
+                    from ...tts.normalize import RussianSpeechNormalizer
+
+                    transliterator = self._transliterator_factory(self._models_dir, self._llm_transliterate)
+                except ImportError as exc:
+                    raise TTSEngineError(INSTALL_HINT) from exc
+                self._russian = RussianSpeechNormalizer(transliterator, self._config.lexicon)
+                self._transliterator = transliterator
+            return self._russian, self._transliterator
 
     def _render(self, model: Any, voice: str, text: str, cancellation: RefreshCancellation | None) -> list[Any]:
         import numpy as np
@@ -221,6 +301,19 @@ class SileroTTSEngine:
         partial_path.write_bytes(data)
         partial_path.replace(path)
         LOGGER.info("download_done engine=silero path=%s bytes=%s", path, len(data))
+
+
+def _speakable(text: str, symbols: str | None) -> str:
+    """Replace characters the model has no symbol for: Silero fails on them when they touch a word."""
+    if not symbols:
+        return text
+    known = set(symbols)
+    unknown = {char for char in text if char != "\n" and char.lower() not in known}
+    if not unknown:
+        return text
+    LOGGER.info("synthesis_dropped_symbols engine=silero symbols=%r", "".join(sorted(unknown)))
+    cleaned = "".join(" " if char in unknown else char for char in text)
+    return "\n".join(_BLANKS.sub(" ", line).strip() for line in cleaned.split("\n"))
 
 
 def _wav_bytes(pieces: list[Any]) -> bytes:

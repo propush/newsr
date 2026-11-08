@@ -30,3 +30,20 @@ def test_user_lexicon_overrides_latin_and_cyrillic_words() -> None:
 
 def test_normalizer_drops_brackets_and_quotes() -> None:
     assert make_normalizer().normalize("Галерея [фото] «новинки»") == "Галерея фото новинки"
+
+
+def test_terms_lists_what_normalize_transliterates() -> None:
+    calls: list[list[str]] = []
+
+    def transliterate(terms: list[str]) -> dict[str, str]:
+        calls.append(terms)
+        return {}
+
+    normalizer = RussianSpeechNormalizer(transliterate, {"Etched": "+этчед"})
+    text = "Etched, Nvidia и «Jane Street» договорились с Cerebras (т. е. Cerebras Systems)."
+
+    terms = normalizer.terms(text)
+    normalizer.normalize(text)
+
+    assert terms == ["Cerebras", "Cerebras Systems", "Jane Street"]
+    assert calls == [terms]

@@ -57,14 +57,21 @@ class RussianSpeechNormalizer:
             for term, spoken in sorted(cyrillic.items(), key=lambda item: len(item[0]), reverse=True)
         ]
 
+    def terms(self, text: str) -> list[str]:
+        """The English terms `normalize` asks the transliterator for."""
+        return self._latin.runs(self._before_latin(text))
+
     def normalize(self, text: str) -> str:
+        text = self._latin.rewrite(self._before_latin(text))
+        text = russian_numbers_to_words(text)
+        text = _CYRILLIC_ACRONYM.sub(_spell_cyrillic, text)
+        text = text.replace("—", "–")
+        return re.sub(r"[ \t]+", " ", text).strip()
+
+    def _before_latin(self, text: str) -> str:
         text = _DROPPED.sub("", text)
         for short, full in RUSSIAN_ABBREVIATIONS.items():
             text = text.replace(short, full)
         for pattern, spoken in self._cyrillic:
             text = pattern.sub(spoken, text)
-        text = self._latin.rewrite(text)
-        text = russian_numbers_to_words(text)
-        text = _CYRILLIC_ACRONYM.sub(_spell_cyrillic, text)
-        text = text.replace("—", "–")
-        return re.sub(r"[ \t]+", " ", text).strip()
+        return text

@@ -178,6 +178,7 @@ class NewsReaderApp(App[None]):
         self.load_articles()
         self.call_after_refresh(self.refresh_view)
         self.call_after_refresh(self.show_provider_home)
+        self.call_after_refresh(self._playlist.prepare_queued)
         self.call_after_refresh(self._refresh.run_due_refresh_if_idle)
         self.set_interval(60, self._refresh.run_due_refresh_if_idle, pause=False)
 

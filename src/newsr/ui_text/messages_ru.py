@@ -294,6 +294,7 @@ RU_MESSAGES: Final[dict[str, str]] = {
     "playlist.status.buffering": "… {title} · {provider} · в очереди {count}",
     "playlist.status.starting": "… запуск плейлиста, в очереди {count}",
     "playlist.status.queued": "■ плейлист: в очереди {count}",
+    "playlist.status.preparing": ", подготовка {count}",
     "playlist.status.error": "⚠ TTS: {error}",
     "playlist.speech.intro": "{provider}. Статья {current} из {total}.",
     "quick_nav.binding.close": "Закрыть",

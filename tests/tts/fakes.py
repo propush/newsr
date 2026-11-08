@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from threading import Event, Lock, Semaphore
 
 from newsr.cancellation import RefreshCancellation
@@ -26,6 +27,43 @@ class FakeTTSEngine:
         if self.fail_on is not None and self.fail_on in text:
             raise TTSEngineError(f"cannot speak {self.fail_on}")
         return SynthesizedAudio(data=text.encode("utf-8"), format="wav")
+
+
+class FakePreparingTTSEngine(FakeTTSEngine):
+    """Records `prepare` calls; while `gate` is clear, each preparation waits for it."""
+
+    def __init__(
+        self,
+        *,
+        max_chars: int = 1000,
+        blocked: bool = False,
+        prepare_error: Exception | None = None,
+    ) -> None:
+        super().__init__(max_chars=max_chars)
+        self.prepared: list[tuple[tuple[str, str | None], ...]] = []
+        self.prepare_error = prepare_error
+        self.preparing = Event()
+        self.gate = Event()
+        if not blocked:
+            self.gate.set()
+
+    def prepare(
+        self,
+        texts: Sequence[tuple[str, str | None]],
+        cancellation: RefreshCancellation | None = None,
+    ) -> None:
+        with self._lock:
+            self.prepared.append(tuple(texts))
+        self.preparing.set()
+        while not self.gate.wait(0.01):
+            if cancellation is not None:
+                cancellation.raise_if_cancelled()
+        if self.prepare_error is not None:
+            raise self.prepare_error
+
+    def prepared_texts(self) -> list[str]:
+        with self._lock:
+            return [text for texts in self.prepared for text, _language in texts]
 
 
 class FakeAudioOutput:

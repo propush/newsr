@@ -56,3 +56,15 @@ def test_rewriter_drops_articles_and_leaves_numbers_before_months_and_units() ->
     text, _transliterator = rewrite("По данным The Information, Blackwell Ultra 28 сентября и Pixel 9 16 ГБ.")
 
     assert text == "По данным <Information>, <Blackwell Ultra> 28 сентября и <Pixel> девять 16 ГБ."
+
+
+def test_runs_lists_the_terms_rewrite_transliterates() -> None:
+    text = "Илон Маск (Elon Musk) показал The Galaxy Ultra и Android 17 Beta, а Jane Street и Elon Musk молчат."
+    transliterator = RecordingTransliterator()
+    rewriter = LatinRewriter(PRONUNCIATIONS, transliterator)
+
+    runs = rewriter.runs(text)
+    rewriter.rewrite(text)
+
+    assert runs == ["Elon Musk", "Galaxy Ultra", "Jane Street"]
+    assert transliterator.calls == [runs]

@@ -75,6 +75,7 @@ def test_llm_client_summary_prompt_includes_current_datetime(monkeypatch) -> Non
     assert payload["model"] == "summary"
     assert "Summarize the article 'Headline' in Russian." in system_prompt
     assert "Current local date and time: 2026-06-26 15:04:05 CEST." in system_prompt
+    assert "never as LaTeX or other math markup" in system_prompt
     assert payload["messages"][1]["content"] == "Translated article"
 
 

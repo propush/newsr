@@ -167,18 +167,18 @@ Voice selection per language:
 
 ### Silero Engine
 
-Silero voices read letters only: digits, symbols, and, for the Russian voices, Latin letters are skipped. NewsR therefore rewrites every text before the Silero engine speaks it.
+Silero voices read letters only: digits, symbols, and, for the Russian voices, Latin letters are skipped. NewsR therefore rewrites every text before the Silero engine speaks it. Characters that remain after the rewrite and that the voice model has no symbol for, such as `^` or `{`, are replaced with spaces, and the replaced characters are noted in `cache/newsr-tts.log`.
 
 Russian text:
 
 - Numbers, years, dates, times, ordinals, units (`млн`, `млрд`, `%`, `ГБ`, `Гбит/с`, `мАч`, and others), and currency amounts are written as Russian words in the grammatical case required by the surrounding words: `до 40%` becomes `до сорока процентов`, `28 сентября 2026 г.` becomes `двадцать восьмого сентября две тысячи двадцать шестого года`.
-- English names and brands are written in Cyrillic. NewsR looks them up in `silero.lexicon`, then in a built-in list of frequent tech names with stress marks, then transliterates them with the RUNorm model. Names that RUNorm can only spell letter by letter go to the configured LLM (`llm.model_translation`). Transliterations are cached in `transliterations.json` inside `silero.models_dir`, so each name sounds the same every time; edit or delete entries there to change them.
+- English names and brands are written in Cyrillic. NewsR looks them up in `silero.lexicon`, then in a built-in list of frequent tech names with stress marks, then transliterates them with the RUNorm model. Names that RUNorm can only spell letter by letter go to the configured LLM (`llm.model_translation`), in batches of up to 40 names. NewsR does this work in the background when articles are added to the playlist, when it starts with a restored playlist, and when a queued article gets its summary, so playback itself sends no LLM requests. When playback reaches an article whose preparation is still running, it waits until the preparation finishes. Names that neither RUNorm nor the LLM could transliterate are spelled letter by letter. Transliterations are cached in `transliterations.json` inside `silero.models_dir`, so each name sounds the same every time; edit or delete entries there to change them.
 - Version numbers inside names are read with `точка` (`Beta 6.1` becomes `бета шесть точка один`).
 - Latin and Cyrillic acronyms are spelled letter by letter and stressed on the last letter (`TSMC` becomes `ти-эс-эм-си`, `ФРС` becomes `эф-эр-эс`). Acronyms read as words, such as `NASA` and `НАТО`, are kept as words.
 
 English text: numbers, years, currency amounts, percentages, and units are written as English words, and acronyms are spelled with English letter names (`TSMC` becomes `tee-ess-em-see`).
 
-Without the optional dependencies, playback stops with an error that names the install command and the missing packages, and nothing is downloaded. Downloads happen on first use and go to `silero.models_dir`: the Russian model `v5_ru` (145 MB) from `models.silero.ai`, the English model `v3_en` (57 MB) when English text is spoken, and the RUNorm model (17 MB) from Hugging Face when an English name needs transliteration. The optional Python dependencies take about 210 MB to download and about 1 GB on disk on macOS, mostly PyTorch. On Linux, install the CPU-only PyTorch build first (`pip install torch --index-url https://download.pytorch.org/whl/cpu`), because the default Linux build also pulls in GPU libraries.
+Without the optional dependencies, playback stops with an error that names the install command and the missing packages, playlist preparation is skipped with a note in `cache/newsr-tts.log`, and nothing is downloaded. Downloads happen on first use and go to `silero.models_dir`: the Russian model `v5_ru` (145 MB) from `models.silero.ai`, the English model `v3_en` (57 MB) when English text is spoken, and the RUNorm model (17 MB) from Hugging Face when an English name first needs transliteration, usually when articles are first added to the playlist. The optional Python dependencies take about 210 MB to download and about 1 GB on disk on macOS, mostly PyTorch. On Linux, install the CPU-only PyTorch build first (`pip install torch --index-url https://download.pytorch.org/whl/cpu`), because the default Linux build also pulls in GPU libraries.
 
 ## Scheduling Notes
 
@@ -191,7 +191,7 @@ Without the optional dependencies, playback stops with an error that names the i
 
 - `newsr.yml`: global app configuration.
 - `cache/newsr.sqlite3`: providers, targets, topic watches, article content, translations, summaries, cached `more_info`, reader state, options, the article playlist, and refresh bookkeeping.
-- `cache/newsr-tts.log`: text-to-speech log with engine, voice, request size, retry, download, and error metadata. Spoken text is not logged.
+- `cache/newsr-tts.log`: text-to-speech log with engine, voice, request size, retry, download, playlist preparation, and error metadata. Spoken text is not logged.
 - `cache/piper/`: downloaded Piper voices and the Piper voice index, when `tts.piper.models_dir` keeps its default.
 - `cache/silero/`: downloaded Silero models, the RUNorm transliteration model, and `transliterations.json`, when `tts.silero.models_dir` keeps its default.
 - `cache/tts/`: temporary files used while the `system` engine synthesizes speech.

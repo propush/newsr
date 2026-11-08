@@ -294,6 +294,7 @@ EN_MESSAGES: Final[dict[str, str]] = {
     "playlist.status.buffering": "… {title} · {provider} · {count} queued",
     "playlist.status.starting": "… starting playlist, {count} queued",
     "playlist.status.queued": "■ playlist: {count} queued",
+    "playlist.status.preparing": ", preparing {count}",
     "playlist.status.error": "⚠ TTS: {error}",
     "playlist.speech.intro": "{provider}. Article {current} of {total}.",
     "quick_nav.binding.close": "Close",

@@ -236,3 +236,26 @@ def test_silero_engine_wraps_synthesis_errors(tmp_path: Path) -> None:
 
     with pytest.raises(TTSEngineError, match="silero synthesis failed: bad symbol"):
         engine.synthesize("Привет.", "ru")
+
+
+def test_silero_engine_drops_symbols_the_model_cannot_speak(tmp_path: Path) -> None:
+    models: list[FakeModel] = []
+
+    def load(path: Path) -> FakeModel:
+        model = FakeModel(path, ["xenia"])
+        model.symbols = "_~|!+,-.:;?абвгдежзийклмнопрстуфхцчшщъыьэюяё–… "  # type: ignore[attr-defined]
+        models.append(model)
+        return model
+
+    engine = SileroTTSEngine(
+        TTSSileroConfig(models_dir=str(tmp_path / "silero")),
+        speed=1.0,
+        fetch=FakeFetcher(),
+        model_loader=load,
+        normalizers={"ru": lambda text: text},
+        dependency_check=lambda: None,
+    )
+
+    engine.synthesize("Более 10^{20}$ Вт/см².\n\nВторой абзац.", "ru")
+
+    assert [call["text"] for call in models[0].calls] == ["Более Вт см .", "Второй абзац."]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import Event, Lock, Thread
 from typing import Any, Protocol
 
@@ -24,6 +24,8 @@ class PlannedItem:
     scope_id: str
     mode: ViewMode
     segments: tuple[SpeechSegment, ...]
+    # Set when the engine has prepared the article's text; playback waits for it before speaking.
+    prepared: Event | None = field(default=None, compare=False)
 
 
 class PlaybackHost(Protocol):
@@ -144,6 +146,8 @@ class PlaybackRunner:
         self._restart.clear()
         self._take_seek()
         self._retain({(segment.text, segment.language) for segment in item.segments})
+        if not self._await_prepared(item):
+            return self._interruption()
         index = 0
         try:
             while index < len(item.segments):
@@ -178,7 +182,7 @@ class PlaybackRunner:
         missing = _PREFETCH_SEGMENTS - len(ahead)
         if missing > 0:
             upcoming = self._dispatch(self._host.peek_next_item, self, item.article_id)
-            if upcoming is not None:
+            if upcoming is not None and _is_prepared(upcoming):
                 ahead.extend(upcoming.segments[:missing])
         for segment in ahead:
             self._future_for(segment, engine, executor)
@@ -199,6 +203,23 @@ class PlaybackRunner:
     def _await(self, future: Future[SynthesizedAudio]) -> SynthesizedAudio | None:
         if future.done():
             return future.result()
+        return self._buffering(lambda: future.result(timeout=_POLL_SECONDS))
+
+    def _await_prepared(self, item: PlannedItem) -> bool:
+        """Wait until the item's text is prepared; False when skip, restart, or seek interrupts the wait."""
+        prepared = item.prepared
+        if prepared is None or prepared.is_set():
+            return True
+
+        def poll() -> bool:
+            if prepared.wait(_POLL_SECONDS):
+                return True
+            raise FutureTimeoutError
+
+        return bool(self._buffering(poll)) and not self._interrupted()
+
+    def _buffering(self, poll: Callable[[], Any]) -> Any:
+        """Report buffering while `poll` times out; None when an interruption ends the wait."""
         self._dispatch(self._host.buffering_changed, self, True)
         try:
             while True:
@@ -206,7 +227,7 @@ class PlaybackRunner:
                 if self._interrupted():
                     return None
                 try:
-                    return future.result(timeout=_POLL_SECONDS)
+                    return poll()
                 except FutureTimeoutError:
                     continue
         finally:
@@ -238,3 +259,7 @@ class PlaybackRunner:
             self._dispatch(callback, *args)
         except Exception:
             return
+
+
+def _is_prepared(item: PlannedItem) -> bool:
+    return item.prepared is None or item.prepared.is_set()

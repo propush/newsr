@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 from textual.app import ScreenStackError
 from textual.timer import Timer
 
-from ...domain import ArticleRecord, PlaylistItem, ReaderState, ViewMode
+from ...domain import ArticleRecord, PlaylistItem, ViewMode
 from ...providers.tts import TTSEngine, build_tts_engine
-from ...providers.tts.base import LOGGER, configure_tts_logger
+from ...providers.tts.base import LOGGER, PreparingTTSEngine, configure_tts_logger
 from ...tts import (
     AudioOutput,
     MediaCommand,
@@ -20,14 +20,14 @@ from ...tts import (
     PlannedItem,
     PlaybackRunner,
     PlaybackStatus,
-    body_language,
-    build_item_script,
+    SpeechPreparer,
     build_media_controls,
 )
 from ...tts.media_controls.base import ALBUM_TITLE
 from ..screens import ConfirmDialogScreen
 from ..screens.playlist import PlaylistRow, PlaylistScreen
-from .article_rendering import article_text, article_title, provider_display_names, truncate_cells
+from .article_rendering import provider_display_names, truncate_cells
+from .playlist_script import article_segments, preparation_texts
 
 if TYPE_CHECKING:
     from ...config.models import TTSConfig
@@ -59,6 +59,7 @@ class PlaylistController:
         self._output: AudioOutput | None = None
         self._engine: TTSEngine | None = None
         self._engine_lock = Lock()
+        self._preparer: SpeechPreparer | None = None
         self._current: PlannedItem | None = None
         self._current_title = ""
         self._current_provider = ""
@@ -86,8 +87,24 @@ class PlaylistController:
     def is_playing(self) -> bool:
         return self._runner is not None and not self._paused
 
+    @property
+    def preparing_count(self) -> int:
+        return self._preparer.pending_count if self._preparer is not None else 0
+
     def load(self) -> None:
         self._items = self._app.storage.load_playlist()
+
+    # ------------------------------------------------------------------
+    # Speech preparation
+    # ------------------------------------------------------------------
+
+    def prepare_queued(self) -> None:
+        """Prepare a restored playlist; articles whose preparation finished earlier cost almost nothing."""
+        self._prepare(self._items)
+
+    def article_updated(self, article_id: str) -> None:
+        """Prepare a queued article again after the refresh changed its text, such as a new summary."""
+        self._prepare([item for item in self._items if item.article_id == article_id])
 
     # ------------------------------------------------------------------
     # Queue editing
@@ -208,6 +225,10 @@ class PlaylistController:
 
     def cancel(self) -> None:
         self._stop_runner()
+        preparer = self._preparer
+        self._preparer = None
+        if preparer is not None:
+            preparer.stop()
         output = self._output
         self._output = None
         if output is not None:
@@ -266,25 +287,29 @@ class PlaylistController:
         ui = self._app.ui
         if self._error is not None:
             text = ui.text("playlist.status.error", error=self._error)
-        elif self._runner is not None and self._current is not None:
-            if self._paused:
-                key = "playlist.status.paused"
-            elif self._buffering:
-                key = "playlist.status.buffering"
-            else:
-                key = "playlist.status.playing"
-            text = ui.text(
-                key,
-                title=self._current_title,
-                provider=self._current_provider,
-                count=len(self._items),
-            )
-        elif self._runner is not None:
-            text = ui.text("playlist.status.starting", count=len(self._items))
-        elif self._items:
-            text = ui.text("playlist.status.queued", count=len(self._items))
         else:
-            return ""
+            if self._runner is not None and self._current is not None:
+                if self._paused:
+                    key = "playlist.status.paused"
+                elif self._buffering:
+                    key = "playlist.status.buffering"
+                else:
+                    key = "playlist.status.playing"
+                text = ui.text(
+                    key,
+                    title=self._current_title,
+                    provider=self._current_provider,
+                    count=len(self._items),
+                )
+            elif self._runner is not None:
+                text = ui.text("playlist.status.starting", count=len(self._items))
+            elif self._items:
+                text = ui.text("playlist.status.queued", count=len(self._items))
+            else:
+                return ""
+            preparing = self.preparing_count
+            if preparing:
+                text += ui.text("playlist.status.preparing", count=preparing)
         return truncate_cells(text, max(1, max_cells))
 
     # ------------------------------------------------------------------
@@ -370,6 +395,7 @@ class PlaylistController:
         ]
         self._items.extend(added)
         self._save()
+        self._prepare(added)
         self._set_app_status(self._app.ui.text("playlist.status.added", added=len(added), total=len(self._items)))
         self._refresh()
 
@@ -413,6 +439,52 @@ class PlaylistController:
                 else:
                     self._engine = self._engine_factory(self._app.config.tts)
             return self._engine
+
+    def _prepare(self, items: list[PlaylistItem]) -> None:
+        if not items:
+            return
+        engine = self._engine_instance()
+        if not isinstance(engine, PreparingTTSEngine):
+            return
+        preparer = self._preparer
+        if preparer is None:
+            preparer = self._preparer = SpeechPreparer(engine, on_change=self._preparation_changed)
+        provider_names = provider_display_names(self._app.storage)
+        scopes: dict[str, list[ArticleRecord]] = {}
+        for item in items:
+            if item.scope_id not in scopes:
+                scopes[item.scope_id] = self._app._articles_for_scope(item.scope_id)
+            scope_articles = scopes[item.scope_id]
+            position = _position(scope_articles, item.article_id)
+            if position is None:
+                continue
+            article = scope_articles[position]
+            preparer.submit(
+                article.article_id,
+                preparation_texts(
+                    self._app.ui,
+                    self._app.config,
+                    article,
+                    position=position,
+                    total=len(scope_articles),
+                    provider_name=provider_names.get(article.provider_id, article.provider_id),
+                    max_chars=engine.max_chars,
+                ),
+            )
+        preparer.sync([item.article_id for item in self._items])
+
+    def _preparation_changed(self) -> None:
+        """Runs on the preparation thread after each finished article."""
+        app = self._app
+        if not app.is_mounted:
+            return
+        loop = getattr(app, "_loop", None)
+        if loop is None or loop.is_closed():
+            return
+        try:
+            app.call_from_thread(self._refresh, rows=False)
+        except RuntimeError:
+            return
 
     def _ensure_media(self) -> None:
         if self._media is not None:
@@ -495,49 +567,34 @@ class PlaylistController:
 
     def _plan(self, item: PlaylistItem, *, mark_read: bool) -> PlannedItem | None:
         scope_articles = self._app._articles_for_scope(item.scope_id)
-        position = next(
-            (index for index, article in enumerate(scope_articles) if article.article_id == item.article_id),
-            None,
-        )
+        position = _position(scope_articles, item.article_id)
         if position is None:
             return None
         article = scope_articles[position]
         mode = self._view_mode(item.scope_id)
         if mark_read:
             self._mark_read(item, scope_articles, position)
-        config = self._app.config
         provider_name = provider_display_names(self._app.storage).get(article.provider_id, article.provider_id)
-        reader_state = ReaderState(article_id=article.article_id, view_mode=mode, scroll_offset=0)
-        title = article_title(reader_state, article)
-        body = article_text(reader_state, article)
-        language = body_language(
-            mode,
-            f"{title}\n{body}",
-            target_language=config.translation.target_language,
-            original_language=config.tts.original_language,
-        )
-        engine_max_chars = self._engine.max_chars if self._engine is not None else 1000
-        segments = build_item_script(
-            intro=self._app.ui.text(
-                "playlist.speech.intro",
-                provider=provider_name,
-                current=position + 1,
-                total=len(scope_articles),
-            ),
-            intro_language=config.ui.locale,
-            title=title,
-            body=body,
-            body_language=language,
-            max_chars=engine_max_chars,
+        segments = article_segments(
+            self._app.ui,
+            self._app.config,
+            article,
+            mode=mode,
+            position=position,
+            total=len(scope_articles),
+            provider_name=provider_name,
+            max_chars=self._engine_instance().max_chars,
         )
         if mark_read:
             self._current_title = article.translated_title or article.title
             self._current_provider = provider_name
+        preparer = self._preparer
         return PlannedItem(
             article_id=article.article_id,
             scope_id=item.scope_id,
             mode=mode,
-            segments=tuple(segments),
+            segments=segments,
+            prepared=preparer.pending_event(article.article_id) if preparer is not None else None,
         )
 
     def _view_mode(self, scope_id: str) -> ViewMode:
@@ -570,6 +627,8 @@ class PlaylistController:
 
     def _save(self) -> None:
         self._app.storage.save_playlist(self._items)
+        if self._preparer is not None:
+            self._preparer.sync([item.article_id for item in self._items])
 
     def _set_app_status(self, text: str) -> None:
         self._app._refresh.set_status_text(text, busy=False, hold_seconds=2.0)
@@ -611,6 +670,10 @@ class PlaylistController:
         else:
             state = ui.text("playlist.state.playing")
         return ui.text("playlist.header", count=len(self._items), state=state)
+
+
+def _position(articles: list[ArticleRecord], article_id: str) -> int | None:
+    return next((index for index, article in enumerate(articles) if article.article_id == article_id), None)
 
 
 def _log_media_error(event: str, exc: Exception) -> None:

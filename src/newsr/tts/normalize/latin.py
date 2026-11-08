@@ -81,6 +81,10 @@ def _without_articles(part: Part) -> Part:
     return kind, " ".join(words)
 
 
+def _runs(spans: list[list[Part]]) -> list[str]:
+    return sorted({value for parts in spans for kind, value in parts if kind == "run"})
+
+
 class LatinRewriter:
     """Replace Latin spans with Cyrillic: pronunciations first, spelled acronyms, numbers, transliterated words."""
 
@@ -89,15 +93,22 @@ class LatinRewriter:
         self._longest = max((len(key) for key in self._pronunciations), default=1)
         self._transliterate = transliterate
 
+    def runs(self, text: str) -> list[str]:
+        """The English word runs that `rewrite` asks the transliterator for."""
+        return _runs(self._parse(text)[1])
+
     def rewrite(self, text: str) -> str:
-        positions = self._spans(text)
-        spans = [self._resolve(classify(text[start:end].rstrip("-/"))) for start, end in positions]
-        runs = sorted({value for parts in spans for kind, value in parts if kind == "run"})
+        positions, spans = self._parse(text)
+        runs = _runs(spans)
         known = dict(self._transliterate(runs)) if runs else {}
         for (start, end), parts in zip(reversed(positions), reversed(spans)):
             trailing = text[start:end][len(text[start:end].rstrip("-/")):]
             text = text[:start] + self._speak(parts, known) + trailing + text[end:]
         return text
+
+    def _parse(self, text: str) -> tuple[list[tuple[int, int]], list[list[Part]]]:
+        positions = self._spans(text)
+        return positions, [self._resolve(classify(text[start:end].rstrip("-/"))) for start, end in positions]
 
     def _spans(self, text: str) -> list[tuple[int, int]]:
         spans = []
