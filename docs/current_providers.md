@@ -13,11 +13,11 @@ This page is the canonical reference for NewsR’s implemented built-in article 
 
 ## Verification
 
-Last audited: **2026-10-17**. The built-in catalog contains **19 providers and 402 targets**. The audit compares first-party navigation and primary topic indexes, checks destination content and extracted candidates, and checks representative written articles. Individual product models, exhaustive tag directories, temporary promotions, and podcast-only destinations are outside the catalog. Accessible empty topic pages are identified explicitly; HTTP success alone does not establish an article-bearing listing.
+Last audited: **2026-11-09**. The built-in catalog contains **19 providers and 425 targets**. The audit compares first-party navigation and primary topic indexes, checks destination content and extracted candidates, and checks representative written articles. Individual product models, exhaustive tag directories, temporary promotions, and podcast-only destinations are outside the catalog. Accessible empty topic pages are identified explicitly; HTTP success alone does not establish an article-bearing listing.
 
-The verification notes below distinguish direct HTML checks from indexed first-party evidence and blocked endpoints. Static catalogs represent this audit snapshot; BBC also supports live navigation discovery. Direct parsing produced candidates for 364 targets; 16 published coverage pages were explicitly empty and one listing contained only sponsored cards. Fifteen listing endpoints and six Deloitte search requests were blocked. Representative written articles were parsed for 18 providers; The Hacker News article parsing remains unverified.
+The verification notes below distinguish direct HTML checks from indexed first-party evidence and blocked endpoints. Static catalogs represent this audit snapshot; BBC also supports live navigation discovery. Direct parsing produced candidates for 400 targets; 18 published coverage pages were explicitly empty and one listing contained only sponsored cards. Six Deloitte search requests were blocked. HR Dive, Marketing Dive, Payments Dive, and Lawfare intermittently returned HTTP 403 challenge pages; sequential retries verified every one of their destinations. Representative written articles were parsed for all 19 providers.
 
-Each catalog table records the stable target key, label, first-party destination, HTTP/content status, and extracted candidate count on **2026-10-17**. The destination column gives both the requested and final URL for the current catalog; these URLs resolved without redirects during verification. Candidate counts use the provider’s parser on the fetched listing or discovery response, before any fetch limit. An em dash means live candidate extraction could not be verified, not an empty listing. Temporary raw downloads are excluded from the repository. Bootstrap selections retain their stable keys; the additional targets are unselected by default.
+Each catalog table records the stable target key, label, first-party destination, HTTP/content status, and extracted candidate count on **2026-11-09**. The destination column gives both the requested and final URL for the current catalog; these URLs resolved without redirects during verification. Candidate counts use the provider’s parser on the fetched listing or discovery response, before any fetch limit; for destinations that needed a retry, the count comes from the successful request. An em dash means live candidate extraction could not be verified, not an empty listing. Temporary raw downloads are excluded from the repository. Bootstrap selections retain their stable keys; the additional targets are unselected by default.
 
 For an on-demand live audit and code update, use the repository skill [`$update-provider-categories`](../.codex/skills/update-provider-categories/SKILL.md). It covers all built-in providers by default, accepts a named provider subset, and supports an audit-only report.
 
@@ -29,37 +29,37 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: enabled by default
 - default selected targets: `World`, `Technology`, `Business`, `Entertainment & Arts`
 - catalog behavior: Live discovery merges navigation categories with the built-in catalog. Regional `/news/world/*` pages and top-level editorial sections are supported. Candidate extraction is scoped to the main listing, excluding global navigation and footer promotions. Candidates include native news reports and written BBC features; live coverage, video pages, external links, and topic indexes are excluded.
-- verification: **2026-10-17**. All 27 destinations produced native written-article candidates within the main listing. Representative news and Culture feature articles supplied readable bodies, author names, and publication dates. Article metadata supports structured ReportageNewsArticle, NewsArticle, and Article records; publication dates use datePublished.
+- verification: **2026-11-09**. All 27 destinations produced native written-article candidates within the main listing, and live navigation discovery returned the 27 built-in targets. Representative news and Culture feature articles supplied readable bodies, author names, and publication dates. Article metadata supports structured ReportageNewsArticle, NewsArticle, and Article records; publication dates use datePublished. Navigation links to deeper pages for China, India, and the nations’ politics, In Pictures galleries, and audio, video, and live destinations are outside the catalog.
 - first-party catalog reference: [publisher navigation or topic index](https://www.bbc.com/news)
-- article verification samples: [Written article](https://www.bbc.com/news/articles/cr20wlp09gn3o), [Culture](https://www.bbc.com/culture/article/20261015-hollywood-stars-on-the-films-that-mean-most-to-them)
+- article verification samples: [Written article](https://www.bbc.com/news/articles/c6y434dw8319o), [Culture](https://www.bbc.com/culture/article/20261106-why-the-300-year-old-novel-gullivers-travels-is-so-misunderstood)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
-| `world` | World | [/news/world](https://www.bbc.com/news/world) | 200 listing | 17 |
+| `world` | World | [/news/world](https://www.bbc.com/news/world) | 200 listing | 22 |
 | `technology` | Technology | [/technology](https://www.bbc.com/technology) | 200 listing | 25 |
-| `business` | Business | [/business](https://www.bbc.com/business) | 200 listing | 31 |
+| `business` | Business | [/business](https://www.bbc.com/business) | 200 listing | 34 |
 | `entertainment_and_arts` | Entertainment & Arts | [/culture/entertainment-news](https://www.bbc.com/culture/entertainment-news) | 200 listing | 20 |
 | `bbcindepth` | BBC InDepth | [/news/bbcindepth](https://www.bbc.com/news/bbcindepth) | 200 listing | 12 |
-| `science-environment` | Science & Environment | [/news/science_and_environment](https://www.bbc.com/news/science_and_environment) | 200 listing | 9 |
+| `science-environment` | Science & Environment | [/news/science_and_environment](https://www.bbc.com/news/science_and_environment) | 200 listing | 8 |
 | `health` | Health | [/health](https://www.bbc.com/health) | 200 listing | 41 |
 | `newsbeat` | Newsbeat | [/news/newsbeat](https://www.bbc.com/news/newsbeat) | 200 listing | 12 |
-| `latest` | Latest | [/news](https://www.bbc.com/news) | 200 listing | 23 |
-| `us-canada` | US & Canada | [/news/us-canada](https://www.bbc.com/news/us-canada) | 200 listing | 20 |
-| `uk` | UK | [/news/uk](https://www.bbc.com/news/uk) | 200 listing | 25 |
-| `world/africa` | Africa | [/news/world/africa](https://www.bbc.com/news/world/africa) | 200 listing | 15 |
-| `world/asia` | Asia | [/news/world/asia](https://www.bbc.com/news/world/asia) | 200 listing | 14 |
-| `world/australia` | Australia | [/news/world/australia](https://www.bbc.com/news/world/australia) | 200 listing | 11 |
-| `world/europe` | Europe | [/news/world/europe](https://www.bbc.com/news/world/europe) | 200 listing | 18 |
-| `world/latin_america` | Latin America | [/news/world/latin_america](https://www.bbc.com/news/world/latin_america) | 200 listing | 15 |
-| `world/middle_east` | Middle East | [/news/world/middle_east](https://www.bbc.com/news/world/middle_east) | 200 listing | 19 |
-| `bbcverify` | BBC Verify | [/news/bbcverify](https://www.bbc.com/news/bbcverify) | 200 listing | 16 |
-| `politics` | UK Politics | [/news/politics](https://www.bbc.com/news/politics) | 200 listing | 24 |
+| `latest` | Latest | [/news](https://www.bbc.com/news) | 200 listing | 21 |
+| `us-canada` | US & Canada | [/news/us-canada](https://www.bbc.com/news/us-canada) | 200 listing | 19 |
+| `uk` | UK | [/news/uk](https://www.bbc.com/news/uk) | 200 listing | 20 |
+| `world/africa` | Africa | [/news/world/africa](https://www.bbc.com/news/world/africa) | 200 listing | 13 |
+| `world/asia` | Asia | [/news/world/asia](https://www.bbc.com/news/world/asia) | 200 listing | 15 |
+| `world/australia` | Australia | [/news/world/australia](https://www.bbc.com/news/world/australia) | 200 listing | 9 |
+| `world/europe` | Europe | [/news/world/europe](https://www.bbc.com/news/world/europe) | 200 listing | 21 |
+| `world/latin_america` | Latin America | [/news/world/latin_america](https://www.bbc.com/news/world/latin_america) | 200 listing | 16 |
+| `world/middle_east` | Middle East | [/news/world/middle_east](https://www.bbc.com/news/world/middle_east) | 200 listing | 17 |
+| `bbcverify` | BBC Verify | [/news/bbcverify](https://www.bbc.com/news/bbcverify) | 200 listing | 20 |
+| `politics` | UK Politics | [/news/politics](https://www.bbc.com/news/politics) | 200 listing | 26 |
 | `england` | England | [/news/england](https://www.bbc.com/news/england) | 200 listing | 26 |
-| `northern_ireland` | Northern Ireland | [/news/northern_ireland](https://www.bbc.com/news/northern_ireland) | 200 listing | 27 |
-| `scotland` | Scotland | [/news/scotland](https://www.bbc.com/news/scotland) | 200 listing | 21 |
+| `northern_ireland` | Northern Ireland | [/news/northern_ireland](https://www.bbc.com/news/northern_ireland) | 200 listing | 21 |
+| `scotland` | Scotland | [/news/scotland](https://www.bbc.com/news/scotland) | 200 listing | 17 |
 | `wales` | Wales | [/news/wales](https://www.bbc.com/news/wales) | 200 listing | 16 |
-| `culture` | Culture | [/culture](https://www.bbc.com/culture) | 200 listing | 34 |
-| `arts` | Arts | [/arts](https://www.bbc.com/arts) | 200 listing | 27 |
+| `culture` | Culture | [/culture](https://www.bbc.com/culture) | 200 listing | 36 |
+| `arts` | Arts | [/arts](https://www.bbc.com/arts) | 200 listing | 28 |
 | `travel` | Travel | [/travel](https://www.bbc.com/travel) | 200 listing | 43 |
 | `earth` | Earth | [/future-planet](https://www.bbc.com/future-planet) | 200 listing | 24 |
 
@@ -70,19 +70,19 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `Latest`, `iPhone`, `Mac`, `iPad`, `Apple Watch`
 - catalog behavior: Static guide-backed catalog with the site root as Latest. Candidate extraction accepts native written articles and excludes podcast cards.
-- verification: **2026-10-17**. All 30 destinations produced written-article candidates, including HomePod. Representative Apple Watch and HomePod articles supplied readable bodies, authors, and publication dates.
+- verification: **2026-11-09**. All 30 destinations produced written-article candidates. The primary navigation lists the catalog’s product families and services together with individual product models and podcast shows, which are outside the catalog. A representative macOS article supplied a readable body, author, and publication date.
 - first-party catalog reference: [publisher navigation or topic index](https://9to5mac.com/)
-- article verification samples: [Written article](https://9to5mac.com/2026/10/07/watchos-27-adds-three-new-apps-to-your-apple-watch/), [HomePod](https://9to5mac.com/2026/10/16/homepod-is-about-to-get-free-upgrade-with-these-new-features/)
+- article verification samples: [Written article](https://9to5mac.com/2026/11/08/macos-changes-for-full-disk-access-ai-agents-imessage/)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
-| `latest` | Latest | [/](https://9to5mac.com/) | 200 listing | 26 |
-| `iphone` | iPhone | [/guides/iphone/](https://9to5mac.com/guides/iphone/) | 200 listing | 22 |
+| `latest` | Latest | [/](https://9to5mac.com/) | 200 listing | 27 |
+| `iphone` | iPhone | [/guides/iphone/](https://9to5mac.com/guides/iphone/) | 200 listing | 24 |
 | `mac` | Mac | [/guides/mac/](https://9to5mac.com/guides/mac/) | 200 listing | 24 |
-| `ipad` | iPad | [/guides/ipad/](https://9to5mac.com/guides/ipad/) | 200 listing | 22 |
+| `ipad` | iPad | [/guides/ipad/](https://9to5mac.com/guides/ipad/) | 200 listing | 23 |
 | `apple-watch` | Apple Watch | [/guides/apple-watch/](https://9to5mac.com/guides/apple-watch/) | 200 listing | 24 |
 | `vision-pro` | Vision Pro | [/guides/vision-pro/](https://9to5mac.com/guides/vision-pro/) | 200 listing | 24 |
-| `apple-tv` | Apple TV | [/guides/apple-tv/](https://9to5mac.com/guides/apple-tv/) | 200 listing | 22 |
+| `apple-tv` | Apple TV | [/guides/apple-tv/](https://9to5mac.com/guides/apple-tv/) | 200 listing | 24 |
 | `airpods` | AirPods | [/guides/airpods/](https://9to5mac.com/guides/airpods/) | 200 listing | 24 |
 | `homekit` | HomeKit | [/guides/homekit/](https://9to5mac.com/guides/homekit/) | 200 listing | 24 |
 | `reviews` | Reviews | [/guides/review/](https://9to5mac.com/guides/review/) | 200 listing | 23 |
@@ -114,9 +114,9 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `Latest`, `Pixel`, `Android`, `Chrome`, `TV`, `Workspace`
 - catalog behavior: Static guide-backed catalog covering product families, Android manufacturers, and Workspace services with the site root as Latest and feature-backed Reviews and Exclusives. Taxonomy classes for YouTube topics are supported while embedded video and podcast cards are excluded.
-- verification: **2026-10-17**. All 35 destinations produced written-article candidates. Representative Android, Gmail, and Pixel Watch articles supplied readable bodies, authors, and publication dates. Cars and some guide pages contain older archive material.
+- verification: **2026-11-09**. All 35 destinations produced written-article candidates. The primary navigation matches the catalog apart from individual product models, Android 17, newsletters, and videos, which are outside the catalog. A representative review supplied a readable body, author, and publication date. Cars and some guide pages contain older archive material.
 - first-party catalog reference: [publisher navigation or topic index](https://9to5google.com/)
-- article verification samples: [Written article](https://9to5google.com/2026/10/16/iphone-duo-pre-order-delay-android-foldable-alternatives/), [Gmail](https://9to5google.com/2026/09/19/gmail-copy-code/), [Pixel Watch](https://9to5google.com/2026/10/08/google-ending-safety-signal-support-pixel-watch/)
+- article verification samples: [Written article](https://9to5google.com/2026/11/05/droiddeck/)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
@@ -142,7 +142,7 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 | `youtube-tv` | YouTube TV | [/guides/youtube-tv/](https://9to5google.com/guides/youtube-tv/) | 200 listing | 24 |
 | `exclusives` | Exclusives | [/feature/exclusives/](https://9to5google.com/feature/exclusives/) | 200 listing | 24 |
 | `pixel-watch` | Pixel Watch | [/guides/google-pixel-watch/](https://9to5google.com/guides/google-pixel-watch/) | 200 listing | 23 |
-| `samsung` | Samsung | [/guides/samsung/](https://9to5google.com/guides/samsung/) | 200 listing | 24 |
+| `samsung` | Samsung | [/guides/samsung/](https://9to5google.com/guides/samsung/) | 200 listing | 23 |
 | `oneplus` | OnePlus | [/guides/oneplus/](https://9to5google.com/guides/oneplus/) | 200 listing | 24 |
 | `oppo` | Oppo | [/guides/oppo/](https://9to5google.com/guides/oppo/) | 200 listing | 24 |
 | `xiaomi` | Xiaomi | [/guides/xiaomi/](https://9to5google.com/guides/xiaomi/) | 200 listing | 24 |
@@ -163,26 +163,26 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `Latest`, `Startups`, `Venture`, `AI`, `Security`
 - catalog behavior: Static catalog covering the editorial Topics menu, including its featured company topics. Latest uses `/latest/`; AI uses the artificial-intelligence category.
-- verification: **2026-10-17**. All 33 destinations produced written-article candidates; a representative article supplied a readable body, author, and publication date.
+- verification: **2026-11-09**. The Topics menu matches the catalog. All 33 destinations produced written-article candidates; a representative article supplied a readable body, author, and publication date.
 - first-party catalog reference: [publisher navigation or topic index](https://techcrunch.com/)
-- article verification samples: [Written article](https://techcrunch.com/2026/10/16/replit-is-no-longer-working-with-anthropic-ceo-says/)
+- article verification samples: [Written article](https://techcrunch.com/2026/11/08/is-jensen-huangs-job-on-the-line-yales-jeffrey-sonnenfeld-estimates-its-about-a-50-50/)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
 | `latest` | Latest | [/latest/](https://techcrunch.com/latest/) | 200 listing | 20 |
-| `startups` | Startups | [/category/startups/](https://techcrunch.com/category/startups/) | 200 listing | 29 |
+| `startups` | Startups | [/category/startups/](https://techcrunch.com/category/startups/) | 200 listing | 27 |
 | `venture` | Venture | [/category/venture/](https://techcrunch.com/category/venture/) | 200 listing | 28 |
 | `ai` | AI | [/category/artificial-intelligence/](https://techcrunch.com/category/artificial-intelligence/) | 200 listing | 28 |
-| `security` | Security | [/category/security/](https://techcrunch.com/category/security/) | 200 listing | 30 |
+| `security` | Security | [/category/security/](https://techcrunch.com/category/security/) | 200 listing | 27 |
 | `apps` | Apps | [/category/apps/](https://techcrunch.com/category/apps/) | 200 listing | 30 |
 | `fintech` | Fintech | [/category/fintech/](https://techcrunch.com/category/fintech/) | 200 listing | 30 |
 | `enterprise` | Enterprise | [/category/enterprise/](https://techcrunch.com/category/enterprise/) | 200 listing | 30 |
 | `climate` | Climate | [/category/climate/](https://techcrunch.com/category/climate/) | 200 listing | 30 |
 | `robotics` | Robotics | [/category/robotics/](https://techcrunch.com/category/robotics/) | 200 listing | 28 |
 | `government-policy` | Government & Policy | [/category/government-policy/](https://techcrunch.com/category/government-policy/) | 200 listing | 29 |
-| `apple` | Apple | [/tag/apple/](https://techcrunch.com/tag/apple/) | 200 listing | 29 |
-| `amazon` | Amazon | [/tag/amazon/](https://techcrunch.com/tag/amazon/) | 200 listing | 27 |
-| `biotech-health` | Biotech & Health | [/category/biotech-health/](https://techcrunch.com/category/biotech-health/) | 200 listing | 29 |
+| `apple` | Apple | [/tag/apple/](https://techcrunch.com/tag/apple/) | 200 listing | 30 |
+| `amazon` | Amazon | [/tag/amazon/](https://techcrunch.com/tag/amazon/) | 200 listing | 28 |
+| `biotech-health` | Biotech & Health | [/category/biotech-health/](https://techcrunch.com/category/biotech-health/) | 200 listing | 30 |
 | `cloud-computing` | Cloud Computing | [/tag/cloud-computing/](https://techcrunch.com/tag/cloud-computing/) | 200 listing | 29 |
 | `commerce` | Commerce | [/category/commerce/](https://techcrunch.com/category/commerce/) | 200 listing | 30 |
 | `cryptocurrency` | Crypto | [/category/cryptocurrency/](https://techcrunch.com/category/cryptocurrency/) | 200 listing | 30 |
@@ -195,7 +195,7 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 | `instagram` | Instagram | [/tag/instagram/](https://techcrunch.com/tag/instagram/) | 200 listing | 30 |
 | `layoffs` | Layoffs | [/tag/layoffs/](https://techcrunch.com/tag/layoffs/) | 200 listing | 28 |
 | `media-entertainment` | Media & Entertainment | [/category/media-entertainment/](https://techcrunch.com/category/media-entertainment/) | 200 listing | 30 |
-| `meta` | Meta | [/tag/meta/](https://techcrunch.com/tag/meta/) | 200 listing | 28 |
+| `meta` | Meta | [/tag/meta/](https://techcrunch.com/tag/meta/) | 200 listing | 29 |
 | `microsoft` | Microsoft | [/tag/microsoft/](https://techcrunch.com/tag/microsoft/) | 200 listing | 30 |
 | `privacy` | Privacy | [/category/privacy/](https://techcrunch.com/category/privacy/) | 200 listing | 30 |
 | `social` | Social | [/category/social/](https://techcrunch.com/category/social/) | 200 listing | 30 |
@@ -209,16 +209,17 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - provider id: `thehackernews`
 - bootstrap state: disabled by default
 - default selected targets: `Threat Intelligence`, `Cyber Attacks`, `Vulnerabilities`, `Expert Insights`
-- catalog behavior: Static catalog of the four written-news sections in site navigation.
-- verification: **2026-10-17**. Indexed first-party navigation confirms the four sections. Direct requests to the homepage and all four destinations returned HTTP 403 challenge pages, including a repeated Threat Intelligence check. Current raw listing and article extraction remain unverified; no targets are retired on this evidence.
-- first-party catalog references: [publisher homepage](https://thehackernews.com/), [indexed first-party navigation](https://thehackernews.com/search?by-date=false&max-results=20&q=vulnerabilities&start=1807&updated-max=2017-09-29T10%3A57%3A00-07%3A00)
+- catalog behavior: Static catalog of the four written-news sections in site navigation. Vulnerabilities uses the `/search/label/Vulnerability` label linked from the navigation. Candidate extraction accepts dated news articles and Expert Insights articles under `/expert-insights/`. Article parsing reads Blogger author and datePublished metadata and treats the site name as no named author.
+- verification: **2026-11-09**. The homepage navigation lists Threat Intelligence, Vulnerabilities, Cyber Attacks, and Expert Insights. All four destinations returned HTTP 200 and produced written-article candidates; the Expert Insights listing also links one older news article. Representative news and Expert Insights articles supplied readable bodies and publication dates. The news article supplied its author; Expert Insights articles credited to The Hacker News have no named author.
+- first-party catalog references: [publisher navigation](https://thehackernews.com/), [Expert Insights](https://thehackernews.com/expert-insights/)
+- article verification samples: [Written article](https://thehackernews.com/2026/11/cisa-flags-sonicwall-sonicos-mfa-bypass.html), [Expert Insights](https://thehackernews.com/expert-insights/2026/11/pedm-vs-standing-elevated-privileges.html)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
-| `threat-intelligence` | Threat Intelligence | [/search/label/Threat%20Intelligence](https://thehackernews.com/search/label/Threat%20Intelligence) | 403 challenge | — |
-| `cyber-attacks` | Cyber Attacks | [/search/label/Cyber%20Attack](https://thehackernews.com/search/label/Cyber%20Attack) | 403 challenge | — |
-| `vulnerabilities` | Vulnerabilities | [/search/label/Vulnerable](https://thehackernews.com/search/label/Vulnerable) | 403 challenge | — |
-| `expert-insights` | Expert Insights | [/expert-insights/](https://thehackernews.com/expert-insights/) | 403 challenge | — |
+| `threat-intelligence` | Threat Intelligence | [/search/label/Threat%20Intelligence](https://thehackernews.com/search/label/Threat%20Intelligence) | 200 listing | 43 |
+| `cyber-attacks` | Cyber Attacks | [/search/label/Cyber%20Attack](https://thehackernews.com/search/label/Cyber%20Attack) | 200 listing | 45 |
+| `vulnerabilities` | Vulnerabilities | [/search/label/Vulnerability](https://thehackernews.com/search/label/Vulnerability) | 200 listing | 45 |
+| `expert-insights` | Expert Insights | [/expert-insights/](https://thehackernews.com/expert-insights/) | 200 listing | 22 |
 
 
 ### Ars Technica
@@ -226,10 +227,10 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - provider id: `arstechnica`
 - bootstrap state: disabled by default
 - default selected targets: `Latest`, `Tech`, `Science`, `Security`
-- catalog behavior: Static mixed catalog with a catch-all Latest feed and editorial sections.
-- verification: **2026-10-17**. All 12 destinations produced written-article candidates. The navigation and section headings identify Tech and Policy; their stable keys are gadgets and tech-policy. A representative article supplied a readable body, author, and publication date.
+- catalog behavior: Static mixed catalog with a catch-all Latest feed, the editorial sections, and the Features and Reviews categories from the Sections menu.
+- verification: **2026-11-09**. All 14 destinations produced written-article candidates. The Sections menu lists the eleven editorial sections followed by Feature and Reviews; their category pages are titled Features and Reviews. The navigation and section headings identify Tech and Policy; their stable keys are gadgets and tech-policy. A representative article and a review supplied readable bodies, authors, and publication dates.
 - first-party catalog reference: [publisher navigation or topic index](https://arstechnica.com/)
-- article verification samples: [Written article](https://arstechnica.com/gadgets/2026/10/ray-ban-meta-smart-glasses-found-recording-audio-without-wearers-consent/)
+- article verification samples: [Written article](https://arstechnica.com/apple/2026/11/its-a-weird-time-to-buy-a-laptop-but-the-new-macbook-pro-doesnt-skimp-on-quality/), [Reviews](https://arstechnica.com/reviews/2026/10/the-surface-laptop-ultra-delivers-on-most-of-microsofts-promises/)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
@@ -245,6 +246,8 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 | `information-technology` | Biz & IT | [/information-technology/](https://arstechnica.com/information-technology/) | 200 listing | 36 |
 | `health` | Health | [/health/](https://arstechnica.com/health/) | 200 listing | 36 |
 | `culture` | Culture | [/culture/](https://arstechnica.com/culture/) | 200 listing | 36 |
+| `features` | Features | [/features/](https://arstechnica.com/features/) | 200 listing | 36 |
+| `reviews` | Reviews | [/reviews/](https://arstechnica.com/reviews/) | 200 listing | 36 |
 
 
 ### HR Dive
@@ -252,20 +255,20 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - provider id: `hrdive`
 - bootstrap state: disabled by default
 - default selected targets: `Talent`, `Comp & Benefits`
-- catalog behavior: Static catalog covering the navigation topic menu.
-- verification: **2026-10-17**. All eight destinations produced written-article candidates; a representative article supplied a readable body, author, and publication date through sailthru.date metadata.
+- catalog behavior: Static catalog covering the navigation topic menu. Article authors come from sailthru.author metadata, which also covers contributor bylines without author links.
+- verification: **2026-11-09**. The navigation topic menu matches the catalog; the menu abbreviates HR Management as HR Mgmt. All eight destinations produced written-article candidates. Representative staff and contributor articles supplied readable bodies, authors, and publication dates through sailthru metadata. Article requests intermittently returned an HTTP 403 JavaScript challenge; retries succeeded.
 - first-party catalog reference: [publisher navigation or topic index](https://www.hrdive.com/)
-- article verification samples: [Written article](https://www.hrdive.com/news/benefits-outlook-2026-wtw/833170/)
+- article verification samples: [Contributor article](https://www.hrdive.com/news/workers-are-facing-a-crisis-of-disengagement/874016/)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
 | `talent` | Talent | [/topic/talent/](https://www.hrdive.com/topic/talent/) | 200 listing | 24 |
-| `compensation-benefits` | Comp & Benefits | [/topic/compensation-benefits/](https://www.hrdive.com/topic/compensation-benefits/) | 200 listing | 20 |
-| `diversity-inclusion` | Diversity & Inclusion | [/topic/diversity-inclusion/](https://www.hrdive.com/topic/diversity-inclusion/) | 200 listing | 24 |
+| `compensation-benefits` | Comp & Benefits | [/topic/compensation-benefits/](https://www.hrdive.com/topic/compensation-benefits/) | 200 listing | 22 |
+| `diversity-inclusion` | Diversity & Inclusion | [/topic/diversity-inclusion/](https://www.hrdive.com/topic/diversity-inclusion/) | 200 listing | 23 |
 | `learning` | Learning | [/topic/learning/](https://www.hrdive.com/topic/learning/) | 200 listing | 24 |
-| `hr-management` | HR Management | [/topic/hr-management/](https://www.hrdive.com/topic/hr-management/) | 200 listing | 17 |
-| `compliance` | Compliance | [/topic/legal/](https://www.hrdive.com/topic/legal/) | 200 listing | 24 |
-| `hr-technology-analytics` | Tech & Analytics | [/topic/hr-technology-analytics/](https://www.hrdive.com/topic/hr-technology-analytics/) | 200 listing | 21 |
+| `hr-management` | HR Management | [/topic/hr-management/](https://www.hrdive.com/topic/hr-management/) | 200 listing | 20 |
+| `compliance` | Compliance | [/topic/legal/](https://www.hrdive.com/topic/legal/) | 200 listing | 25 |
+| `hr-technology-analytics` | Tech & Analytics | [/topic/hr-technology-analytics/](https://www.hrdive.com/topic/hr-technology-analytics/) | 200 listing | 20 |
 | `state-local-laws` | State & Local Laws | [/topic/state-local-laws/](https://www.hrdive.com/topic/state-local-laws/) | 200 listing | 5 |
 
 
@@ -275,23 +278,23 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `Health Tech`, `Devices & Diagnostics`
 - catalog behavior: Static catalog of written news, channels, and contributor articles. Sponsored and webinar destinations are excluded.
-- verification: **2026-10-17**. All 11 destinations produced written-article candidates; a representative article supplied a readable body, author, and publication date.
+- verification: **2026-11-09**. All 11 destinations produced written-article candidates; a representative article supplied a readable body, author, and publication date. The header menu lists News, Health Tech, BioPharma, Devices & Diagnostics, Consumer / Employer, and Contributors. Pharma, Hospitals, and Physicians appear only as article category labels and are outside the catalog.
 - first-party catalog reference: [publisher navigation or topic index](https://medcitynews.com/)
-- article verification samples: [Written article](https://medcitynews.com/2026/10/why-epic-is-launching-a-prescription-price-comparison-tool/)
+- article verification samples: [Written article](https://medcitynews.com/2026/11/myths-of-customer-discovery/)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
-| `health-tech` | Health Tech | [/category/channel/health-tech/](https://medcitynews.com/category/channel/health-tech/) | 200 listing | 13 |
-| `biopharma` | BioPharma | [/category/channel/biopharma/](https://medcitynews.com/category/channel/biopharma/) | 200 listing | 15 |
-| `medical-devices-and-diagnostics` | Devices & Diagnostics | [/category/channel/medical-devices-and-diagnostics/](https://medcitynews.com/category/channel/medical-devices-and-diagnostics/) | 200 listing | 14 |
-| `consumer-employer` | Consumer / Employer | [/category/channel/consumer-employer/](https://medcitynews.com/category/channel/consumer-employer/) | 200 listing | 14 |
+| `health-tech` | Health Tech | [/category/channel/health-tech/](https://medcitynews.com/category/channel/health-tech/) | 200 listing | 12 |
+| `biopharma` | BioPharma | [/category/channel/biopharma/](https://medcitynews.com/category/channel/biopharma/) | 200 listing | 13 |
+| `medical-devices-and-diagnostics` | Devices & Diagnostics | [/category/channel/medical-devices-and-diagnostics/](https://medcitynews.com/category/channel/medical-devices-and-diagnostics/) | 200 listing | 15 |
+| `consumer-employer` | Consumer / Employer | [/category/channel/consumer-employer/](https://medcitynews.com/category/channel/consumer-employer/) | 200 listing | 15 |
 | `news` | News | [/category/news/](https://medcitynews.com/category/news/) | 200 listing | 13 |
 | `contributors` | Contributors | [/category/medcity-influencers/](https://medcitynews.com/category/medcity-influencers/) | 200 listing | 15 |
-| `artificial-intelligence` | Artificial Intelligence | [/category/channel/artificial-intelligence/](https://medcitynews.com/category/channel/artificial-intelligence/) | 200 listing | 13 |
+| `artificial-intelligence` | Artificial Intelligence | [/category/channel/artificial-intelligence/](https://medcitynews.com/category/channel/artificial-intelligence/) | 200 listing | 14 |
 | `startups` | Startups | [/category/channel/startup-channel/](https://medcitynews.com/category/channel/startup-channel/) | 200 listing | 15 |
-| `payers` | Payers | [/category/channel/payers/](https://medcitynews.com/category/channel/payers/) | 200 listing | 12 |
+| `payers` | Payers | [/category/channel/payers/](https://medcitynews.com/category/channel/payers/) | 200 listing | 13 |
 | `providers` | Providers | [/category/channel/providers/](https://medcitynews.com/category/channel/providers/) | 200 listing | 14 |
-| `policy` | Policy | [/category/channel/politics-channel/](https://medcitynews.com/category/channel/politics-channel/) | 200 listing | 15 |
+| `policy` | Policy | [/category/channel/politics-channel/](https://medcitynews.com/category/channel/politics-channel/) | 200 listing | 14 |
 
 
 ### Hyperallergic
@@ -300,9 +303,9 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `News`, `Reviews`
 - catalog behavior: Static tag-backed editorial catalog. Reviews, Features, Interviews, Guides, and Announcements use singular tag paths. Explicit Community, Opportunities, and Announcements targets accept editorial posts in those sections; sponsored cards remain excluded.
-- verification: **2026-10-17**. Eleven destinations produced eligible written-article candidates; a representative article supplied a readable body, author, and publication date. Announcements returned HTTP 200 with only sponsored cards and zero eligible candidates. It remains a valid published listing; sponsored cards are excluded for every target.
+- verification: **2026-11-09**. Eleven destinations produced eligible written-article candidates; a representative article supplied a readable body, author, and publication date. Announcements returned HTTP 200 with only sponsored cards and zero eligible candidates. It is a valid published listing; sponsored cards are excluded for every target. The navigation’s Podcast and Crosswords tags are outside the written-article catalog.
 - first-party catalog reference: [publisher navigation or topic index](https://hyperallergic.com/)
-- article verification samples: [Written article](https://hyperallergic.com/this-ron-desantis-statue-cant-take-the-heat/)
+- article verification samples: [Written article](https://hyperallergic.com/pablo-helguera-to-helm-the-new-schools-vera-list-center/)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
@@ -325,14 +328,14 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - provider id: `edsurge`
 - bootstrap state: disabled by default
 - default selected targets: `Latest`, `Higher Education`
-- catalog behavior: Static catalog using the homepage for Latest and `/coverage-areas/*` for the published coverage-area catalog. Written article URLs support both undated slugs and dated archive slugs. Podcast cards are excluded.
-- verification: **2026-10-17**. The homepage produced written candidates; a representative article supplied a readable body, author, and date. All 16 coverage-area pages returned HTTP 200 with “No Articles Available under this topic” and zero candidates. Education Workforce uses /coverage-areas/education-workforce; the trailing-hyphen navigation link returns HTTP 404. Empty topics have no cross-category fallback.
+- catalog behavior: Static catalog using the homepage for Latest and `/coverage-areas/*` for the published coverage-area catalog. Written article URLs support both undated slugs and dated archive slugs. Podcast cards and the EdSurge Podcast coverage area are excluded.
+- verification: **2026-11-09**. The homepage produced written candidates; a representative article supplied a readable body, author, and date. All 18 coverage-area pages, including Attendance and Civics, returned HTTP 200 with “No Articles Available under this topic” and zero candidates. The server-rendered HTML carries only this empty state; coverage-area article lists load in the browser from an Algolia search index, which the HTTP provider does not query. Higher Education is absent from the current coverage-area menu, and its page is published. Education Workforce uses /coverage-areas/education-workforce; the trailing-hyphen navigation link returns HTTP 404. Empty topics have no cross-category fallback.
 - first-party catalog reference: [publisher navigation or topic index](https://www.edsurge.com/)
-- article verification samples: [Written article](https://www.edsurge.com/news/can-high-impact-tutoring-survive-post-pandemic-funding-loss)
+- article verification samples: [Written article](https://www.edsurge.com/news/finding-our-way-forward-the-struggle-and-promise-of-ai-literacy)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
-| `latest` | Latest | [/](https://www.edsurge.com/) | 200 listing | 10 |
+| `latest` | Latest | [/](https://www.edsurge.com/) | 200 listing | 9 |
 | `higher-ed` | Higher Education | [/coverage-areas/higher-education](https://www.edsurge.com/coverage-areas/higher-education) | 200 explicit empty | 0 |
 | `artificial-intelligence` | Artificial Intelligence | [/coverage-areas/artificial-intelligence](https://www.edsurge.com/coverage-areas/artificial-intelligence) | 200 explicit empty | 0 |
 | `career-readiness` | Career Readiness | [/coverage-areas/career-readiness](https://www.edsurge.com/coverage-areas/career-readiness) | 200 explicit empty | 0 |
@@ -349,6 +352,8 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 | `digital-access` | Digital Access | [/coverage-areas/digital-access](https://www.edsurge.com/coverage-areas/digital-access) | 200 explicit empty | 0 |
 | `instructional-trends` | Instructional Trends | [/coverage-areas/instructional-trends](https://www.edsurge.com/coverage-areas/instructional-trends) | 200 explicit empty | 0 |
 | `data-privacy` | Data Privacy | [/coverage-areas/data-privacy](https://www.edsurge.com/coverage-areas/data-privacy) | 200 explicit empty | 0 |
+| `attendance` | Attendance | [/coverage-areas/attendance](https://www.edsurge.com/coverage-areas/attendance) | 200 explicit empty | 0 |
+| `civics` | Civics | [/coverage-areas/civics](https://www.edsurge.com/coverage-areas/civics) | 200 explicit empty | 0 |
 
 
 ### Marketing Dive
@@ -356,10 +361,10 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - provider id: `marketingdive`
 - bootstrap state: disabled by default
 - default selected targets: `Brand Strategy`, `Social Media`
-- catalog behavior: Static topic catalog with Marketing mapped to the homepage. Topic paths preserve the publisher’s capitalization, including Social Media and Video.
-- verification: **2026-10-17**. All 11 destinations produced written-article candidates; a representative article supplied a readable body, author, and publication date through sailthru.date metadata. Social Media and Video paths retain publisher capitalization.
+- catalog behavior: Static topic catalog with Marketing mapped to the homepage. Topic paths preserve the publisher’s capitalization, including Social Media and Video. Article authors come from sailthru.author metadata, which also covers contributor bylines without author links.
+- verification: **2026-11-09**. The navigation topic menu matches the catalog. All 11 destinations produced written-article candidates. Listing and article requests intermittently returned an HTTP 403 JavaScript challenge; sequential retries succeeded for every destination. Representative staff and contributor articles supplied readable bodies, authors, and publication dates through sailthru metadata. Social Media and Video paths retain publisher capitalization.
 - first-party catalog reference: [publisher navigation or topic index](https://www.marketingdive.com/)
-- article verification samples: [Written article](https://www.marketingdive.com/news/wendys-signs-on-as-first-sponsor-for-in-app-bravo-fan-experience/833067/)
+- article verification samples: [Written article](https://www.marketingdive.com/news/how-lands-ends-holiday-pop-up-feeds-an-always-on-marketing-strategy/873792/), [Contributor article](https://www.marketingdive.com/news/where-agency-strategists-see-opportunity-as-ai-challenges-their-worth/872985/)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
@@ -368,11 +373,11 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 | `creative` | Creative | [/topic/creative/](https://www.marketingdive.com/topic/creative/) | 200 listing | 25 |
 | `social-media` | Social Media | [/topic/Social-media-marketing/](https://www.marketingdive.com/topic/Social-media-marketing/) | 200 listing | 24 |
 | `video` | Video | [/topic/Video-marketing/](https://www.marketingdive.com/topic/Video-marketing/) | 200 listing | 22 |
-| `agencies` | Agencies | [/topic/agencies/](https://www.marketingdive.com/topic/agencies/) | 200 listing | 23 |
-| `data-analytics` | Data/Analytics | [/topic/analytics/](https://www.marketingdive.com/topic/analytics/) | 200 listing | 19 |
+| `agencies` | Agencies | [/topic/agencies/](https://www.marketingdive.com/topic/agencies/) | 200 listing | 24 |
+| `data-analytics` | Data/Analytics | [/topic/analytics/](https://www.marketingdive.com/topic/analytics/) | 200 listing | 20 |
 | `influencer` | Influencer Marketing | [/topic/influencer-marketing/](https://www.marketingdive.com/topic/influencer-marketing/) | 200 listing | 24 |
-| `marketing` | Marketing | [/](https://www.marketingdive.com/) | 200 listing | 24 |
-| `ad-tech` | Ad Tech | [/topic/marketing-tech/](https://www.marketingdive.com/topic/marketing-tech/) | 200 listing | 24 |
+| `marketing` | Marketing | [/](https://www.marketingdive.com/) | 200 listing | 25 |
+| `ad-tech` | Ad Tech | [/topic/marketing-tech/](https://www.marketingdive.com/topic/marketing-tech/) | 200 listing | 23 |
 | `cmo-corner` | CMO Corner | [/topic/cmo-corner/](https://www.marketingdive.com/topic/cmo-corner/) | 200 listing | 24 |
 
 
@@ -382,21 +387,21 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `Technology`, `Fraud`
 - catalog behavior: Static catalog using the homepage for Latest and the navigation topic destinations. Candidate extraction accepts written articles and filters sponsored cards and trendlines.
-- verification: **2026-10-17**. All nine destinations produced written-article candidates; a representative article supplied a readable body, author, and publication date.
+- verification: **2026-11-09**. The navigation topic menu matches the catalog. All nine destinations produced written-article candidates. Listing and article requests intermittently returned an HTTP 403 JavaScript challenge; sequential retries succeeded for every destination. A representative article supplied a readable body, author, and publication date.
 - first-party catalog reference: [publisher navigation or topic index](https://www.paymentsdive.com/)
-- article verification samples: [Written article](https://www.paymentsdive.com/news/treasury-taps-data-to-fend-off-payments-fraud/832511/)
+- article verification samples: [Written article](https://www.paymentsdive.com/news/california-coinflip-crypto-atm-enforcement-fraud/874002/)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
 | `latest` | Latest | [/](https://www.paymentsdive.com/) | 200 listing | 31 |
-| `retail` | Retail | [/topic/retail/](https://www.paymentsdive.com/topic/retail/) | 200 listing | 24 |
-| `banking` | Banking | [/topic/banking/](https://www.paymentsdive.com/topic/banking/) | 200 listing | 25 |
+| `retail` | Retail | [/topic/retail/](https://www.paymentsdive.com/topic/retail/) | 200 listing | 25 |
+| `banking` | Banking | [/topic/banking/](https://www.paymentsdive.com/topic/banking/) | 200 listing | 24 |
 | `restaurants` | Restaurants | [/topic/restaurants/](https://www.paymentsdive.com/topic/restaurants/) | 200 listing | 25 |
 | `regulations_and_policy` | Regulations & Policy | [/topic/regulations_and_policy/](https://www.paymentsdive.com/topic/regulations_and_policy/) | 200 listing | 25 |
 | `risk` | Consumer Risk | [/topic/risk/](https://www.paymentsdive.com/topic/risk/) | 200 listing | 24 |
-| `technology` | Technology | [/topic/technology/](https://www.paymentsdive.com/topic/technology/) | 200 listing | 21 |
-| `b2b` | B2B | [/topic/b2b/](https://www.paymentsdive.com/topic/b2b/) | 200 listing | 25 |
-| `fraud` | Fraud | [/topic/fraud/](https://www.paymentsdive.com/topic/fraud/) | 200 listing | 24 |
+| `technology` | Technology | [/topic/technology/](https://www.paymentsdive.com/topic/technology/) | 200 listing | 22 |
+| `b2b` | B2B | [/topic/b2b/](https://www.paymentsdive.com/topic/b2b/) | 200 listing | 24 |
+| `fraud` | Fraud | [/topic/fraud/](https://www.paymentsdive.com/topic/fraud/) | 200 listing | 23 |
 
 
 ### Tom's Hardware
@@ -404,22 +409,22 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - provider id: `tomshardware`
 - bootstrap state: disabled by default
 - default selected targets: `PC Components`, `CPUs`, `GPUs`
-- catalog behavior: Static hardware, software, and technology catalog using server-rendered `/news` indexes. Candidates include written news and reviews, including legacy `/news/*.html` URLs; buying guides, deals, sponsored cards, and category indexes are excluded.
-- verification: **2026-10-17**. All 36 /news destinations produced eligible candidates, including the navigation sections for routers, PC building, laptop and desktop types, monitors, keyboards, mice, and headphones. Representative CPU, headphone, and ultrabook articles supplied readable bodies, authors, and publication dates. Headphones and Ultrabooks listings have no h1 heading, but contain relevant native written-article cards. Some sections contain older archive material.
+- catalog behavior: Static hardware, software, and technology catalog using server-rendered `/news` indexes for the meganav sections and their nested entries. Candidates include written news and reviews, including legacy `/news/*.html` URLs; buying guides, deals, sponsored cards, and category indexes are excluded. Tags, premium analysis, and article category labels outside the meganav are outside the catalog.
+- verification: **2026-11-09**. All 51 /news destinations produced eligible candidates, including the meganav entries for semiconductors, GPU drivers, DRAM, DDR5, HDDs, SSDs, cooling types, individual operating systems, and Microsoft Office. Representative semiconductor and legacy iOS articles supplied readable bodies, authors, and publication dates. The iOS and ChromeOS listings contain only 2010–2017 archive articles, and some other sections contain older archive material. Many listings, including the nested meganav entries, have no h1 heading but contain relevant native written-article cards.
 - first-party catalog reference: [publisher navigation or topic index](https://www.tomshardware.com/)
-- article verification samples: [Written article](https://www.tomshardware.com/pc-components/cpus/qualcomm-wins-architecture-breach-verdict-against-arm-but-gets-just-usd2-judge-could-still-suspend-royalty-fees-for-five-years), [Headphones](https://www.tomshardware.com/peripherals/gaming-headsets/corsair-launches-lightweight-budget-friendly-hs35-v3-gaming-headsets), [Ultrabooks](https://www.tomshardware.com/laptops/ultrabooks-ultraportables/intels-googlebooks-might-not-run-some-android-apps-as-well-as-qualcomms-google-says-this-is-because-android-apps-were-designed-for-arm-chips)
+- article verification samples: [Written article](https://www.tomshardware.com/tech-industry/semiconductors/india-targets-creating-homegrown-gpus-within-2-years-and-plans-to-commercialize-indigenous-shakti-and-vega-risc-v-processors-sees-ai-boom-as-a-potential-repeat-of-the-y2k-opportunity-for-its-it-industry), [iOS archive](https://www.tomshardware.com/news/eff-criticizes-ios-11-wireles-settings,35626.html)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
 | `pc-components` | PC Components | [/pc-components/news](https://www.tomshardware.com/pc-components/news) | 200 listing | 10 |
-| `cpus` | CPUs | [/pc-components/cpus/news](https://www.tomshardware.com/pc-components/cpus/news) | 200 listing | 9 |
+| `cpus` | CPUs | [/pc-components/cpus/news](https://www.tomshardware.com/pc-components/cpus/news) | 200 listing | 10 |
 | `gpus` | GPUs | [/pc-components/gpus/news](https://www.tomshardware.com/pc-components/gpus/news) | 200 listing | 10 |
 | `storage` | Storage | [/pc-components/storage/news](https://www.tomshardware.com/pc-components/storage/news) | 200 listing | 10 |
 | `laptops` | Laptops | [/laptops/news](https://www.tomshardware.com/laptops/news) | 200 listing | 10 |
 | `desktops` | Desktops | [/desktops/news](https://www.tomshardware.com/desktops/news) | 200 listing | 10 |
 | `software` | Software | [/software/news](https://www.tomshardware.com/software/news) | 200 listing | 10 |
 | `artificial-intelligence` | Artificial Intelligence | [/tech-industry/artificial-intelligence/news](https://www.tomshardware.com/tech-industry/artificial-intelligence/news) | 200 listing | 10 |
-| `latest` | Latest | [/news](https://www.tomshardware.com/news) | 200 listing | 7 |
+| `latest` | Latest | [/news](https://www.tomshardware.com/news) | 200 listing | 9 |
 | `ram` | RAM | [/pc-components/ram/news](https://www.tomshardware.com/pc-components/ram/news) | 200 listing | 10 |
 | `cooling` | Cooling | [/pc-components/cooling/news](https://www.tomshardware.com/pc-components/cooling/news) | 200 listing | 10 |
 | `motherboards` | Motherboards | [/pc-components/motherboards/news](https://www.tomshardware.com/pc-components/motherboards/news) | 200 listing | 10 |
@@ -447,6 +452,21 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 | `keyboards` | Keyboards | [/peripherals/keyboards/news](https://www.tomshardware.com/peripherals/keyboards/news) | 200 listing | 10 |
 | `mice` | Mice | [/peripherals/mice/news](https://www.tomshardware.com/peripherals/mice/news) | 200 listing | 10 |
 | `headphones` | Headphones | [/peripherals/headphones-headsets/news](https://www.tomshardware.com/peripherals/headphones-headsets/news) | 200 listing | 7 |
+| `semiconductors` | Semiconductors | [/tech-industry/manufacturing/semiconductors/news](https://www.tomshardware.com/tech-industry/manufacturing/semiconductors/news) | 200 listing | 10 |
+| `gpu-drivers` | GPU Drivers | [/pc-components/gpus/gpu-drivers/news](https://www.tomshardware.com/pc-components/gpus/gpu-drivers/news) | 200 listing | 10 |
+| `dram` | DRAM | [/pc-components/ram/dram/news](https://www.tomshardware.com/pc-components/ram/dram/news) | 200 listing | 10 |
+| `ddr5` | DDR5 | [/pc-components/ram/dram/ddr5/news](https://www.tomshardware.com/pc-components/ram/dram/ddr5/news) | 200 listing | 10 |
+| `hdds` | HDDs | [/pc-components/storage/hdds/news](https://www.tomshardware.com/pc-components/storage/hdds/news) | 200 listing | 10 |
+| `ssds` | SSDs | [/pc-components/storage/ssds/news](https://www.tomshardware.com/pc-components/storage/ssds/news) | 200 listing | 10 |
+| `air-cooling` | Air Cooling | [/pc-components/cooling/air-cooling/news](https://www.tomshardware.com/pc-components/cooling/air-cooling/news) | 200 listing | 10 |
+| `liquid-cooling` | Liquid Cooling | [/pc-components/cooling/liquid-cooling/news](https://www.tomshardware.com/pc-components/cooling/liquid-cooling/news) | 200 listing | 10 |
+| `thermal-paste` | Thermal Paste | [/pc-components/cooling/thermal-paste/news](https://www.tomshardware.com/pc-components/cooling/thermal-paste/news) | 200 listing | 9 |
+| `windows` | Windows | [/software/operating-systems/windows/news](https://www.tomshardware.com/software/operating-systems/windows/news) | 200 listing | 10 |
+| `macos` | macOS | [/software/operating-systems/macos/news](https://www.tomshardware.com/software/operating-systems/macos/news) | 200 listing | 10 |
+| `ios` | iOS | [/software/operating-systems/ios/news](https://www.tomshardware.com/software/operating-systems/ios/news) | 200 listing | 10 |
+| `chromeos` | ChromeOS | [/software/operating-systems/chromeos/news](https://www.tomshardware.com/software/operating-systems/chromeos/news) | 200 listing | 10 |
+| `linux` | Linux | [/software/operating-systems/linux/news](https://www.tomshardware.com/software/operating-systems/linux/news) | 200 listing | 10 |
+| `microsoft-office` | Microsoft Office | [/software/applications/microsoft-office/news](https://www.tomshardware.com/software/applications/microsoft-office/news) | 200 listing | 10 |
 
 
 ### Canary Media
@@ -454,10 +474,10 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - provider id: `canarymedia`
 - bootstrap state: disabled by default
 - default selected targets: `Grid Edge`, `Solar`
-- catalog behavior: Static catalog covering the published View All Topics index through `/articles/<topic>` destinations. The Sponsored topic is excluded.
-- verification: **2026-10-17**. All 61 destinations in the primary topic index produced candidates; a representative article supplied a readable body, author, and publication date. The sponsored topic is outside the editorial catalog.
-- first-party catalog reference: [publisher navigation or topic index](https://www.canarymedia.com/articles/categories)
-- article verification samples: [Written article](https://www.canarymedia.com/articles/transmission/advanced-grid-tech-doe-boost)
+- catalog behavior: Static catalog covering the published View All Topics index through `/articles/<topic>` destinations and the header’s U.S. regions menu through `/regions/<region>` destinations. Region labels carry the U.S. prefix from the menu group. The Sponsored topic is excluded.
+- verification: **2026-11-09**. All 61 topic-index destinations and all four region destinations produced candidates; representative topic and region articles supplied readable bodies, authors, and publication dates. The sponsored topic is outside the editorial catalog.
+- first-party catalog references: [topic index](https://www.canarymedia.com/articles/categories), [U.S. regions](https://www.canarymedia.com/regions/northeast)
+- article verification samples: [Written article](https://www.canarymedia.com/articles/transmission/pjm-desperately-needs-grid-batteries-is-it-finally-about-to-act), [Region](https://www.canarymedia.com/articles/carbon-capture/michigan-utility-gas-plants)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
@@ -515,13 +535,17 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 | `ocean-energy` | Ocean energy | [/articles/ocean-energy](https://www.canarymedia.com/articles/ocean-energy) | 200 listing | 4 |
 | `offshore-wind` | Offshore wind | [/articles/offshore-wind](https://www.canarymedia.com/articles/offshore-wind) | 200 listing | 11 |
 | `policy-regulation` | Policy & regulation | [/articles/policy-regulation](https://www.canarymedia.com/articles/policy-regulation) | 200 listing | 11 |
-| `politics` | Politics | [/articles/politics](https://www.canarymedia.com/articles/politics) | 200 listing | 11 |
+| `politics` | Politics | [/articles/politics](https://www.canarymedia.com/articles/politics) | 200 listing | 10 |
 | `public-transit` | Public transit | [/articles/public-transit](https://www.canarymedia.com/articles/public-transit) | 200 listing | 11 |
 | `recycling-renewables` | Recycling renewables | [/articles/recycling-renewables](https://www.canarymedia.com/articles/recycling-renewables) | 200 listing | 11 |
 | `transmission` | Transmission | [/articles/transmission](https://www.canarymedia.com/articles/transmission) | 200 listing | 11 |
 | `utilities` | Utilities | [/articles/utilities](https://www.canarymedia.com/articles/utilities) | 200 listing | 11 |
 | `virtual-power-plants` | Virtual power plants | [/articles/virtual-power-plants](https://www.canarymedia.com/articles/virtual-power-plants) | 200 listing | 10 |
 | `workforce-diversity` | Workforce diversity | [/articles/workforce-diversity](https://www.canarymedia.com/articles/workforce-diversity) | 200 listing | 11 |
+| `region-northeast` | U.S. Northeast | [/regions/northeast](https://www.canarymedia.com/regions/northeast) | 200 listing | 11 |
+| `region-southeast` | U.S. Southeast | [/regions/southeast](https://www.canarymedia.com/regions/southeast) | 200 listing | 11 |
+| `region-midwest` | U.S. Midwest | [/regions/midwest](https://www.canarymedia.com/regions/midwest) | 200 listing | 11 |
+| `region-west` | U.S. West | [/regions/west](https://www.canarymedia.com/regions/west) | 200 listing | 11 |
 
 
 ### Lawfare
@@ -530,24 +554,24 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `Cybersecurity & Tech`, `Surveillance & Privacy`
 - catalog behavior: Static catalog covering all twelve Topics navigation entries. Listing extraction accepts written article titles and excludes podcast and multimedia entries.
-- verification: **2026-10-17**. The Topics navigation is present in accessible Cybersecurity & Tech HTML and indexed first-party pages. Cybersecurity & Tech produced written candidates and a representative article supplied a readable body, author, and publication date. The homepage and the other eleven destinations returned HTTP 403 challenge pages; a repeated Congress request was also blocked. Their raw listing extraction remains unverified.
-- first-party catalog references: [publisher homepage](https://www.lawfaremedia.org/), [accessible Topics navigation](https://www.lawfaremedia.org/topics/cybersecurity-tech)
-- article verification samples: [Written article](https://www.lawfaremedia.org/article/russia's-digital-detox-boomerang)
+- verification: **2026-11-09**. The Topics navigation lists all twelve catalog topics. All twelve destinations returned HTTP 200 and produced written-article candidates; Lawfare Daily, Lawfare Live, and other podcast entries are excluded. Some requests, including the homepage, intermittently returned an HTTP 403 challenge page; retries succeeded for every topic. The Surveillance & Privacy page heading reads States & Localities; its page title and listed articles identify the Surveillance & Privacy topic. A representative article supplied a readable body, author, and publication date.
+- first-party catalog references: [publisher homepage](https://www.lawfaremedia.org/), [Topics navigation](https://www.lawfaremedia.org/topics/cybersecurity-tech)
+- article verification samples: [Written article](https://www.lawfaremedia.org/article/the-ritual-bitcoin-sacrifices-will-continue-until-security-improves)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
-| `cybersecurity-tech` | Cybersecurity & Tech | [/topics/cybersecurity-tech](https://www.lawfaremedia.org/topics/cybersecurity-tech) | 200 listing | 10 |
-| `surveillance-privacy` | Surveillance & Privacy | [/topics/surveillance-privacy](https://www.lawfaremedia.org/topics/surveillance-privacy) | 403 challenge | — |
-| `intelligence` | Intelligence | [/topics/intelligence](https://www.lawfaremedia.org/topics/intelligence) | 403 challenge | — |
-| `foreign-relations-international-law` | Foreign Relations & International Law | [/topics/foreign-relations-international-law](https://www.lawfaremedia.org/topics/foreign-relations-international-law) | 403 challenge | — |
-| `armed-conflict` | Armed Conflict | [/topics/armed-conflict](https://www.lawfaremedia.org/topics/armed-conflict) | 403 challenge | — |
-| `congress` | Congress | [/topics/congress](https://www.lawfaremedia.org/topics/congress) | 403 challenge | — |
-| `courts-litigation` | Courts & Litigation | [/topics/courts-litigation](https://www.lawfaremedia.org/topics/courts-litigation) | 403 challenge | — |
-| `criminal-justice-rule-of-law` | Criminal Justice & Rule of Law | [/topics/criminal-justice-rule-of-law](https://www.lawfaremedia.org/topics/criminal-justice-rule-of-law) | 403 challenge | — |
-| `democracy-elections` | Democracy & Elections | [/topics/democracy-elections](https://www.lawfaremedia.org/topics/democracy-elections) | 403 challenge | — |
-| `executive-branch` | Executive Branch | [/topics/executive-branch](https://www.lawfaremedia.org/topics/executive-branch) | 403 challenge | — |
-| `states-localities` | States & Localities | [/topics/states-localities](https://www.lawfaremedia.org/topics/states-localities) | 403 challenge | — |
-| `terrorism-extremism` | Terrorism & Extremism | [/topics/terrorism-extremism](https://www.lawfaremedia.org/topics/terrorism-extremism) | 403 challenge | — |
+| `cybersecurity-tech` | Cybersecurity & Tech | [/topics/cybersecurity-tech](https://www.lawfaremedia.org/topics/cybersecurity-tech) | 200 listing | 9 |
+| `surveillance-privacy` | Surveillance & Privacy | [/topics/surveillance-privacy](https://www.lawfaremedia.org/topics/surveillance-privacy) | 200 listing | 12 |
+| `intelligence` | Intelligence | [/topics/intelligence](https://www.lawfaremedia.org/topics/intelligence) | 200 listing | 7 |
+| `foreign-relations-international-law` | Foreign Relations & International Law | [/topics/foreign-relations-international-law](https://www.lawfaremedia.org/topics/foreign-relations-international-law) | 200 listing | 9 |
+| `armed-conflict` | Armed Conflict | [/topics/armed-conflict](https://www.lawfaremedia.org/topics/armed-conflict) | 200 listing | 5 |
+| `congress` | Congress | [/topics/congress](https://www.lawfaremedia.org/topics/congress) | 200 listing | 10 |
+| `courts-litigation` | Courts & Litigation | [/topics/courts-litigation](https://www.lawfaremedia.org/topics/courts-litigation) | 200 listing | 5 |
+| `criminal-justice-rule-of-law` | Criminal Justice & Rule of Law | [/topics/criminal-justice-rule-of-law](https://www.lawfaremedia.org/topics/criminal-justice-rule-of-law) | 200 listing | 11 |
+| `democracy-elections` | Democracy & Elections | [/topics/democracy-elections](https://www.lawfaremedia.org/topics/democracy-elections) | 200 listing | 3 |
+| `executive-branch` | Executive Branch | [/topics/executive-branch](https://www.lawfaremedia.org/topics/executive-branch) | 200 listing | 4 |
+| `states-localities` | States & Localities | [/topics/states-localities](https://www.lawfaremedia.org/topics/states-localities) | 200 listing | 7 |
+| `terrorism-extremism` | Terrorism & Extremism | [/topics/terrorism-extremism](https://www.lawfaremedia.org/topics/terrorism-extremism) | 200 listing | 9 |
 
 
 ### InfoQ
@@ -556,9 +580,9 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `Software Architecture`, `Cloud Architecture`
 - catalog behavior: Static catalog covering the technical navigation topics and Cloud Architecture. Candidate extraction is restricted to each page’s News and Articles modules, excluding podcasts, presentations, and guides.
-- verification: **2026-10-17**. All 46 destinations produced written-article candidates; a representative article supplied a readable body, author, and publication date. Case Studies, Patterns, and Security use the canonical /case_study/, /designpattern/, and /security/ destinations.
+- verification: **2026-11-09**. All 46 destinations produced written-article candidates; a representative article supplied a readable body, author, and publication date. Case Studies, Patterns, and Security use the canonical /case_study/, /designpattern/, and /security/ destinations.
 - first-party catalog reference: [publisher navigation or topic index](https://www.infoq.com/)
-- article verification samples: [Written article](https://www.infoq.com/news/2026/10/aws-enhanced-eventbridge-buses/)
+- article verification samples: [Written article](https://www.infoq.com/articles/identity-as-architecture/)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
@@ -616,7 +640,7 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `Strategy`, `Technology`
 - catalog behavior: Static catalog covering the editorial Topics menu. Candidate discovery uses the first-party search endpoint and each target’s search tag. Economics uses the research-center hub. Article parsing supports insights articles and readable research-center hubs.
-- verification: **2026-10-17**. All six destination pages were accessible. The search endpoint returned HTTP 403 for each target’s discovery request, so candidate discovery remains unverified. A representative Tech Trends article supplied a readable body, author, and publication date. Economics uses the research-center hub; /us/en/insights/topics/economy.html resolves to that hub. Leadership appears in suggested topics and is outside the six-item editorial Topics menu.
+- verification: **2026-11-09**. All six destination pages returned HTTP 200. The search endpoint returned HTTP 403 for each target’s discovery request, so candidate discovery remains unverified. A representative Tech Trends article supplied a readable body, author, and publication date. The header Topics menu links Economics through /us/en/insights/topics/economy.html, which redirects to the research-center hub used by the catalog. The menu also links an Industries directory of industry research hubs; it has no single topic search tag and is outside the topic catalog. Leadership appears in suggested topics and is outside the editorial Topics menu.
 - first-party catalog reference: [publisher navigation or topic index](https://www.deloitte.com/us/en/insights.html)
 - article verification samples: [Technology](https://www.deloitte.com/us/en/insights/topics/technology-management/tech-trends.html)
 
@@ -636,28 +660,28 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `Leadership`, `Strategy`
 - catalog behavior: Static catalog covering the featured subjects on the Topics index. Candidate extraction reads Digital Article records from server-rendered Next.js result state and supports stream-item cards. Magazine articles, podcasts, store items, and external URLs are excluded. The exhaustive alphabetical subject, industry, and geography directories are outside this catalog.
-- verification: **2026-10-17**. All 17 destinations produced digital-article candidates; a representative article supplied a readable body, author, and publication date. Work-life Balance uses the canonical /topic/subject/work_life-balance destination with the stable key work-life-balance. The navigation label Managing Teams links to Managing People; the catalog uses the topic-page label.
+- verification: **2026-11-09**. All 17 destinations produced digital-article candidates; a representative article supplied a readable body, author, and publication date. The catalog covers the 15 Most Popular subjects on the Topics index and the header’s Gender and Work-life Balance topics. The header links /topic/subject/work-life-balance, which redirects to the canonical /topic/subject/work_life-balance destination with the stable key work-life-balance. The navigation label Managing Teams links to Managing People; the catalog uses the topic-page label.
 - first-party catalog reference: [publisher navigation or topic index](https://hbr.org/topics)
-- article verification samples: [Written article](https://hbr.org/2026/10/the-most-consequential-move-a-new-ceo-can-make)
+- article verification samples: [Written article](https://hbr.org/2026/11/do-people-want-ceos-to-shut-up)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |
 | `leadership` | Leadership | [/topic/subject/leadership](https://hbr.org/topic/subject/leadership) | 200 listing | 3 |
-| `strategy` | Strategy | [/topic/subject/strategy](https://hbr.org/topic/subject/strategy) | 200 listing | 3 |
-| `innovation` | Innovation | [/topic/subject/innovation](https://hbr.org/topic/subject/innovation) | 200 listing | 3 |
+| `strategy` | Strategy | [/topic/subject/strategy](https://hbr.org/topic/subject/strategy) | 200 listing | 4 |
+| `innovation` | Innovation | [/topic/subject/innovation](https://hbr.org/topic/subject/innovation) | 200 listing | 5 |
 | `managing-people` | Managing People | [/topic/subject/managing-people](https://hbr.org/topic/subject/managing-people) | 200 listing | 7 |
-| `managing-yourself` | Managing Yourself | [/topic/subject/managing-yourself](https://hbr.org/topic/subject/managing-yourself) | 200 listing | 4 |
+| `managing-yourself` | Managing Yourself | [/topic/subject/managing-yourself](https://hbr.org/topic/subject/managing-yourself) | 200 listing | 2 |
 | `gender` | Gender | [/topic/subject/gender](https://hbr.org/topic/subject/gender) | 200 listing | 3 |
 | `work-life-balance` | Work-life Balance | [/topic/subject/work_life-balance](https://hbr.org/topic/subject/work_life-balance) | 200 listing | 1 |
-| `technology-and-analytics` | Technology and Analytics | [/topic/subject/technology-and-analytics](https://hbr.org/topic/subject/technology-and-analytics) | 200 listing | 7 |
+| `technology-and-analytics` | Technology and Analytics | [/topic/subject/technology-and-analytics](https://hbr.org/topic/subject/technology-and-analytics) | 200 listing | 9 |
 | `organizational-culture` | Organizational Culture | [/topic/subject/organizational-culture](https://hbr.org/topic/subject/organizational-culture) | 200 listing | 3 |
-| `marketing` | Marketing | [/topic/subject/marketing](https://hbr.org/topic/subject/marketing) | 200 listing | 2 |
+| `marketing` | Marketing | [/topic/subject/marketing](https://hbr.org/topic/subject/marketing) | 200 listing | 4 |
 | `business-communication` | Business Communication | [/topic/subject/business-communication](https://hbr.org/topic/subject/business-communication) | 200 listing | 4 |
 | `economics` | Economics | [/topic/subject/economics](https://hbr.org/topic/subject/economics) | 200 listing | 4 |
-| `decision-making-and-problem-solving` | Decision Making and Problem Solving | [/topic/subject/decision-making-and-problem-solving](https://hbr.org/topic/subject/decision-making-and-problem-solving) | 200 listing | 3 |
+| `decision-making-and-problem-solving` | Decision Making and Problem Solving | [/topic/subject/decision-making-and-problem-solving](https://hbr.org/topic/subject/decision-making-and-problem-solving) | 200 listing | 1 |
 | `competitive-strategy` | Competitive Strategy | [/topic/subject/competitive-strategy](https://hbr.org/topic/subject/competitive-strategy) | 200 listing | 5 |
 | `customer-experience` | Customer Experience | [/topic/subject/customer-experience](https://hbr.org/topic/subject/customer-experience) | 200 listing | 4 |
-| `international-business` | International Business | [/topic/subject/international-business](https://hbr.org/topic/subject/international-business) | 200 listing | 4 |
+| `international-business` | International Business | [/topic/subject/international-business](https://hbr.org/topic/subject/international-business) | 200 listing | 3 |
 | `career-planning` | Career Planning | [/topic/subject/career-planning](https://hbr.org/topic/subject/career-planning) | 200 listing | 6 |
 
 
@@ -667,9 +691,9 @@ For an on-demand live audit and code update, use the repository skill [`$update-
 - bootstrap state: disabled by default
 - default selected targets: `Health & Medicine`, `Computers & Math`
 - catalog behavior: Static catalog covering the primary science sections, Latest, and Top Science News. Candidate extraction is scoped to the category-page headline modules, and article URLs are restricted to internal `/releases/*` pages. Deeper subtopic directories are outside this catalog.
-- verification: **2026-10-17**. All 15 destinations produced native release candidates, including Latest and Top Science News. Representative release articles supplied readable bodies, institutional sources, and dates. Strange & Offbeat identifies the /news/strange_offbeat/ section. Deeper science subtopics remain outside this catalog.
+- verification: **2026-11-09**. All 15 destinations produced native release candidates, including Latest and Top Science News. A representative release supplied a readable body, institutional source, and date. Strange & Offbeat identifies the /news/strange_offbeat/ section. Deeper science subtopics and the Top Health, Top Physical/Tech, Top Environment, and Top Society variants are outside this catalog.
 - first-party catalog reference: [publisher navigation or topic index](https://www.sciencedaily.com/)
-- article verification samples: [Written article](https://www.sciencedaily.com/releases/2026/10/261014072018.htm), [Latest](https://www.sciencedaily.com/releases/2026/10/261015003803.htm)
+- article verification samples: [Written article](https://www.sciencedaily.com/releases/2026/11/261106174543.htm)
 
 | Key | Target | Destination | HTTP/content | Candidates |
 | --- | --- | --- | --- | --- |

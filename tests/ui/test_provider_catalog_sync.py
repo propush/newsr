@@ -18,6 +18,8 @@ def test_startup_updates_catalogs_without_resetting_user_state(app_config, tmp_p
         ProviderRecord("edsurge", "EdSurge", False),
         ProviderRecord("arstechnica", "Ars Technica", True),
         ProviderRecord("infoq", "InfoQ", True),
+        ProviderRecord("thehackernews", "The Hacker News", True),
+        ProviderRecord("tomshardware", "Tom's Hardware", True),
     ])
     storage.replace_provider_targets("ninetofivegoogle", [
         ProviderTarget("ninetofivegoogle", "workspace", "category", "Workspace", {"path": "/guides/workspace/"}),
@@ -44,6 +46,15 @@ def test_startup_updates_catalogs_without_resetting_user_state(app_config, tmp_p
         ProviderTarget("infoq", "case-study", "topic", "Case Studies", {"path": "/Case_Study/"}),
     ])
     storage.set_selected_targets("infoq", ["case-study"])
+    storage.replace_provider_targets("thehackernews", [
+        ProviderTarget("thehackernews", "vulnerabilities", "category", "Vulnerabilities", {"path": "/search/label/Vulnerable"}),
+        ProviderTarget("thehackernews", "expert-insights", "category", "Expert Insights", {"path": "/expert-insights/"}),
+    ])
+    storage.set_selected_targets("thehackernews", ["vulnerabilities"])
+    storage.replace_provider_targets("tomshardware", [
+        ProviderTarget("tomshardware", "cpus", "category", "CPUs", {"path": "/pc-components/cpus/news"}),
+    ])
+    storage.set_selected_targets("tomshardware", ["cpus"])
     topic = storage.create_topic_provider(display_name="A watched topic", topic_query="example", update_schedule=None)
     watched_targets = storage.list_provider_targets(topic.provider_id)
     storage.close()
@@ -76,6 +87,17 @@ def test_startup_updates_catalogs_without_resetting_user_state(app_config, tmp_p
                 assert ars["gadgets"].label == "Tech"
                 assert ars["tech-policy"].label == "Policy"
                 assert {target.target_key for target in app.storage.list_selected_targets("arstechnica")} == {"gadgets", "tech-policy"}
+                assert ars["features"].selected is False
+                assert ars["reviews"].selected is False
+                hacker_news = {target.target_key: target for target in app.storage.list_provider_targets("thehackernews")}
+                assert hacker_news["vulnerabilities"].payload["path"] == "/search/label/Vulnerability"
+                assert hacker_news["vulnerabilities"].selected is True
+                assert hacker_news["expert-insights"].selected is False
+                toms = {target.target_key: target for target in app.storage.list_provider_targets("tomshardware")}
+                assert toms["cpus"].selected is True
+                assert toms["semiconductors"].selected is False
+                assert toms["microsoft-office"].payload["path"] == "/software/applications/microsoft-office/news"
+                assert edsurge["attendance"].selected is False
                 infoq = app.storage.list_selected_targets("infoq")
                 assert [(target.target_key, target.payload["path"]) for target in infoq] == [("case-study", "/case_study/")]
                 assert app.storage.list_provider_targets(topic.provider_id) == watched_targets

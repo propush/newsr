@@ -175,6 +175,9 @@ def _author_text(soup: BeautifulSoup) -> str | None:
     meta_author = _meta_content(soup, "name", "author")
     if meta_author:
         return _clean_author(meta_author)
+    sailthru_author = _clean_author(_meta_content(soup, "name", "sailthru.author"))
+    if sailthru_author:
+        return sailthru_author
     for selector in (
         '[rel="author"]',
         '[itemprop="author"] [itemprop="name"]',

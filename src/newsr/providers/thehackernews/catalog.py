@@ -24,7 +24,7 @@ BASE_SECTION_OPTIONS: tuple[SectionOption, ...] = (
     SectionOption(
         slug="vulnerabilities",
         label="Vulnerabilities",
-        path="/search/label/Vulnerable",
+        path="/search/label/Vulnerability",
     ),
     SectionOption(
         slug="expert-insights",

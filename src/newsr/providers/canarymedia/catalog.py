@@ -88,4 +88,8 @@ BASE_TARGET_OPTIONS = [
     TargetOption("utilities", "Utilities", "/articles/utilities"),
     TargetOption("virtual-power-plants", "Virtual power plants", "/articles/virtual-power-plants"),
     TargetOption("workforce-diversity", "Workforce diversity", "/articles/workforce-diversity"),
+    TargetOption("region-northeast", "U.S. Northeast", "/regions/northeast"),
+    TargetOption("region-southeast", "U.S. Southeast", "/regions/southeast"),
+    TargetOption("region-midwest", "U.S. Midwest", "/regions/midwest"),
+    TargetOption("region-west", "U.S. West", "/regions/west"),
 ]

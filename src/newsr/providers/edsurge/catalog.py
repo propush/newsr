@@ -44,4 +44,6 @@ BASE_TARGET_OPTIONS = [
     TargetOption("digital-access", "Digital Access", "/coverage-areas/digital-access"),
     TargetOption("instructional-trends", "Instructional Trends", "/coverage-areas/instructional-trends"),
     TargetOption("data-privacy", "Data Privacy", "/coverage-areas/data-privacy"),
+    TargetOption("attendance", "Attendance", "/coverage-areas/attendance"),
+    TargetOption("civics", "Civics", "/coverage-areas/civics"),
 ]

@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlparse, urlunparse
 
 THN_ROOT = "https://thehackernews.com"
 _ALLOWED_HOSTS = {"thehackernews.com", "www.thehackernews.com"}
-_ARTICLE_PATH_RE = re.compile(r"^/\d{4}/\d{2}/[^/]+\.html$")
+_ARTICLE_PATH_RE = re.compile(r"^/(?:expert-insights/)?\d{4}/\d{2}/[^/]+\.html$")
 
 
 def normalize_url(href: str) -> str:

@@ -24,4 +24,6 @@ BASE_TARGET_OPTIONS = [
     TargetOption("information-technology", "Biz & IT", "/information-technology/", "category"),
     TargetOption("health", "Health", "/health/", "category"),
     TargetOption("culture", "Culture", "/culture/", "category"),
+    TargetOption("features", "Features", "/features/", "category"),
+    TargetOption("reviews", "Reviews", "/reviews/", "category"),
 ]

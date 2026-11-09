@@ -88,6 +88,16 @@ _SKIP_TEXT_SNIPPETS = (
 )
 _NON_ALNUM_PATTERN = re.compile(r"[\W_]+")
 _SITE_AUTHOR_PLACEHOLDER = "The Hacker News"
+_AUTHOR_SELECTORS = (
+    'a[rel="author"]',
+    '[itemprop="author"] [itemprop="name"]',
+    '[itemprop="author"]',
+    ".postmeta .author",
+    ".auth-name",
+    ".author",
+    ".byline",
+    ".post-author",
+)
 
 
 def parse_section_html(html: str, category: str) -> list[SectionCandidate]:
@@ -242,17 +252,20 @@ def _comparable_text(value: str) -> str:
 def _author_text(soup: BeautifulSoup) -> str | None:
     meta_author = _meta_content(soup, "name", "author")
     if meta_author:
-        return _clean_author_text(meta_author)
-    author_link = soup.select_one('a[rel="author"], [itemprop="author"]')
-    if isinstance(author_link, Tag):
-        text = author_link.get_text(" ", strip=True)
-        if text:
-            return _clean_author_text(text)
-    byline = soup.select_one(".author, .byline, .post-author")
-    if isinstance(byline, Tag):
-        text = byline.get_text(" ", strip=True)
-        if text:
-            return _clean_author_text(text.removeprefix("by ").strip())
+        cleaned = _clean_author_text(meta_author)
+        if cleaned:
+            return cleaned
+    for selector in _AUTHOR_SELECTORS:
+        node = soup.select_one(selector)
+        if not isinstance(node, Tag):
+            continue
+        if node.name == "meta":
+            text = str(node.get("content", "")).strip()
+        else:
+            text = node.get_text(" ", strip=True)
+        cleaned = _clean_author_text(text.removeprefix("by ").strip())
+        if cleaned:
+            return cleaned
     return None
 
 
@@ -267,6 +280,8 @@ def _clean_author_text(value: str) -> str | None:
 
 def _published_at(soup: BeautifulSoup) -> datetime | None:
     raw = _meta_content(soup, "property", "article:published_time")
+    if not raw:
+        raw = _meta_content(soup, "itemprop", "datePublished")
     if not raw:
         time_node = soup.select_one("time[datetime]")
         if isinstance(time_node, Tag):

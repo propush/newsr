@@ -140,3 +140,94 @@ def test_url_helpers_normalize_and_derive_stable_article_ids() -> None:
     assert is_article_url("https://thehackernews.com/expert-insights/") is False
     assert is_article_url("https://thehackernews.uk/free-ebook") is False
     assert article_id_from_url(url) == "2026/03/critical-vpn-zero-day-exploited"
+
+
+def test_parse_section_html_accepts_expert_insights_articles() -> None:
+    html = Path("tests/fixtures/thehackernews_listing_expert_insights.html").read_text(encoding="utf-8")
+
+    candidates = parse_section_html(html, "Expert Insights")
+
+    assert [candidate.article_id for candidate in candidates] == [
+        "expert-insights/2026/11/example-privilege-guide",
+        "expert-insights/2026/10/example-backup-analysis",
+    ]
+    assert candidates[1].url == (
+        "https://thehackernews.com/expert-insights/2026/10/example-backup-analysis.html"
+    )
+    assert is_article_url("https://thehackernews.com/expert-insights/search") is False
+
+
+def test_parse_article_html_reads_blogger_author_and_date_metadata() -> None:
+    html = Path("tests/fixtures/thehackernews_article_blogger_metadata.html").read_text(
+        encoding="utf-8"
+    )
+    candidate = SectionCandidate(
+        article_id="2026/11/example-exploited-gateway-flaw",
+        provider_id="thehackernews",
+        provider_article_id="2026/11/example-exploited-gateway-flaw",
+        url="https://thehackernews.com/2026/11/example-exploited-gateway-flaw.html",
+        category="Vulnerabilities",
+    )
+
+    article = parse_article_html(html, candidate)
+
+    assert article.author == "Example Reporter"
+    assert article.published_at is not None
+    assert article.published_at.isoformat() == "2026-11-09T11:35:00+05:30"
+    assert article.body == "Defenders are patching an exploited gateway flaw."
+
+
+def test_parse_article_html_reads_expert_insights_without_named_author() -> None:
+    html = Path("tests/fixtures/thehackernews_article_expert_insights.html").read_text(
+        encoding="utf-8"
+    )
+    candidate = SectionCandidate(
+        article_id="expert-insights/2026/11/example-privilege-guide",
+        provider_id="thehackernews",
+        provider_article_id="expert-insights/2026/11/example-privilege-guide",
+        url="https://thehackernews.com/expert-insights/2026/11/example-privilege-guide.html",
+        category="Expert Insights",
+    )
+
+    article = parse_article_html(html, candidate)
+
+    assert article.title == "Example Privilege Guide"
+    assert article.author is None
+    assert article.published_at is not None
+    assert article.published_at.isoformat() == "2026-11-02T12:30:00+05:30"
+    assert article.body == "Teams need elevated privileges for routine endpoint work."
+
+
+def test_vulnerabilities_target_uses_current_navigation_label_destination() -> None:
+    target = next(
+        target
+        for target in TheHackerNewsProvider().default_targets()
+        if target.target_key == "vulnerabilities"
+    )
+
+    assert target.label == "Vulnerabilities"
+    assert target.payload["path"] == "/search/label/Vulnerability"
+
+
+def test_expert_insights_target_fetches_expert_insights_candidates(monkeypatch) -> None:
+    provider = TheHackerNewsProvider()
+    target = next(
+        target for target in provider.default_targets() if target.target_key == "expert-insights"
+    )
+    requests: list[str] = []
+
+    def read_url(url, cancellation=None):
+        requests.append(url)
+        return Path("tests/fixtures/thehackernews_listing_expert_insights.html").read_text(
+            encoding="utf-8"
+        )
+
+    monkeypatch.setattr(provider, "_read_url", read_url)
+    candidates = provider.fetch_candidates(target, limit=10)
+
+    assert requests == ["https://thehackernews.com/expert-insights/"]
+    assert [candidate.article_id for candidate in candidates] == [
+        "thehackernews:expert-insights/2026/11/example-privilege-guide",
+        "thehackernews:expert-insights/2026/10/example-backup-analysis",
+    ]
+    assert all(candidate.category == "Expert Insights" for candidate in candidates)
