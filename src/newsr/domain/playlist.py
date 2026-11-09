@@ -7,3 +7,4 @@ from dataclasses import dataclass
 class PlaylistItem:
     article_id: str
     scope_id: str
+    mark_read: bool = True

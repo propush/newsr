@@ -111,6 +111,7 @@ RU_MESSAGES: Final[dict[str, str]] = {
         "C: управление источниками\n"
         "W: создать отслеживаемую тему\n"
         "D: принудительно обновить все провайдеры\n"
+        "Shift+A: все непрочитанные статьи в плейлист\n"
         "P: пуск/пауза плейлиста\n"
         "Shift+P: показать плейлист\n"
         "] / [: следующая статья плейлиста / текущая сначала, в её начале — предыдущая\n"
@@ -259,9 +260,10 @@ RU_MESSAGES: Final[dict[str, str]] = {
     "brief_reader.binding.close": "Закрыть",
     "brief_reader.binding.pgup": "PgUp",
     "brief_reader.binding.pgdn": "PgDn",
+    "brief_reader.binding.playlist_add_all": "Все в плейлист",
     "brief_reader.header": "Краткий обзор",
     "brief_reader.hint": "Esc: закрыть   Up/Down: прокрутка   Space/B: страница",
-    "brief_reader.hint_with_jump": "Номер + Enter: открыть статью   Esc: закрыть   Up/Down: прокрутка",
+    "brief_reader.hint_with_jump": "Номер + Enter: открыть статью   Shift+A: все в плейлист   Esc: закрыть   Up/Down: прокрутка",
     "brief_jump.binding.jump": "Перейти",
     "brief_jump.binding.cancel": "Отмена",
     "brief_jump.header": "Переход к статье",

@@ -116,7 +116,7 @@ class PlaylistController:
         article = self._app._navigation.current_article
         if article is None:
             return
-        self._append([article])
+        self.add_items(self._active_scope_items([article]))
 
     def add_rest_of_scope(self) -> None:
         if not self._can_add():
@@ -124,7 +124,31 @@ class PlaylistController:
         nav = self._app._navigation
         if not nav.articles:
             return
-        self._append(nav.articles[nav.current_index:])
+        self.add_items(self._active_scope_items(nav.articles[nav.current_index:]))
+
+    def add_all_unread(self) -> None:
+        """Queue the unread articles of every enabled provider, each under its own provider scope."""
+        articles = self._app._provider_home.unread_articles()
+        self.add_items(
+            [PlaylistItem(article_id=article.article_id, scope_id=article.provider_id) for article in articles]
+        )
+
+    def add_items(self, items: list[PlaylistItem], *, notify: bool = False) -> None:
+        queued = {item.article_id for item in self._items}
+        added: list[PlaylistItem] = []
+        for item in items:
+            if item.article_id in queued:
+                continue
+            queued.add(item.article_id)
+            added.append(item)
+        self._items.extend(added)
+        self._save()
+        self._prepare(added)
+        text = self._app.ui.text("playlist.status.added", added=len(added), total=len(self._items))
+        self._set_app_status(text)
+        if notify:
+            self._app.notify(text)
+        self._refresh()
 
     def remove(self, article_id: str) -> None:
         index = self._index_of(article_id)
@@ -385,19 +409,9 @@ class PlaylistController:
     def _can_add(self) -> bool:
         return not self._app.provider_home_open and not self._app._brief.article_open
 
-    def _append(self, articles: list[ArticleRecord]) -> None:
+    def _active_scope_items(self, articles: list[ArticleRecord]) -> list[PlaylistItem]:
         scope_id = self._app._provider_home.active_scope_id
-        queued = {item.article_id for item in self._items}
-        added = [
-            PlaylistItem(article_id=article.article_id, scope_id=scope_id)
-            for article in articles
-            if article.article_id not in queued
-        ]
-        self._items.extend(added)
-        self._save()
-        self._prepare(added)
-        self._set_app_status(self._app.ui.text("playlist.status.added", added=len(added), total=len(self._items)))
-        self._refresh()
+        return [PlaylistItem(article_id=article.article_id, scope_id=scope_id) for article in articles]
 
     def _start(self) -> None:
         self._error = None
@@ -572,7 +586,7 @@ class PlaylistController:
             return None
         article = scope_articles[position]
         mode = self._view_mode(item.scope_id)
-        if mark_read:
+        if mark_read and item.mark_read:
             self._mark_read(item, scope_articles, position)
         provider_name = provider_display_names(self._app.storage).get(article.provider_id, article.provider_id)
         segments = article_segments(

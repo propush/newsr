@@ -117,6 +117,7 @@ def test_ui_provider_home_help_shows_provider_only_bindings(app_config, tmp_path
             assert "C: manage sources" in help_text
             assert "W: create watched topic" in help_text
             assert "D: force refresh all providers" in help_text
+            assert "Shift+A: add all unread articles to playlist" in help_text
             assert "Ctrl+P: command palette / choose theme" in help_text
             assert "K: classify categories" not in help_text
             assert "Left/Right: previous/next article" not in help_text

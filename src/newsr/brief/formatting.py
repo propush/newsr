@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from .budget import estimate_token_count, trim_to_budget
 from .models import BriefArticle, BriefBatch
-from .repair import BriefValidation, format_validation
+from .repair import BriefValidation, format_validation, reference_numbers
 
 
 def format_article(article: BriefArticle, input_budget: int) -> str:
@@ -33,22 +33,42 @@ def format_source_catalog(articles: Sequence[BriefArticle], input_budget: int) -
     return trim_to_budget("\n\n".join(entries), input_budget)
 
 
-def batch_texts(values: Sequence[str], input_budget: int) -> list[str]:
-    batches: list[str] = []
+def note_batches(
+    notes: Sequence[str],
+    articles: Sequence[BriefArticle],
+    input_budget: int,
+) -> list[BriefBatch]:
+    """Group notes into batches; each batch requires the markers its notes carried before trimming."""
+    articles_by_number = {article.number: article for article in articles}
+    batches: list[BriefBatch] = []
     current: list[str] = []
+    current_numbers: set[int] = set()
     current_tokens = 0
-    for value in values:
-        text = trim_to_budget(value, input_budget)
+
+    def close_batch() -> None:
+        batches.append(
+            BriefBatch(
+                text="\n\n".join(current),
+                article_numbers=frozenset(current_numbers),
+                articles=tuple(articles_by_number[number] for number in sorted(current_numbers)),
+            )
+        )
+
+    for note in notes:
+        text = trim_to_budget(note, input_budget)
         token_count = estimate_token_count(text)
         separator_tokens = 1 if current else 0
         if current and current_tokens + separator_tokens + token_count > input_budget:
-            batches.append("\n\n".join(current))
+            close_batch()
             current = []
+            current_numbers = set()
             current_tokens = 0
+            separator_tokens = 0
         current.append(text)
+        current_numbers.update(number for number in reference_numbers(note) if number in articles_by_number)
         current_tokens += token_count + separator_tokens
     if current:
-        batches.append("\n\n".join(current))
+        close_batch()
     return batches
 
 

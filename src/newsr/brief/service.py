@@ -8,11 +8,11 @@ from ..cancellation import RefreshCancellation
 from ..config.models import AppConfig
 from ..storage.facade import NewsStorage
 from .budget import BriefBudget, trim_to_budget
-from .formatting import article_batches, batch_texts, final_repair_content, format_article, repair_content
+from .formatting import article_batches, final_repair_content, format_article, note_batches, repair_content
 from .models import BriefArticle, BriefBatch, BriefOptions, BriefResult, Clock, ProgressCallback
 from .progress import LOGGER, emit_progress, log_validation, raise_if_cancelled
 from .prompts import BriefPrompts
-from .repair import MAX_BRIEF_REPAIR_ATTEMPTS, reference_numbers, validate_brief_text
+from .repair import MAX_BRIEF_REPAIR_ATTEMPTS, validate_brief_text
 from .report import append_statistics, empty_report, fallback_brief_text, renumber_article_references
 from .selection import BriefArticleSelector
 
@@ -155,11 +155,12 @@ class BriefService:
                     batch_count=len(batches),
                 )
             )
-        return self._reduce_notes(notes, cancellation, on_progress)
+        return self._reduce_notes(notes, articles, cancellation, on_progress)
 
     def _reduce_notes(
         self,
         notes: list[str],
+        articles: Sequence[BriefArticle],
         cancellation: RefreshCancellation | None,
         on_progress: ProgressCallback | None,
     ) -> list[str]:
@@ -171,7 +172,7 @@ class BriefService:
             raise_if_cancelled(cancellation)
             if self._budget.fits(final_prompt, "\n\n".join(notes), self._budget.final_output_tokens()):
                 return notes
-            batches = batch_texts(notes, input_budget)
+            batches = note_batches(notes, articles, input_budget)
             reduced: list[str] = []
             for index, batch in enumerate(batches, start=1):
                 emit_progress(
@@ -181,7 +182,7 @@ class BriefService:
                     "brief.status.reducing_notes",
                     pass_number=iteration,
                 )
-                trimmed_batch = trim_to_budget(batch, input_budget)
+                trimmed_batch = trim_to_budget(batch.text, input_budget)
                 reduce_started_at = perf_counter()
                 LOGGER.info(
                     "brief_reduce_batch_start pass=%s batch=%s batches=%s input_budget=%s",
@@ -206,11 +207,10 @@ class BriefService:
                     perf_counter() - reduce_started_at,
                     len(note),
                 )
-                batch_scope = frozenset(reference_numbers(trimmed_batch))
                 reduced.append(
                     self._repair_compressed_notes(
                         note,
-                        BriefBatch(text=trimmed_batch, article_numbers=batch_scope),
+                        BriefBatch(text=trimmed_batch, article_numbers=batch.article_numbers, articles=batch.articles),
                         output_tokens,
                         cancellation,
                         on_progress,

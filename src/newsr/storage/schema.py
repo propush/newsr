@@ -237,3 +237,8 @@ def _initialize_playlist_schema(db: StorageConnection) -> None:
         )
         """
     )
+    db.ensure_column(
+        "playlist",
+        "mark_read",
+        """INTEGER NOT NULL DEFAULT 1""",
+    )

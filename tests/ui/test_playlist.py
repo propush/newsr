@@ -276,7 +276,7 @@ def test_ui_playlist_is_restored_after_restart(app_config, tmp_path) -> None:
 
 
 @pytest.mark.provider_home
-def test_ui_provider_home_allows_playback_keys_and_hides_add_keys(app_config, tmp_path) -> None:
+def test_ui_provider_home_allows_playback_and_add_all_keys_and_hides_add_current(app_config, tmp_path) -> None:
     app, _output, _engine = build_app(app_config, tmp_path)
     seed_articles(app, 1)
 
@@ -287,7 +287,7 @@ def test_ui_provider_home_allows_playback_keys_and_hides_add_keys(app_config, tm
             assert app.check_action("toggle_playback", ()) is True
             assert app.check_action("show_playlist", ()) is True
             assert app.check_action("playlist_add_current", ()) is False
-            assert app.check_action("playlist_add_rest", ()) is False
+            assert app.check_action("playlist_add_rest", ()) is True
 
             await pilot.press("P")
             await pilot.pause()

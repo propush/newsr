@@ -8,7 +8,7 @@ from textual.css.query import NoMatches
 from textual.containers import Vertical
 from textual.widgets import DataTable
 
-from ...domain import ProviderRecord, ProviderTarget
+from ...domain import ArticleRecord, ProviderRecord, ProviderTarget
 from ..group_headers import framed_group_header_text
 from ..provider_groups import build_provider_groups, provider_group_id_for_type, provider_group_label
 from ..screens import ProviderHomeRow
@@ -70,7 +70,9 @@ class ProviderHomeController:
                 )
 
     def rows(self) -> list[ProviderHomeRow]:
-        all_articles = self._app._articles_for_scope(ALL_PROVIDERS_SCOPE_ID)
+        return self._rows(self._app._articles_for_scope(ALL_PROVIDERS_SCOPE_ID))
+
+    def _rows(self, all_articles: list[ArticleRecord]) -> list[ProviderHomeRow]:
         provider_rows: list[ProviderHomeRow] = []
         if self._app.config.ui.show_all:
             provider_rows.append(
@@ -132,16 +134,27 @@ class ProviderHomeController:
             ),
         )
 
-    def _unread_count_for_scope(self, scope_id: str, articles: list) -> int:
+    def unread_articles(self) -> list[ArticleRecord]:
+        """Unread articles of every enabled provider, provider by provider in provider-home row order.
+
+        Each provider contributes the articles after its saved position, in that provider's reader order.
+        """
+        all_articles = self._app._articles_for_scope(ALL_PROVIDERS_SCOPE_ID)
+        unread: list[ArticleRecord] = []
+        for row in self._rows(all_articles):
+            if row.scope_id is None or row.scope_id == ALL_PROVIDERS_SCOPE_ID:
+                continue
+            provider_articles = [a for a in all_articles if a.provider_id == row.scope_id]
+            unread.extend(self._unread_articles(row.scope_id, provider_articles))
+        return unread
+
+    def _unread_count_for_scope(self, scope_id: str, articles: list[ArticleRecord]) -> int:
+        return len(self._unread_articles(scope_id, articles))
+
+    def _unread_articles(self, scope_id: str, articles: list[ArticleRecord]) -> list[ArticleRecord]:
         if not articles:
-            return 0
-        state = self._app.storage.load_reader_state(scope_id)
-        if state.article_id is None:
-            return len(articles)
-        for index, article in enumerate(articles):
-            if article.article_id == state.article_id:
-                return max(0, len(articles) - index - 1)
-        return len(articles)
+            return []
+        return _after_article(articles, self._app.storage.load_reader_state(scope_id).article_id)
 
     def show(self) -> None:
         self._selected_scope_id = self._active_scope_id
@@ -298,6 +311,7 @@ class ProviderHomeController:
             "playlist_previous",
             "playlist_seek_forward",
             "playlist_seek_back",
+            "playlist_add_rest",
         }
         hidden_in_provider_home = {
             "previous_article",
@@ -311,7 +325,6 @@ class ProviderHomeController:
             "open_article",
             "return_to_provider_home",
             "playlist_add_current",
-            "playlist_add_rest",
         }
         if action in provider_home_actions:
             return True
@@ -501,3 +514,12 @@ class ProviderHomeController:
                 return index
             index += step
         return None
+
+
+def _after_article(articles: list[ArticleRecord], article_id: str | None) -> list[ArticleRecord]:
+    if article_id is None:
+        return articles
+    for index, article in enumerate(articles):
+        if article.article_id == article_id:
+            return articles[index + 1 :]
+    return articles

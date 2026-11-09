@@ -55,3 +55,36 @@ def test_storage_adds_playlist_table_to_existing_database(tmp_path: Path) -> Non
         assert reopened.load_playlist() == []
     finally:
         reopened.close()
+
+
+def test_storage_persists_playlist_mark_read_flag(storage, article_content: ArticleContent) -> None:
+    storage.upsert_article_source(article_content)
+    items = [PlaylistItem(article_content.article_id, "bbc", mark_read=False)]
+
+    storage.save_playlist(items)
+
+    assert storage.load_playlist() == items
+
+
+def test_storage_adds_mark_read_column_to_existing_playlist(tmp_path: Path, article_content: ArticleContent) -> None:
+    storage_path = tmp_path / "newsr.sqlite3"
+    first = NewsStorage(storage_path)
+    first.initialize()
+    first.upsert_article_source(article_content)
+    first.connection.execute("DROP TABLE playlist")
+    first.connection.execute(
+        "CREATE TABLE playlist (position INTEGER PRIMARY KEY, article_id TEXT NOT NULL, scope_id TEXT NOT NULL)"
+    )
+    first.connection.execute(
+        "INSERT INTO playlist (position, article_id, scope_id) VALUES (0, ?, 'bbc')",
+        (article_content.article_id,),
+    )
+    first.connection.commit()
+    first.close()
+
+    reopened = NewsStorage(storage_path)
+    reopened.initialize()
+    try:
+        assert reopened.load_playlist() == [PlaylistItem(article_content.article_id, "bbc", mark_read=True)]
+    finally:
+        reopened.close()

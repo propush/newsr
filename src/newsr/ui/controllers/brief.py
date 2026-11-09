@@ -8,7 +8,7 @@ from textual.css.query import NoMatches
 
 from ...brief import BriefArticle, BriefOptions, BriefProgress, BriefResult, BriefService
 from ...cancellation import RefreshCancellation, RefreshCancelled
-from ...domain import ArticleRecord
+from ...domain import ArticleRecord, PlaylistItem
 from ...domain.reader import ReaderState
 from ..screens import BriefArticleJumpScreen, BriefReaderScreen, BriefScreen
 
@@ -165,6 +165,14 @@ class BriefController:
         self._app._provider_home._notify_bindings_changed()
         self._app._navigation.invalidate_render_cache()
         self._app.refresh_view()
+
+    def add_articles_to_playlist(self) -> None:
+        """Queue every brief article in brief order; playing them leaves saved reader positions unchanged."""
+        items = [
+            PlaylistItem(article_id=article.article_id, scope_id=article.provider_id, mark_read=False)
+            for article in sorted(self._articles, key=lambda article: article.number)
+        ]
+        self._app._playlist.add_items(items, notify=True)
 
     def update_active_article(self, article: ArticleRecord) -> None:
         if self._active_article is None or self._active_article.article_id != article.article_id:

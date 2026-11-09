@@ -367,6 +367,9 @@ class NewsReaderApp(App[None]):
         self._playlist.add_current()
 
     def action_playlist_add_rest(self) -> None:
+        if self.provider_home_open:
+            self._playlist.add_all_unread()
+            return
         self._playlist.add_rest_of_scope()
 
     def action_toggle_playback(self) -> None:
@@ -552,6 +555,9 @@ class NewsReaderApp(App[None]):
 
     def request_clear_playlist(self) -> None:
         self._playlist.request_clear()
+
+    def playlist_add_brief_articles(self) -> None:
+        self._brief.add_articles_to_playlist()
 
     def open_article_by_id(self, article_id: str) -> None:
         self._navigation.open_by_id(article_id)

@@ -12,18 +12,24 @@ class PlaylistStore:
         with self._db._lock:
             rows = self._db.connection.execute(
                 """
-                SELECT article_id, scope_id
+                SELECT article_id, scope_id, mark_read
                 FROM playlist
                 WHERE article_id IN (SELECT article_id FROM articles)
                 ORDER BY position ASC
                 """
             ).fetchall()
-        return [PlaylistItem(article_id=row["article_id"], scope_id=row["scope_id"]) for row in rows]
+        return [
+            PlaylistItem(article_id=row["article_id"], scope_id=row["scope_id"], mark_read=bool(row["mark_read"]))
+            for row in rows
+        ]
 
     def save(self, items: list[PlaylistItem]) -> None:
         with self._db.transaction():
             self._db.connection.execute("DELETE FROM playlist")
             self._db.connection.executemany(
-                "INSERT INTO playlist (position, article_id, scope_id) VALUES (?, ?, ?)",
-                [(position, item.article_id, item.scope_id) for position, item in enumerate(items)],
+                "INSERT INTO playlist (position, article_id, scope_id, mark_read) VALUES (?, ?, ?, ?)",
+                [
+                    (position, item.article_id, item.scope_id, int(item.mark_read))
+                    for position, item in enumerate(items)
+                ],
             )

@@ -83,6 +83,7 @@ class BriefReaderScreen(ModalScreen[None]):
             Binding("down", "scroll_down_report", show=False),
             Binding("pageup,b", "page_up_report", self._ui.text("brief_reader.binding.pgup"), show=False),
             Binding("pagedown,space", "page_down_report", self._ui.text("brief_reader.binding.pgdn"), show=False),
+            Binding("A", "playlist_add_all", self._ui.text("brief_reader.binding.playlist_add_all"), show=False),
         ]
 
     def compose(self) -> ComposeResult:
@@ -145,6 +146,9 @@ class BriefReaderScreen(ModalScreen[None]):
 
     def action_close_reader(self) -> None:
         self.app.close_brief_reader()
+
+    def action_playlist_add_all(self) -> None:
+        self.app.playlist_add_brief_articles()
 
     def action_scroll_up_report(self) -> None:
         self.query_one("#brief-reader-pane", VerticalScroll).scroll_up(animate=False)

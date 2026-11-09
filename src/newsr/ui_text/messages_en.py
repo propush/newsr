@@ -111,6 +111,7 @@ EN_MESSAGES: Final[dict[str, str]] = {
         "C: manage sources\n"
         "W: create watched topic\n"
         "D: force refresh all providers\n"
+        "Shift+A: add all unread articles to playlist\n"
         "P: play/pause playlist\n"
         "Shift+P: show playlist\n"
         "] / [: next playlist article / restart current article, at its start the previous one\n"
@@ -259,9 +260,10 @@ EN_MESSAGES: Final[dict[str, str]] = {
     "brief_reader.binding.close": "Close",
     "brief_reader.binding.pgup": "PgUp",
     "brief_reader.binding.pgdn": "PgDn",
+    "brief_reader.binding.playlist_add_all": "Add All to Playlist",
     "brief_reader.header": "Brief Review",
     "brief_reader.hint": "Esc: close   Up/Down: scroll   Space/B: page",
-    "brief_reader.hint_with_jump": "Type number + Enter: open article   Esc: close   Up/Down: scroll",
+    "brief_reader.hint_with_jump": "Type number + Enter: open article   Shift+A: all to playlist   Esc: close   Up/Down: scroll",
     "brief_jump.binding.jump": "Jump",
     "brief_jump.binding.cancel": "Cancel",
     "brief_jump.header": "Jump to Article",
