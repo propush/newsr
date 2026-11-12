@@ -161,6 +161,7 @@ NewsR starts in a provider home view. This is the default home screen shown afte
 - `Up` / `Down` / `PgUp` / `PgDn` move through the list.
 - `Enter` opens the highlighted scope.
 - `B` opens brief review generation.
+- `A` adds the unread articles of the highlighted row to the playlist; `Shift+A` adds the unread articles of every enabled provider.
 - `C`, `W`, `D`, `P`, `Shift+P`, `]`, `[`, `H`, `Ctrl+O`, `Ctrl+P`, and `Q` stay available from this view.
 
 ## Brief Review
@@ -221,7 +222,7 @@ Press `Right` on the last article in the current scope to return to the provider
 
 NewsR reads articles aloud from a playlist, like a podcast of your news.
 
-- `A` queues the current article; `Shift+A` queues it together with every following article of the current scope. Articles already in the playlist are skipped.
+- `A` queues the current article; `Shift+A` queues it together with every following article of the current scope. In provider home, `A` queues the unread articles of the highlighted row, and `Shift+A` queues the unread articles of every enabled provider. Articles already in the playlist are skipped.
 - `P` starts, pauses, and resumes playback. `]` skips to the next article. `[` restarts the current article, or returns to the previous one while the article intro plays.
 - `.` and `,` move one passage forward or back. Passages are the intro, the title, and groups of body sentences that start near 200 characters and grow up to the request size of the speech engine. `,` first restarts a passage that has played for more than three seconds.
 - Media keys, Bluetooth headset buttons, and the system Now Playing controls on macOS, Linux (MPRIS), and Windows control the playlist while it plays or is paused: play/pause, next and previous article, and seek forward or back one passage. See `tts.media_controls` in [Configuration](docs/configuration.md#tts).

@@ -133,6 +133,14 @@ class PlaylistController:
             [PlaylistItem(article_id=article.article_id, scope_id=article.provider_id) for article in articles]
         )
 
+    def add_selected_provider_unread(self) -> None:
+        """Queue the unread articles of the highlighted provider-home row under that row's scope."""
+        selection = self._app._provider_home.selected_unread_articles()
+        if selection is None:
+            return
+        scope_id, articles = selection
+        self.add_items([PlaylistItem(article_id=article.article_id, scope_id=scope_id) for article in articles])
+
     def add_items(self, items: list[PlaylistItem], *, notify: bool = False) -> None:
         queued = {item.article_id for item in self._items}
         added: list[PlaylistItem] = []

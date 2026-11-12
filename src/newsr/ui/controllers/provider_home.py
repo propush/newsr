@@ -148,6 +148,17 @@ class ProviderHomeController:
             unread.extend(self._unread_articles(row.scope_id, provider_articles))
         return unread
 
+    def selected_unread_articles(self) -> tuple[str, list[ArticleRecord]] | None:
+        """Scope of the highlighted row and its unread articles in that scope's reader order."""
+        try:
+            table = self._app.query_one("#provider-home-table", DataTable)
+        except NoMatches:
+            return None
+        row = self._row_at(self.rows(), table.cursor_row)
+        if row is None:
+            return None
+        return row.scope_id, self._unread_articles(row.scope_id, self._app._articles_for_scope(row.scope_id))
+
     def _unread_count_for_scope(self, scope_id: str, articles: list[ArticleRecord]) -> int:
         return len(self._unread_articles(scope_id, articles))
 
@@ -311,6 +322,7 @@ class ProviderHomeController:
             "playlist_previous",
             "playlist_seek_forward",
             "playlist_seek_back",
+            "playlist_add_current",
             "playlist_add_rest",
         }
         hidden_in_provider_home = {
@@ -324,7 +336,6 @@ class ProviderHomeController:
             "export_current",
             "open_article",
             "return_to_provider_home",
-            "playlist_add_current",
         }
         if action in provider_home_actions:
             return True

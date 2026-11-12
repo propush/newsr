@@ -111,6 +111,7 @@ EN_MESSAGES: Final[dict[str, str]] = {
         "C: manage sources\n"
         "W: create watched topic\n"
         "D: force refresh all providers\n"
+        "A: add unread articles of the selected provider to playlist\n"
         "Shift+A: add all unread articles to playlist\n"
         "P: play/pause playlist\n"
         "Shift+P: show playlist\n"

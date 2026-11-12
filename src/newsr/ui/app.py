@@ -364,6 +364,9 @@ class NewsReaderApp(App[None]):
         )
 
     def action_playlist_add_current(self) -> None:
+        if self.provider_home_open:
+            self._playlist.add_selected_provider_unread()
+            return
         self._playlist.add_current()
 
     def action_playlist_add_rest(self) -> None:
